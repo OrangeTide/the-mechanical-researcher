@@ -93,6 +93,21 @@ body {
   opacity: 1;
 }
 
+.source-zip {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.8rem;
+  color: #6b5b4a;
+  text-decoration: none;
+  border: 1px solid #2c2420;
+  border-radius: 3px;
+  padding: 0.15rem 0.5rem;
+  background: #fffef7;
+}
+
+.source-zip:hover {
+  background: #f0e8d8;
+}
+
 .article-body h2 {
   font-family: 'IBM Plex Sans', sans-serif;
   font-size: 1.4rem;
@@ -157,11 +172,161 @@ body {
   background: rgba(232, 224, 212, 0.3);
 }
 
-.article-body svg {
+.article-body svg,
+.article-body img {
   display: block;
-  max-width: 100%;
+  width: 100%;
   height: auto;
   margin: 1.25rem auto;
+  cursor: zoom-in;
+}
+
+/* --- Image lightbox --- */
+
+.img-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(44, 36, 32, 0.85);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+}
+
+.img-lightbox img,
+.img-lightbox svg {
+  max-width: 95vw;
+  max-height: 90vh;
+  width: auto;
+  height: auto;
+  cursor: default;
+}
+
+/* Shared close button style — matches index page grid/info close buttons */
+.close-btn {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 110;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  border: 1px solid #d4c9b8;
+  background: #fffef7;
+  color: #4a3f35;
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.close-btn:hover {
+  background: #f0e8d8;
+}
+
+/* --- Table of Contents (checkbox hack, no JS) --- */
+
+.toc-state {
+  display: none;
+}
+
+.toc-btn,
+.toc-close {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 20;
+  padding: 0.4rem 0.85rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.75rem;
+  background: #fffef7;
+  color: #2c2420;
+  border: 1px solid #2c2420;
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.toc-btn:hover,
+.toc-close:hover {
+  background: #f0e8d8;
+}
+
+/* Hide close label, show open label by default */
+.toc-close {
+  display: none;
+}
+
+/* When checked: hide open label, show close label and panel */
+.toc-state:checked ~ .toc-btn {
+  display: none;
+}
+
+.toc-state:checked ~ .toc-close {
+  display: block;
+  border-radius: 50%;
+  padding: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  font-size: 0.9rem;
+  line-height: 1;
+  text-align: center;
+}
+
+.toc-panel {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 19;
+  max-width: 20rem;
+  max-height: 70vh;
+  overflow-y: auto;
+  background: #fffef7;
+  border: 1px solid #2c2420;
+  border-radius: 4px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+  display: none;
+}
+
+.toc-state:checked ~ .toc-panel {
+  display: block;
+}
+
+.toc-header {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #d4c9b8;
+}
+
+.toc-header span {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.75rem;
+  color: #8b7a68;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.toc-list {
+  list-style: none;
+  padding: 0.5rem 0;
+}
+
+.toc-list a {
+  display: block;
+  padding: 0.3rem 0.75rem;
+  font-family: 'IBM Plex Sans Condensed', sans-serif;
+  font-size: 0.85rem;
+  color: #4a3f35;
+  text-decoration: none;
+}
+
+.toc-list a:hover {
+  background: #f0e8d8;
+  color: #1a1512;
 }
 
 .bottom-bar {
@@ -175,4 +340,40 @@ body {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.75rem;
   color: #8b7a68;
+}
+
+/* --- Mobile adjustments --- */
+
+@media (max-width: 600px) {
+  .research-article {
+    margin: 1.5rem auto;
+    padding: 0 1rem;
+  }
+
+  .research-article h1 {
+    font-size: 1.5rem;
+  }
+
+  .article-body h2 {
+    font-size: 1.15rem;
+    margin-top: 1.75rem;
+  }
+
+  .article-body pre {
+    padding: 0.75rem;
+    font-size: 0.8em;
+  }
+
+  .article-body table {
+    font-size: 0.8em;
+  }
+
+  .article-body th,
+  .article-body td {
+    padding: 0.35rem 0.5rem;
+  }
+
+  .top-bar {
+    padding: 0.5rem 1rem;
+  }
 }

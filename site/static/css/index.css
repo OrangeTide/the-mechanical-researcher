@@ -78,122 +78,134 @@ html, body {
   cursor: pointer;
 }
 
-/* --- Mug (oblique 3D view — cylinder seen from above-right) --- */
-/* Built from: elliptical rim, cylindrical body with shading, elliptical base, handle */
+/* --- Mug (teal diner mug, oblique 3D view from above) --- */
+/* Proportions: ~3.25" diameter body, ~4.5" with handle, vs 5" card width */
+/* Card stack is 18vmin wide, so mug body ≈ 12vmin wide */
 
 .mug {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 5.5vmin;
-  height: 7vmin;
-  /* Cylindrical body — vertical gradient for light/shadow curvature */
+  left: 22%;
+  top: 26%;
+  width: 12vmin;
+  height: 14vmin;
+  /* Cylindrical body — horizontal gradient for left/right curvature shading */
   background:
     linear-gradient(
       90deg,
-      #c4b8a4 0%,
-      #ddd5c8 15%,
-      #ece6dc 35%,
-      #f5f0e8 50%,
-      #ece6dc 65%,
-      #ddd5c8 85%,
-      #c4b8a4 100%
+      #1a6b6b 0%,
+      #2a8a8a 12%,
+      #35a0a0 30%,
+      #3bb0ab 48%,
+      #35a0a0 66%,
+      #2a8a8a 85%,
+      #1a6b6b 100%
     );
-  border-radius: 50% 50% 50% 50% / 4% 4% 6% 6%;
+  border-radius: 50% 50% 50% 50% / 3% 3% 5% 5%;
   box-shadow:
-    0.3vmin 0.5vmin 1.5vmin rgba(0,0,0,0.3),
-    -0.1vmin 0 0.3vmin rgba(0,0,0,0.08);
+    0.4vmin 0.8vmin 2vmin rgba(0,0,0,0.35),
+    -0.15vmin 0 0.4vmin rgba(0,0,0,0.1);
+}
+
+/* Chip in the rim — small notch on the left edge */
+.mug-chip {
+  position: absolute;
+  top: 0.2vmin;
+  left: 1.5vmin;
+  width: 1.2vmin;
+  height: 0.8vmin;
+  background: #d4b896; /* desk wood color showing through */
+  border-radius: 0 0 50% 50%;
+  z-index: 5;
+  box-shadow: inset 0 0.1vmin 0.2vmin rgba(0,0,0,0.15);
 }
 
 /* Elliptical rim (top opening — seen from oblique above) */
 .mug::before {
   content: '';
   position: absolute;
-  top: -0.6vmin;
-  left: -0.15vmin;
-  width: calc(100% + 0.3vmin);
-  height: 2.8vmin;
+  top: -1.2vmin;
+  left: -0.2vmin;
+  width: calc(100% + 0.4vmin);
+  height: 5vmin;
   border-radius: 50%;
-  /* Outer rim */
-  border: 0.25vmin solid #b8aa96;
-  /* Tea liquid inside — darker center, lighter edge (meniscus) */
+  /* Thick rim edge */
+  border: 0.4vmin solid #1a6b6b;
+  /* Tea/coffee liquid inside — darker center, lighter edge (meniscus) */
   background:
     radial-gradient(
       ellipse 70% 60% at 45% 50%,
-      #5c4430 0%,
-      #7a5e42 50%,
-      #967754 80%,
-      #b8aa96 100%
+      #3a2210 0%,
+      #5c3a1e 35%,
+      #7a5533 65%,
+      #1a6b6b 100%
     );
   box-shadow:
-    inset 0 0.2vmin 0.5vmin rgba(0,0,0,0.2),
-    inset 0 -0.1vmin 0.3vmin rgba(255,255,255,0.1);
+    inset 0 0.3vmin 0.8vmin rgba(0,0,0,0.3),
+    inset 0 -0.15vmin 0.4vmin rgba(255,255,255,0.08);
 }
 
-/* Elliptical base (bottom of mug — visible in oblique view) */
-/* We use a box-shadow trick since we've used both pseudo-elements */
-/* The bottom curvature is handled by the body's border-radius + a bottom shadow */
-
-/* Elliptical base (bottom of cylinder — only bottom half visible) */
+/* Elliptical base (bottom of cylinder — overlaps body to avoid gap) */
 .mug-base {
   position: absolute;
-  bottom: -0.9vmin;
-  left: -0.15vmin;
-  width: calc(100% + 0.3vmin);
-  height: 1.8vmin;
+  bottom: -0.6vmin;
+  left: -0.2vmin;
+  width: calc(100% + 0.4vmin);
+  height: 3vmin;
   border-radius: 50%;
   background:
     linear-gradient(
       90deg,
-      #a89880 0%,
-      #c4b8a4 30%,
-      #d4c9b8 50%,
-      #c4b8a4 70%,
-      #a89880 100%
+      #155858 0%,
+      #1a6b6b 30%,
+      #228080 50%,
+      #1a6b6b 70%,
+      #155858 100%
     );
-  box-shadow: 0 0.3vmin 0.6vmin rgba(0,0,0,0.2);
+  box-shadow: 0 0.4vmin 1vmin rgba(0,0,0,0.25);
   z-index: -1;
   clip-path: inset(50% 0 0 0);
 }
 
-/* Handle — C-shaped, attached to the right side */
+/* Handle — thick C-shape, diner style, flush against body */
 .mug::after {
   content: '';
   position: absolute;
-  right: -1.8vmin;
-  top: 18%;
-  width: 1.8vmin;
-  height: 3.2vmin;
-  border: 0.35vmin solid transparent;
-  border-right-color: #c4b8a4;
-  border-top-color: #c4b8a4;
-  border-bottom-color: #c4b8a4;
+  right: -2.5vmin;
+  top: 20%;
+  width: 3vmin;
+  height: 5.5vmin;
+  border: 0.7vmin solid transparent;
+  border-right-color: #2a8a8a;
+  border-top-color: #2a8a8a;
+  border-bottom-color: #2a8a8a;
   border-radius: 0 50% 50% 0;
   /* Shading on handle */
   background:
     linear-gradient(
       180deg,
-      #ddd5c8 0%,
-      #ece6dc 40%,
-      #ddd5c8 100%
+      #35a0a0 0%,
+      #3bb0ab 30%,
+      #35a0a0 70%,
+      #2a8a8a 100%
     );
   background-clip: padding-box;
-  box-shadow: 0.15vmin 0.2vmin 0.4vmin rgba(0,0,0,0.15);
+  box-shadow: 0.2vmin 0.3vmin 0.6vmin rgba(0,0,0,0.2);
 }
 
 /* --- Pen --- */
 
 .pen {
   position: absolute;
-  left: 15%;
-  bottom: 25%;
+  left: 38%;
+  bottom: 18%;
   width: 12vmin;
   height: 0.7vmin;
   background: linear-gradient(90deg, #1a1512 0%, #1a1512 75%, #c4a44a 75%, #c4a44a 85%, #1a1512 85%);
   border-radius: 0.15vmin 0.35vmin 0.35vmin 0.15vmin;
   transform: rotate(-12deg);
   box-shadow: 0.1vmin 0.2vmin 0.6vmin rgba(0,0,0,0.3);
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 .pen::before {
@@ -211,8 +223,8 @@ html, body {
 
 .card-stack {
   position: absolute;
-  right: 12%;
-  top: 50%;
+  right: 14%;
+  top: 42%;
   transform: translateY(-50%) perspective(50vmin) rotateX(45deg);
   transform-style: preserve-3d;
   width: 18vmin;
@@ -236,27 +248,15 @@ html, body {
 
 .index-card {
   position: absolute;
-  background: #fffef7;
-  border: 1px solid #d4c9b8;
+  background: transparent;
+  border: none;
   border-radius: 0.6vmin;
-  padding: 1em;
-  box-shadow:
-    0 0.2vmin 0.8vmin rgba(0,0,0,0.15),
-    0 0.1vmin 0.2vmin rgba(0,0,0,0.1);
   cursor: pointer;
   pointer-events: auto;
   transform-origin: center center;
   will-change: transform, opacity;
   transition: none;
-  /* Lined paper effect */
-  background-image:
-    repeating-linear-gradient(
-      transparent,
-      transparent 2.4vmin,
-      #c8dae8 2.4vmin,
-      #c8dae8 calc(2.4vmin + 1px)
-    );
-  background-position: 0 1.2vmin;
+  transform-style: preserve-3d;
 }
 
 .index-card .card-date {
@@ -313,10 +313,79 @@ html, body {
   opacity: 1;
 }
 
+/* --- Card back (visible during flip) --- */
+
+.index-card .card-back {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  visibility: hidden;
+  background: #fffef7;
+  border: 1px solid #d4c9b8;
+  overflow: hidden;
+  box-shadow:
+    0 0.2vmin 0.8vmin rgba(0,0,0,0.15),
+    0 0.1vmin 0.2vmin rgba(0,0,0,0.1);
+}
+
+/* Back face styles — applied randomly via data-back attribute */
+.index-card .card-back[data-back="lines"] {
+  background-image:
+    repeating-linear-gradient(
+      transparent,
+      transparent 2.4vmin,
+      #c8dae8 2.4vmin,
+      #c8dae8 calc(2.4vmin + 1px)
+    );
+  background-position: 0 1.2vmin;
+}
+
+.index-card .card-back[data-back="stain"] {
+  background-image:
+    radial-gradient(
+      ellipse 35% 40% at 65% 40%,
+      rgba(140, 100, 60, 0.12) 0%,
+      rgba(140, 100, 60, 0.06) 40%,
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 20% 25% at 60% 45%,
+      rgba(120, 80, 40, 0.08) 0%,
+      transparent 60%
+    );
+}
+
+.index-card .card-back[data-back="blank"] {
+  /* just the cream card, nothing else */
+}
+
+.index-card .card-front {
+  position: absolute;
+  inset: 0;
+  padding: 1em;
+  background: #fffef7;
+  border: 1px solid #d4c9b8;
+  border-radius: inherit;
+  box-shadow:
+    0 0.2vmin 0.8vmin rgba(0,0,0,0.15),
+    0 0.1vmin 0.2vmin rgba(0,0,0,0.1);
+  background-image:
+    repeating-linear-gradient(
+      transparent,
+      transparent 2.4vmin,
+      #c8dae8 2.4vmin,
+      #c8dae8 calc(2.4vmin + 1px)
+    );
+  background-position: 0 1.2vmin;
+}
+
 /* --- End card --- */
 
 .index-card.end-card {
   background-image: none;
+}
+
+.index-card.end-card .card-front {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -368,6 +437,358 @@ html, body {
 .bottom-bar .github-link:hover,
 .bottom-bar .rss-link:hover {
   opacity: 1;
+}
+
+/* --- Info button (on desk next to pen) --- */
+
+.info-btn {
+  position: absolute;
+  left: 40%;
+  bottom: 24%;
+  width: 3vmin;
+  height: 3vmin;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  border-radius: 50%;
+  border: 0.15vmin solid #8b7a68;
+  background: rgba(255, 254, 247, 0.8);
+  color: #6b5b4a;
+  font-family: 'IBM Plex Sans', sans-serif;
+  pointer-events: auto;
+  font-size: max(0.65rem, 1.4vmin);
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0.1vmin 0.4vmin rgba(0,0,0,0.15);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.info-btn:hover {
+  background: #fffef7;
+  transform: scale(1.1);
+}
+
+/* --- Info overlay --- */
+
+.info-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(43, 30, 22, 0.7);
+  backdrop-filter: blur(4px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.info-overlay.active {
+  display: flex;
+}
+
+.info-card {
+  background: #fffef7;
+  border: 1px solid #d4c9b8;
+  border-radius: 8px;
+  padding: 2.5rem;
+  max-width: 32rem;
+  width: 100%;
+  box-shadow: 0 0.5vmin 2vmin rgba(0,0,0,0.3);
+  position: relative;
+  font-family: 'IBM Plex Sans Condensed', sans-serif;
+  font-size: 1rem;
+  color: #4a3f35;
+  line-height: 1.7;
+}
+
+.info-card p {
+  margin-bottom: 1em;
+}
+
+.info-card p:last-child {
+  margin-bottom: 0;
+}
+
+.info-hint {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.85em;
+  color: #8b7a68;
+  font-style: italic;
+}
+
+.info-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 1px solid #d4c9b8;
+  background: #fffef7;
+  color: #6b5b4a;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.info-close:hover {
+  background: #f0e8d8;
+}
+
+/* --- Brown packages (source downloads) --- */
+
+.packages {
+  position: absolute;
+  left: 8%;
+  bottom: 28%;
+  width: 16vmin;
+  height: 8vmin;
+  pointer-events: auto;
+  cursor: pointer;
+  transform: perspective(50vmin) rotateX(40deg) rotate(-3deg);
+  transform-style: preserve-3d;
+}
+
+.package {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  border-radius: 0.3vmin;
+  /* Kraft paper texture */
+  background:
+    repeating-linear-gradient(
+      175deg,
+      transparent,
+      transparent 1.2vmin,
+      rgba(160, 120, 70, 0.08) 1.2vmin,
+      rgba(160, 120, 70, 0.08) 1.4vmin
+    ),
+    linear-gradient(180deg, #c9a06c, #b8914e);
+  box-shadow:
+    0 0.2vmin 0.8vmin rgba(0,0,0,0.25),
+    inset 0 0.1vmin 0.3vmin rgba(255,255,255,0.15);
+}
+
+.package-bottom {
+  bottom: 0;
+  height: 55%;
+  z-index: 1;
+}
+
+.package-top {
+  bottom: 48%;
+  height: 50%;
+  width: 90%;
+  left: 5%;
+  z-index: 2;
+}
+
+/* Twine — horizontal and vertical cross lines */
+.package::before,
+.package::after {
+  content: '';
+  position: absolute;
+  background: #a08060;
+  z-index: 3;
+}
+
+/* Horizontal twine */
+.package::before {
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 0.15vmin;
+  transform: translateY(-50%);
+}
+
+/* Vertical twine */
+.package::after {
+  left: 50%;
+  top: 0;
+  height: 100%;
+  width: 0.15vmin;
+  transform: translateX(-50%);
+}
+
+.packages:hover .package {
+  filter: brightness(1.05);
+}
+
+/* --- Packages overlay (source downloads modal) --- */
+
+.packages-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(43, 30, 22, 0.7);
+  backdrop-filter: blur(4px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.packages-overlay.active {
+  display: flex;
+}
+
+.packages-modal {
+  background: #fffef7;
+  border: 1px solid #d4c9b8;
+  border-radius: 8px;
+  padding: 2rem;
+  max-width: 36rem;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 0.5vmin 2vmin rgba(0,0,0,0.3);
+  position: relative;
+}
+
+.packages-title {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #1a1512;
+  margin-bottom: 1.25rem;
+}
+
+.packages-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 1px solid #2c2420;
+  background: #fffef7;
+  color: #2c2420;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.packages-close:hover {
+  background: #f0e8d8;
+}
+
+/* Package index cards */
+.pkg-card {
+  background: #fffef7;
+  border: 1px solid #d4c9b8;
+  border-radius: 4px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 0.75rem;
+  /* Lined paper effect */
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 1.6em,
+    #e8dfd2 1.6em,
+    #e8dfd2 1.65em
+  );
+  background-position: 0 0.4em;
+}
+
+.pkg-card-name {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1a1512;
+  margin-bottom: 0.25rem;
+}
+
+.pkg-card-meta {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.75rem;
+  color: #8b7a68;
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.pkg-card-links {
+  display: flex;
+  gap: 1rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.8rem;
+}
+
+.pkg-card-links a {
+  color: #6b5b4a;
+  text-decoration: none;
+  border: 1px solid #2c2420;
+  border-radius: 3px;
+  padding: 0.2rem 0.5rem;
+  background: #fffef7;
+}
+
+.pkg-card-links a:hover {
+  background: #f0e8d8;
+}
+
+/* --- Mobile adjustments --- */
+
+@media (max-width: 600px) {
+  .mug {
+    left: 10%;
+    top: 14%;
+    width: 16vmin;
+    height: 18vmin;
+  }
+
+  .pen {
+    left: 55%;
+    bottom: 10%;
+    width: 20vmin;
+    height: 1.2vmin;
+  }
+
+  .info-btn {
+    left: 58%;
+    bottom: 16%;
+    width: 5vmin;
+    height: 5vmin;
+    min-width: 2rem;
+    min-height: 2rem;
+    font-size: max(0.8rem, 2vmin);
+  }
+
+  .card-stack {
+    right: 50%;
+    top: 46%;
+    transform: translateX(50%) translateY(-50%) perspective(50vmin) rotateX(45deg);
+  }
+
+  .index-card {
+    border-radius: 4px;
+    padding: 0.75em;
+  }
+
+  .bottom-bar {
+    padding: 0.6vh 2vw;
+  }
+
+  .info-card {
+    padding: 1.5rem;
+    font-size: 0.9rem;
+  }
+
+  .packages {
+    left: 70%;
+    top: 12%;
+    width: 14vmin;
+    height: 7vmin;
+  }
 }
 
 /* ========================================================
