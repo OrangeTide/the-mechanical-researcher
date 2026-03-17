@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>The Mechanical Researcher</title>
+    <link>https://orangetide.github.io/the-mechanical-researcher/</link>
+    <description>Research topics gathered through agentic AI sessions</description>
+    <language>en-us</language>
+    <atom:link href="https://orangetide.github.io/the-mechanical-researcher/feed.xml" rel="self" type="application/rss+xml"/>
+    
+    <item>
+      <title>Build Systems</title>
+      <link>https://orangetide.github.io/the-mechanical-researcher/build-systems/index.html</link>
+      <guid>https://orangetide.github.io/the-mechanical-researcher/build-systems/index.html</guid>
+      <pubDate>Mon, 16 Mar 2026 00:00:00 -0700</pubDate>
+      <description>A comparative analysis of build system design — make, tup, Plan 9 mk, Perforce Jam, Ninja, and CMake.</description>
+      <category>software engineering</category>
+    </item>
+  </channel>
+</rss>
