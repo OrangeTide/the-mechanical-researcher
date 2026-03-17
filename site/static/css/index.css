@@ -356,7 +356,8 @@ html, body {
   letter-spacing: 0.05em;
 }
 
-.bottom-bar .github-link {
+.bottom-bar .github-link,
+.bottom-bar .rss-link {
   color: #c4b8a4;
   opacity: 0.6;
   transition: opacity 0.15s ease;
@@ -364,7 +365,8 @@ html, body {
   display: flex;
 }
 
-.bottom-bar .github-link:hover {
+.bottom-bar .github-link:hover,
+.bottom-bar .rss-link:hover {
   opacity: 1;
 }
 

@@ -13,6 +13,7 @@ SITE_DIR="$(cd "$(dirname "$0")" && pwd)"
 OUT_DIR="${1:-$SITE_DIR/_build}"
 TEMPLATE_DIR="$SITE_DIR/site/templates"
 STATIC_DIR="$SITE_DIR/site/static"
+SITE_URL="https://orangetide.github.io/the-mechanical-researcher"
 
 # Clean and prepare output
 rm -rf "$OUT_DIR"
@@ -75,6 +76,7 @@ render_template() {
 
 CARDS_JSON=""
 CARD_SEP=""
+RSS_ITEMS=""
 
 # Find topic directories (contain an index.md)
 for index_md in */index.md; do
@@ -137,6 +139,20 @@ for index_md in */index.md; do
     CARDS_JSON="${CARDS_JSON}${CARD_SEP}{\"title\":\"${js_title}\",\"abstract\":\"${js_abstract}\",\"date\":\"${date}\",\"dateDisplay\":\"${date_display}\",\"category\":\"${js_category}\",\"url\":\"${slug}/index.html\"}"
     CARD_SEP=","
 
+    # Collect RSS item
+    rss_date="$(date -d "$date" -R 2>/dev/null || echo "$date")"
+    xml_title="$(printf '%s' "$title" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')"
+    xml_abstract="$(printf '%s' "$abstract" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')"
+    RSS_ITEMS="${RSS_ITEMS}
+    <item>
+      <title>${xml_title}</title>
+      <link>${SITE_URL}/${slug}/index.html</link>
+      <guid>${SITE_URL}/${slug}/index.html</guid>
+      <pubDate>${rss_date}</pubDate>
+      <description>${xml_abstract}</description>
+      <category>${category}</category>
+    </item>"
+
     echo "  built: $slug"
 done
 
@@ -155,6 +171,24 @@ done
 # Inject cards JSON into the index template
 sed "s|{{CARDS}}|${CARDS_JSON}|" "$TEMPLATE_DIR/index.html" \
     > "$OUT_DIR/index.html"
+
+# --------------------------------------------------------------------------
+# Build RSS feed
+# --------------------------------------------------------------------------
+
+cat > "$OUT_DIR/feed.xml" << RSSEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>The Mechanical Researcher</title>
+    <link>${SITE_URL}/</link>
+    <description>Research topics gathered through agentic AI sessions</description>
+    <language>en-us</language>
+    <atom:link href="${SITE_URL}/feed.xml" rel="self" type="application/rss+xml"/>
+    ${RSS_ITEMS}
+  </channel>
+</rss>
+RSSEOF
 
 echo ""
 echo "Site built in: $OUT_DIR"
