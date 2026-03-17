@@ -1,0 +1,515 @@
+/* Index page styles — The Mechanical Researcher */
+/* Desk scene with card stack */
+/* All sizes proportional via vw/vh/vmin/% — no fixed pixel dimensions */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  font-family: 'IBM Plex Sans', sans-serif;
+}
+
+/* --- Desk scene --- */
+
+.desk-scene {
+  width: 100%;
+  height: 100%;
+  /* Light warm wood base color */
+  background-color: #d4b896;
+  /* Wood grain: converging lines for oblique perspective feel */
+  background-image:
+    /* Broad grain bands — slightly converging toward top (oblique) */
+    repeating-linear-gradient(
+      178deg,
+      transparent,
+      transparent 2.5vh,
+      rgba(160,120,75,0.12) 2.5vh,
+      rgba(160,120,75,0.12) 2.8vh,
+      transparent 2.8vh,
+      transparent 4vh
+    ),
+    /* Fine grain lines */
+    repeating-linear-gradient(
+      178deg,
+      transparent,
+      transparent 0.9vh,
+      rgba(140,105,65,0.07) 0.9vh,
+      rgba(140,105,65,0.07) 1vh
+    ),
+    /* Subtle knot / color variation */
+    radial-gradient(
+      ellipse 40vw 25vh at 30% 60%,
+      rgba(190,150,100,0.25) 0%,
+      transparent 100%
+    ),
+    radial-gradient(
+      ellipse 30vw 20vh at 75% 35%,
+      rgba(175,135,90,0.2) 0%,
+      transparent 100%
+    ),
+    /* Oblique shading — lighter at top (further), darker at bottom (closer) */
+    linear-gradient(
+      to bottom,
+      rgba(255,245,225,0.3) 0%,
+      transparent 30%,
+      rgba(0,0,0,0.06) 100%
+    );
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.desk-surface {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* Make mug clickable */
+.mug {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+/* --- Mug (oblique 3D view — cylinder seen from above-right) --- */
+/* Built from: elliptical rim, cylindrical body with shading, elliptical base, handle */
+
+.mug {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 5.5vmin;
+  height: 7vmin;
+  /* Cylindrical body — vertical gradient for light/shadow curvature */
+  background:
+    linear-gradient(
+      90deg,
+      #c4b8a4 0%,
+      #ddd5c8 15%,
+      #ece6dc 35%,
+      #f5f0e8 50%,
+      #ece6dc 65%,
+      #ddd5c8 85%,
+      #c4b8a4 100%
+    );
+  border-radius: 50% 50% 50% 50% / 4% 4% 6% 6%;
+  box-shadow:
+    0.3vmin 0.5vmin 1.5vmin rgba(0,0,0,0.3),
+    -0.1vmin 0 0.3vmin rgba(0,0,0,0.08);
+}
+
+/* Elliptical rim (top opening — seen from oblique above) */
+.mug::before {
+  content: '';
+  position: absolute;
+  top: -0.6vmin;
+  left: -0.15vmin;
+  width: calc(100% + 0.3vmin);
+  height: 2.8vmin;
+  border-radius: 50%;
+  /* Outer rim */
+  border: 0.25vmin solid #b8aa96;
+  /* Tea liquid inside — darker center, lighter edge (meniscus) */
+  background:
+    radial-gradient(
+      ellipse 70% 60% at 45% 50%,
+      #5c4430 0%,
+      #7a5e42 50%,
+      #967754 80%,
+      #b8aa96 100%
+    );
+  box-shadow:
+    inset 0 0.2vmin 0.5vmin rgba(0,0,0,0.2),
+    inset 0 -0.1vmin 0.3vmin rgba(255,255,255,0.1);
+}
+
+/* Elliptical base (bottom of mug — visible in oblique view) */
+/* We use a box-shadow trick since we've used both pseudo-elements */
+/* The bottom curvature is handled by the body's border-radius + a bottom shadow */
+
+/* Elliptical base (bottom of cylinder — only bottom half visible) */
+.mug-base {
+  position: absolute;
+  bottom: -0.9vmin;
+  left: -0.15vmin;
+  width: calc(100% + 0.3vmin);
+  height: 1.8vmin;
+  border-radius: 50%;
+  background:
+    linear-gradient(
+      90deg,
+      #a89880 0%,
+      #c4b8a4 30%,
+      #d4c9b8 50%,
+      #c4b8a4 70%,
+      #a89880 100%
+    );
+  box-shadow: 0 0.3vmin 0.6vmin rgba(0,0,0,0.2);
+  z-index: -1;
+  clip-path: inset(50% 0 0 0);
+}
+
+/* Handle — C-shaped, attached to the right side */
+.mug::after {
+  content: '';
+  position: absolute;
+  right: -1.8vmin;
+  top: 18%;
+  width: 1.8vmin;
+  height: 3.2vmin;
+  border: 0.35vmin solid transparent;
+  border-right-color: #c4b8a4;
+  border-top-color: #c4b8a4;
+  border-bottom-color: #c4b8a4;
+  border-radius: 0 50% 50% 0;
+  /* Shading on handle */
+  background:
+    linear-gradient(
+      180deg,
+      #ddd5c8 0%,
+      #ece6dc 40%,
+      #ddd5c8 100%
+    );
+  background-clip: padding-box;
+  box-shadow: 0.15vmin 0.2vmin 0.4vmin rgba(0,0,0,0.15);
+}
+
+/* --- Pen --- */
+
+.pen {
+  position: absolute;
+  left: 15%;
+  bottom: 25%;
+  width: 12vmin;
+  height: 0.7vmin;
+  background: linear-gradient(90deg, #1a1512 0%, #1a1512 75%, #c4a44a 75%, #c4a44a 85%, #1a1512 85%);
+  border-radius: 0.15vmin 0.35vmin 0.35vmin 0.15vmin;
+  transform: rotate(-12deg);
+  box-shadow: 0.1vmin 0.2vmin 0.6vmin rgba(0,0,0,0.3);
+}
+
+.pen::before {
+  content: '';
+  position: absolute;
+  left: -0.9vmin;
+  top: 0.08vmin;
+  width: 1vmin;
+  height: 0.5vmin;
+  background: linear-gradient(90deg, #8b7a68, #1a1512);
+  clip-path: polygon(0 50%, 100% 0, 100% 100%);
+}
+
+/* --- Card stack (decorative pile on desk, oblique view) --- */
+
+.card-stack {
+  position: absolute;
+  right: 12%;
+  top: 50%;
+  transform: translateY(-50%) perspective(50vmin) rotateX(45deg);
+  transform-style: preserve-3d;
+  width: 18vmin;
+  height: calc(18vmin * 3 / 5);  /* 5:3 aspect ratio */
+  pointer-events: none;
+}
+
+/* --- Active card area (where the zoomed card lives) --- */
+
+.active-card-area {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* --- Index card --- */
+
+.index-card {
+  position: absolute;
+  background: #fffef7;
+  border: 1px solid #d4c9b8;
+  border-radius: 0.6vmin;
+  padding: 1em;
+  box-shadow:
+    0 0.2vmin 0.8vmin rgba(0,0,0,0.15),
+    0 0.1vmin 0.2vmin rgba(0,0,0,0.1);
+  cursor: pointer;
+  pointer-events: auto;
+  transform-origin: center center;
+  will-change: transform, opacity;
+  transition: none;
+  /* Lined paper effect */
+  background-image:
+    repeating-linear-gradient(
+      transparent,
+      transparent 2.4vmin,
+      #c8dae8 2.4vmin,
+      #c8dae8 calc(2.4vmin + 1px)
+    );
+  background-position: 0 1.2vmin;
+}
+
+.index-card .card-date {
+  position: absolute;
+  top: 1em;
+  right: 1em;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7em;
+  color: #8b7a68;
+}
+
+.index-card .card-category {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7em;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #8b7a68;
+  margin-bottom: 0.3em;
+}
+
+.index-card .card-title {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 1.8em;
+  font-weight: 600;
+  color: #1a1512;
+  line-height: 1.3;
+  margin-bottom: 0.4em;
+}
+
+.index-card .card-abstract {
+  font-family: 'IBM Plex Sans Condensed', sans-serif;
+  font-size: 1.1em;
+  color: #4a3f35;
+  line-height: 1.5;
+}
+
+.index-card .card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 0.6em;
+}
+
+.card-permalink {
+  font-size: 0.8em;
+  text-decoration: none;
+  color: #8b7a68;
+  opacity: 0.5;
+  transition: opacity 0.15s ease;
+  cursor: pointer;
+}
+
+.card-permalink:hover {
+  opacity: 1;
+}
+
+/* --- End card --- */
+
+.index-card.end-card {
+  background-image: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.index-card.end-card .card-title {
+  text-align: center;
+  color: #8b7a68;
+  font-size: max(1rem, 2.2vmin);
+}
+
+/* --- Bottom bar --- */
+
+.bottom-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  text-align: center;
+  padding: 0.8vh 1vw;
+  background: rgba(43, 30, 22, 0.85);
+  backdrop-filter: blur(4px);
+  z-index: 20;
+}
+
+.bottom-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8vmin;
+}
+
+.bottom-bar .site-title {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: max(0.6rem, 0.9vmin);
+  color: #c4b8a4;
+  letter-spacing: 0.05em;
+}
+
+.bottom-bar .github-link {
+  color: #c4b8a4;
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+  line-height: 1;
+  display: flex;
+}
+
+.bottom-bar .github-link:hover {
+  opacity: 1;
+}
+
+/* ========================================================
+   Grid (exploded) view
+   ======================================================== */
+
+.grid-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: #d4b896;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: none;
+}
+
+.grid-overlay.active {
+  display: block;
+}
+
+.grid-close {
+  position: fixed;
+  top: 2vmin;
+  right: 2vmin;
+  z-index: 60;
+  width: 5vmin;
+  height: 5vmin;
+  min-width: 2rem;
+  min-height: 2rem;
+  border-radius: 50%;
+  border: 0.2vmin solid #8b7a68;
+  background: #fffef7;
+  color: #4a3f35;
+  font-size: max(1rem, 2vmin);
+  line-height: 1;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0.2vmin 0.8vmin rgba(0,0,0,0.15);
+}
+
+.grid-close:hover {
+  background: #f0e8d8;
+}
+
+.grid-overlay.active ~ .grid-close {
+  display: flex;
+}
+
+.grid-container {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 3vmin;
+  padding: 5vmin 4vw 8vmin;
+  max-width: 80rem;
+  margin: 0 auto;
+}
+
+@media (min-width: 600px) {
+  .grid-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1000px) {
+  .grid-container {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.grid-card {
+  background: #fffef7;
+  border: 1px solid #d4c9b8;
+  border-radius: 0.6vmin;
+  padding: 2vmin;
+  aspect-ratio: 5 / 3;
+  cursor: pointer;
+  box-shadow:
+    0 0.2vmin 0.8vmin rgba(0,0,0,0.15),
+    0 0.1vmin 0.2vmin rgba(0,0,0,0.1);
+  background-image:
+    repeating-linear-gradient(
+      transparent,
+      transparent 2.4vmin,
+      #c8dae8 2.4vmin,
+      #c8dae8 calc(2.4vmin + 1px)
+    );
+  background-position: 0 1.2vmin;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.grid-card:hover {
+  transform: translateY(-0.3vmin);
+  box-shadow:
+    0 0.4vmin 1.2vmin rgba(0,0,0,0.2),
+    0 0.2vmin 0.4vmin rgba(0,0,0,0.12);
+}
+
+.grid-card {
+  position: relative;
+}
+
+.grid-card .card-date {
+  position: absolute;
+  top: 2vmin;
+  right: 2vmin;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: max(0.55rem, 0.9vmin);
+  color: #8b7a68;
+}
+
+.grid-card .card-category {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: max(0.55rem, 0.9vmin);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #8b7a68;
+  margin-bottom: 0.3vmin;
+}
+
+.grid-card .card-title {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: max(0.85rem, 1.6vmin);
+  font-weight: 600;
+  color: #1a1512;
+  line-height: 1.3;
+  margin-bottom: 0.5vmin;
+}
+
+.grid-card .card-abstract {
+  font-family: 'IBM Plex Sans Condensed', sans-serif;
+  font-size: max(0.7rem, 1.1vmin);
+  color: #4a3f35;
+  line-height: 1.5;
+}
+
+.grid-card .card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: auto;
+  padding-top: 0.5vmin;
+}

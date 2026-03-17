@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{TITLE}} — The Mechanical Researcher</title>
+  <link rel="stylesheet" href="{{ROOT}}/static/css/article.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Sans+Condensed:wght@400;600&family=IBM+Plex+Mono:wght@400&display=swap">
+</head>
+<body>
+  <nav class="top-bar">
+    <a href="{{ROOT}}/index.html" class="back-link">&larr; Back to desk</a>
+  </nav>
+  <article class="research-article">
+    <header>
+      <span class="article-category">{{CATEGORY}}</span>
+      <h1>{{TITLE}}</h1>
+      <div class="article-meta">
+        <time datetime="{{DATE}}">{{DATE_DISPLAY}}</time>
+        <a href="#" class="permalink" title="Copy permalink">&#x1f517;</a>
+      </div>
+    </header>
+    <script>
+      document.querySelector('.permalink').addEventListener('click', function(e) {
+        e.preventDefault();
+        var url = window.location.href.replace(/#.*$/, '');
+        navigator.clipboard.writeText(url).then(function() {
+          var el = e.target;
+          el.textContent = '\u2713';
+          el.classList.add('copied');
+          setTimeout(function() {
+            el.textContent = '\uD83D\uDD17';
+            el.classList.remove('copied');
+          }, 1500);
+        });
+      });
+    </script>
+    <div class="article-body">
+      {{BODY}}
+    </div>
+  </article>
+  <footer class="bottom-bar">
+    <span class="site-title">The Mechanical Researcher</span>
+  </footer>
+</body>
+</html>

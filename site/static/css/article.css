@@ -1,0 +1,178 @@
+/* Article page styles — The Mechanical Researcher */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'IBM Plex Sans Condensed', sans-serif;
+  background: #f5f0e8;
+  color: #2c2420;
+  line-height: 1.7;
+}
+
+.top-bar {
+  position: sticky;
+  top: 0;
+  padding: 0.75rem 1.5rem;
+  background: rgba(245, 240, 232, 0.95);
+  backdrop-filter: blur(4px);
+  border-bottom: 1px solid #d4c9b8;
+  z-index: 10;
+}
+
+.back-link {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.85rem;
+  color: #6b5b4a;
+  text-decoration: none;
+}
+
+.back-link:hover {
+  color: #2c2420;
+}
+
+.research-article {
+  max-width: 42rem;
+  margin: 3rem auto;
+  padding: 0 1.5rem;
+}
+
+.research-article header {
+  margin-bottom: 2.5rem;
+}
+
+.article-category {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8b7a68;
+}
+
+.research-article h1 {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 2.25rem;
+  font-weight: 600;
+  line-height: 1.2;
+  margin-top: 0.5rem;
+  color: #1a1512;
+}
+
+.article-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.research-article time {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.8rem;
+  color: #8b7a68;
+}
+
+.permalink {
+  font-size: 0.85rem;
+  text-decoration: none;
+  color: #8b7a68;
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.permalink:hover {
+  opacity: 1;
+}
+
+.permalink.copied {
+  color: #5a8a5a;
+  opacity: 1;
+}
+
+.article-body h2 {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin-top: 2.5rem;
+  margin-bottom: 0.75rem;
+  color: #1a1512;
+}
+
+.article-body p {
+  margin-bottom: 1.25rem;
+}
+
+.article-body code {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.9em;
+  background: #e8e0d4;
+  padding: 0.15em 0.35em;
+  border-radius: 3px;
+}
+
+.article-body pre {
+  background: #2c2420;
+  color: #f5f0e8;
+  padding: 1.25rem;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin-bottom: 1.25rem;
+}
+
+.article-body pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+}
+
+.article-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1.25rem;
+  font-size: 0.95em;
+}
+
+.article-body th,
+.article-body td {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d4c9b8;
+  text-align: left;
+}
+
+.article-body th {
+  background: #e8e0d4;
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-weight: 600;
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #4a3f35;
+}
+
+.article-body tbody tr:nth-child(even) {
+  background: rgba(232, 224, 212, 0.3);
+}
+
+.article-body svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1.25rem auto;
+}
+
+.bottom-bar {
+  text-align: center;
+  padding: 1.5rem;
+  border-top: 1px solid #d4c9b8;
+  margin-top: 4rem;
+}
+
+.bottom-bar .site-title {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.75rem;
+  color: #8b7a68;
+}
