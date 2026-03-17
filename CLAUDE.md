@@ -74,6 +74,24 @@ A scroll-hijacked card stack — index cards piled on a wooden desk with a pen a
 ### Colors
 Warm palette derived from the desk scene — wood tones, cream/white cards, dark ink.
 
+## Supplementary Files
+
+When a research topic links to a `.md` file in a subdirectory (e.g. `demo/README.md`, `demo/PROTOCOL.md`), the build should produce an `.html` version alongside it. Link to both formats from the article so readers can choose.
+
+## Screenshots
+
+Use `tools/term-screenshot` to generate inline SVG terminal screenshots for demonstrating command-line utilities. The SVG can be inlined directly into article markdown (lowdown passes raw HTML/SVG through). Prefer screenshots over code blocks when showing actual program output.
+
+## Website Design
+
+Use the `frontend-design` and `web-design-guidelines` skills when designing or modifying the website's HTML/CSS/JS (index page, article layout, card stack interaction).
+
+The website must support a mobile-friendly layout and interface for both the index page card stack and article pages.
+
+## Demo Setup Documentation
+
+When a research topic includes a demo with runnable code, the demo's README.md must include a clear step-by-step setup guide that a reader can follow to run it themselves. Include prerequisites, build instructions, launch order, and what to expect.
+
 ## Conventions
 
 - The README.md maintains a list of topics with links (currently a TODO).
