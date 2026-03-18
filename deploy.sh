@@ -45,9 +45,9 @@ ORIG_BRANCH="$(git symbolic-ref --short HEAD 2>/dev/null || git rev-parse --shor
 ORIG_STASH=""
 
 # Stash any uncommitted changes so checkout is clean
-if ! git diff --quiet || ! git diff --cached --quiet; then
+if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$(git ls-files --others --exclude-standard)" ]; then
     ORIG_STASH="yes"
-    git stash push -m "deploy.sh: auto-stash before deploy" --quiet
+    git stash push -u -m "deploy.sh: auto-stash before deploy" --quiet
 fi
 
 # Copy build output to a temp directory (outside the worktree)
