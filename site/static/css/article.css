@@ -93,6 +93,16 @@ body {
   opacity: 1;
 }
 
+.article-revised {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.75rem;
+  color: #8b7355;
+}
+
+.article-revised time {
+  font-size: inherit;
+}
+
 .source-zip {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.8rem;
