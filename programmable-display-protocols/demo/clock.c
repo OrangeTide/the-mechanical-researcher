@@ -10,6 +10,10 @@
 #include <time.h>
 #include <poll.h>
 
+/* dimensions of our clock window */
+#define CLOCK_WIDTH 210
+#define CLOCK_HEIGHT 240
+
 static int quit;
 static int clock_id;
 
@@ -57,7 +61,7 @@ send_clock(qu_ctx *ctx, int win)
     char svg[8192];
     int p = 0;
     int r = 80;
-    int ox = 100, oy = 105;
+    int ox = CLOCK_WIDTH / 2, oy = CLOCK_HEIGHT / 2;
     time_t now;
     struct tm tm;
     char date[40];
@@ -147,7 +151,7 @@ main(void)
         return 1;
     }
 
-    int win = qu_window(ctx, "Clock", 60, 60, 210, 240);
+    int win = qu_window(ctx, "Clock", 60, 60, CLOCK_WIDTH, CLOCK_HEIGHT);
 
     qu_on_event(ctx, win, on_close, NULL);
     send_clock(ctx, win);
@@ -170,5 +174,6 @@ main(void)
     }
 
     qu_disconnect(ctx);
+
     return 0;
 }

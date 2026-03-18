@@ -10,16 +10,21 @@ Named after the trans-Neptunian object.
 
 ## Quick Start
 
+Requires [Caddy](https://caddyserver.com/) as a reverse proxy (nginx
+configurations are also provided under [Deployment](#deployment)).
+
     make
+    caddy run --adapter caddyfile --config <(printf ':8080 {\n\troot * .\n\tfile_server\n\treverse_proxy /ws :9090\n}\n') &
     ./quaoar-server &
-    # open quaoar-client.html in a browser
-    ./notepad
+    xdg-open http://localhost:8080/quaoar-client.html
+    export QUAOAR_DISPLAY=/tmp/quaoar-0
+    ./notepad &
 
 The notepad window appears in the browser. Type, click Save/Load, close
 the window — all interactions except typing happen locally in the browser
 with zero network round-trips.
 
-    ./clock
+    ./clock &
 
 An analog clock with SMIL-animated hands. The application sends the
 clock face once; the browser animates the sweep natively.
@@ -29,7 +34,7 @@ clock face once; the browser animates the sweep natively.
 ```
 ┌─────────────┐   Unix socket    ┌───────────────┐   WebSocket   ┌─────────┐
 │ Application │ ──netstrings──▸  │ quaoar-server │ ────────────▸ │ Browser │
-│ (notepad)   │ ◂──events─────  │   (bridge)    │ ◂──events───  │ (SVG)   │
+│ (notepad)   │ ◂──events─────   │   (bridge)    │ ◂──events───  │ (SVG)   │
 └─────────────┘                  └───────────────┘               └─────────┘
       │                                │
   libquaoar.c                    multiplexes N apps
@@ -128,24 +133,53 @@ the application just emits SVG. See `clock.c` for a complete example.
 
 ## Deployment
 
-For localhost development, open `quaoar-client.html` directly in a
-browser. For production, place quaoar-server behind a reverse proxy
-that handles TLS and optionally WebSocket compression.
+The Quick Start uses Caddy for simplicity. For production, place
+quaoar-server behind any reverse proxy that handles TLS and passes
+through WebSocket connections.
+
+### Caddy
+
+For production, create a Caddyfile that serves the HTML client and proxies
+WebSocket connections to quaoar-server:
+
+```
+quaoar.example.com {
+    root * /srv/quaoar
+    file_server
+    reverse_proxy /ws 127.0.0.1:9090
+}
+```
+
+Copy `quaoar-client.html` to the root directory (`/srv/quaoar` in the
+example above). Caddy handles TLS automatically for named hosts.
 
 ### nginx
 
+Copy the HTML client to the web root:
+
+    sudo mkdir -p /srv/quaoar
+    sudo cp quaoar-client.html /srv/quaoar/
+
+**Dedicated virtual host:**
+
 ```nginx
 server {
+    listen 80;
     listen 443 ssl;
     server_name quaoar.example.com;
+    root /srv/quaoar;
 
-    ssl_certificate     /etc/ssl/certs/quaoar.pem;
-    ssl_certificate_key /etc/ssl/private/quaoar.key;
+    if ($scheme = http) {
+            return 301 https://$server_name$request_uri;
+    }
+
+    ssl_certificate     /etc/ssl/certs/yourhost.pem;
+    ssl_certificate_key /etc/ssl/private/yourhost.key;
 
     # Serve the display client
     location / {
-        root /srv/quaoar;
         index quaoar-client.html;
+        try_files $uri $uri =404;
     }
 
     # Proxy WebSocket to quaoar-server
@@ -161,14 +195,39 @@ server {
 }
 ```
 
-### Other proxies
+**Sub-directory on an existing server** (add to your default site):
 
-    caddy       — reverse_proxy /ws 127.0.0.1:9090
-    haproxy     — tcp mode with WebSocket health checks
-    stunnel     — TLS termination at the TCP layer
+```nginx
+    location /quaoar {
+        root /srv;
+        index quaoar-client.html;
+    }
+
+    location /quaoar/ws {
+        proxy_pass http://127.0.0.1:9090;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+```
+
+**Self-signed TLS for testing:**
+
+    openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem \
+      -days 365 -nodes -subj '/CN=localhost'
+    sudo cp cert.pem /etc/ssl/certs/localhost.pem
+    sudo cp key.pem /etc/ssl/private/localhost.key
+
+### Other Proxies
 
 The server is proxy-agnostic — it performs the HTTP upgrade itself, so
 any proxy that passes through WebSocket connections will work.
+
+    haproxy     — tcp mode with WebSocket health checks
+    stunnel     — TLS termination at the TCP layer
 
 ## Not included
 

@@ -1,106 +1,122 @@
-# Quaoar Protocol
+# Quaoar Wire Protocol
 
-## Framing
+## Architecture
 
-Unix socket side: djb netstrings (`length:data,`).
+Messages flow between applications and the browser through the Quaoar server, which bridges two transports:
 
-WebSocket side: standard WebSocket text frames. The server translates
-between the two.
+| Layer | Component | Transport | Framing |
+|-------|-----------|-----------|---------|
+| Application | `libquaoar` | Unix domain socket | djb netstrings (`length:data,`) |
+| Bridge | `quaoar-server` | — | translates between formats |
+| Display | browser client | WebSocket | standard text frames |
 
-## Message format
+## Message Format
 
-Each message has a header line (space-delimited fields) and an optional
-payload after a newline:
+Every message consists of a header line with space-delimited fields, optionally followed by a newline and a payload:
 
     op field1 field2 ...
     payload (if any)
 
-## App ID routing
+The message looks different on each side of the server. Applications send raw commands over the Unix socket. The server prepends an integer app ID for multiplexing before forwarding to the browser over WebSocket:
 
-The server prepends the app ID to messages going to the browser:
+**Unix socket (application side):**
 
-    3 window 1 80 60 480 340
-    Notepad
+| `op` | `field1 field2 ...` | `\npayload` |
+|------|---------------------|-------------|
+| command name | space-delimited arguments | optional, after newline |
 
-The browser prepends the app ID to events going back:
+**WebSocket (browser side):**
 
-    3 event 2 click
+| `appid` | `op` | `field1 field2 ...` | `\npayload` |
+|---------|------|---------------------|-------------|
+| integer, always first | command name | space-delimited arguments | optional, after newline |
+| assigned by server | same as Unix side | same as Unix side | same as Unix side |
 
-Negative IDs are system channels:
+**Example — creating a window (app 3):**
 
-    -1 hello /tmp/quaoar-0       (server → browser)
-    -1 disconnect 3              (server → browser)
-    -1 event 0 paste             (browser → server, broadcast to all)
-    clipboard text to copy       (any app → browser)
+| Side | Wire Content |
+|------|-------------|
+| App sends on Unix socket | `window 1 80 60 480 340\nNotepad` |
+| Browser receives on WebSocket | `3 window 1 80 60 480 340\nNotepad` |
 
-## Messages: application → display
+**Example — click event routed back:**
+
+| Side | Wire Content |
+|------|-------------|
+| Browser sends on WebSocket | `3 event 2 click` |
+| App receives on Unix socket | `event 2 click` |
+
+Applications never see app IDs — the server strips them from incoming browser events and adds them to outgoing application messages.
+
+## System Messages
+
+Negative app IDs are reserved for system-level messages that are not routed to any application:
+
+| Message | Direction | Purpose |
+|---------|-----------|---------|
+| `-1 hello <path>` | server to browser | Initialization, reports socket path |
+| `-1 disconnect <id>` | server to browser | Application disconnected |
+| `-1 event 0 paste` | browser to server | Broadcast event to all applications |
+
+## Commands: Application To Display
 
 **window** `id x y w h\ntitle`
-Create a window with titlebar and close button.
+Create a window with a titlebar and close button. The payload is the window title.
 
-**svg** `id parent\n<svg markup>`
-Insert arbitrary SVG into a parent widget's content area. The markup
-is parsed by DOMParser and inserted into the document. SMIL animations
-in the markup execute natively.
+**svg** `id parent\n<markup>`
+Insert arbitrary SVG into a parent widget's content area. The markup is parsed by `DOMParser` and appended to the document. SMIL animations in the markup execute natively in the browser, requiring no server round-trips.
 
 **textarea** `id parent x y w h`
-Create a multi-line text input (HTML `<textarea>` in a `<foreignObject>`).
+Create a multi-line text input rendered as an HTML `<textarea>` inside a `<foreignObject>`.
 
 **listen** `id event_type`
-Register a DOM event listener on a widget. The event type is any DOM
-event name (`click`, `mouseover`, `focusout`, etc.).
+Register a DOM event listener on a widget. Accepts any DOM event name (e.g. `click`, `mouseover`, `focusout`).
 
 **update** `id key\nvalue`
-Update a widget's content. For text elements, sets the `textContent` of
-the first `[data-qu-text]` descendant (or the element itself if it's a
-`<text>`). For textareas, sets the `value`.
+Update a widget's content. The `key` field determines what is updated:
+
+- `text` — For textareas, sets the `value` property. For SVG elements, sets `textContent` on the first `[data-qu-text]` descendant (or the element itself if it is a `<text>` node).
+- Any other key — Sets the named attribute on the first `[data-qu-<key>]` descendant, or on the widget element itself if no such descendant exists.
 
 **remove** `id`
-Remove a widget from the display.
+Remove a widget and all its children from the display.
 
 **clipboard** `\ntext`
-Write text to the browser clipboard.
+Write text to the browser clipboard via the Clipboard API.
 
-## Messages: display → application
+## Events: Display To Application
 
 **event** `id event_type\nvalue`
-An event occurred on a widget. Event types:
 
-| Event    | Value                          | Trigger                        |
-|----------|--------------------------------|--------------------------------|
-| `click`  | (none)                         | user clicked the element       |
-| `text`   | textarea content               | text changed (300ms debounce)  |
-| `scroll` | `0.0` to `1.0`                 | scrollbar thumb released       |
-| `xy`     | `x y` (each `0.0` to `1.0`)   | 2D drag handle released        |
-| `close`  | (none)                         | window close button clicked    |
-| `paste`  | clipboard text                 | user pasted (Ctrl+V)           |
+An event fired on a widget. The following event types are defined:
 
-Paste events use widget ID 0 and are broadcast to all apps.
+| Event | Value | Trigger |
+|-------|-------|---------|
+| `click` | (none) | User clicked the element |
+| `text` | textarea content | Text changed (300 ms debounce) |
+| `scroll` | `0.0` to `1.0` | Scrollbar thumb released |
+| `xy` | `x y` (each `0.0` to `1.0`) | 2D drag handle released |
+| `close` | (none) | Window close button clicked |
+| `paste` | clipboard text | User pasted (Ctrl+V) |
 
-## Interaction attributes
+Paste events use widget ID 0 and are broadcast to all connected applications.
 
-The display client recognizes `data-qu-*` attributes on SVG elements
-for client-side interactive behavior:
+## Interaction Attributes
 
-**`data-qu-drag="h|v"` `data-qu-track="N"`** — Constrained 1D drag.
-The element's `x` or `y` attribute is updated during drag, clamped to
-`[0, N]`. On release, a `scroll` event fires with the normalized
-position.
+The display client recognizes `data-qu-*` attributes on SVG elements to provide client-side interactive behavior without server involvement:
 
-**`data-qu-xy`** — 2D position tracking. The element (typically a
-`<circle>`) is dragged within its parent's bounding box. On release,
-an `xy` event fires with normalized coordinates. Set
-`data-qu-xy-area` on a sibling to override the bounding area.
+**`data-qu-drag="h|v"` with `data-qu-track="N"`** — Constrained one-dimensional drag. The element's `x` or `y` attribute is updated during the drag, clamped to the range `[0, N]`. When the user releases, a `scroll` event fires with the normalized position.
 
-**`data-qu-text`** — Marks an SVG element as the text target for
-`update` messages. The element's `textContent` is replaced.
+**`data-qu-xy`** — Two-dimensional position tracking. The element (typically a `<circle>`) is dragged within its parent's bounding box. On release, an `xy` event fires with normalized coordinates. Place `data-qu-xy-area` on a sibling element to override the bounding area.
 
-## Adding new interaction classes
+**`data-qu-text`** — Marks an SVG element as the text target for `update` messages. The element's `textContent` is replaced with the payload.
 
-To support a new interaction (rotation, resize, rubber-banding):
+## Adding New Interaction Types
 
-1. Choose a `data-qu-<name>` attribute
-2. Add a mousedown check in the client's mousedown handler
-3. Track state in mousemove
-4. Send an event on mouseup
-5. Applications emit SVG with the attribute — no per-widget changes
+To support a new interaction pattern (rotation, resize, rubber-banding, etc.):
+
+1. Choose a `data-qu-<name>` attribute.
+2. Add a `mousedown` check in the client's pointer handler.
+3. Track state during `mousemove`.
+4. Send an event on `mouseup`.
+5. Applications emit SVG with the new attribute — no protocol changes required.

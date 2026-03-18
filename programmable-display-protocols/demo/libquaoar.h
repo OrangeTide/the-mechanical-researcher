@@ -15,7 +15,7 @@ typedef struct qu_ctx qu_ctx;
  * value is event-specific (text content, scroll position, etc.) or NULL.
  */
 typedef void (*qu_event_fn)(qu_ctx *ctx, int id, const char *event,
-			    const char *value, void *arg);
+                            const char *value, void *arg);
 
 /** Connect to quaoar-server. display may be NULL to use QUAOAR_DISPLAY. */
 qu_ctx *qu_connect(const char *display);
@@ -35,11 +35,11 @@ void qu_on_event(qu_ctx *ctx, int id, qu_event_fn fn, void *arg);
 /* widget creation — all return a widget ID */
 int qu_window(qu_ctx *ctx, const char *title, int x, int y, int w, int h);
 int qu_button(qu_ctx *ctx, int parent, const char *label,
-	      int x, int y, int w, int h);
+          int x, int y, int w, int h);
 int qu_label(qu_ctx *ctx, int parent, const char *text, int x, int y);
 int qu_textarea(qu_ctx *ctx, int parent, int x, int y, int w, int h);
 int qu_scrollbar(qu_ctx *ctx, int parent, int x, int y, int w, int h,
-		 char orient);
+         char orient);
 int qu_svg(qu_ctx *ctx, int parent, const char *markup);
 
 /* widget updates */

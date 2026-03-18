@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Quaoar Protocol — The Mechanical Researcher</title>
+  <title>Quaoar Wire Protocol — The Mechanical Researcher</title>
   <link rel="stylesheet" href="../../static/css/article.css">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Sans+Condensed:wght@400;600&family=IBM+Plex+Mono:wght@400&display=swap">
 </head>
@@ -14,7 +14,7 @@
   <article class="research-article">
     <header>
       <span class="article-category">systems design</span>
-      <h1>Quaoar Protocol</h1>
+      <h1>Quaoar Wire Protocol</h1>
       <div class="article-meta">
         <time datetime="2026-03-17">March 17, 2026</time>
         <a href="#" class="permalink" title="Copy permalink">&#x1f517;</a>
@@ -38,59 +38,185 @@
     </script>
     <div class="article-body">
       
-<h1 id="quaoar-protocol">Quaoar Protocol</h1>
-<h2 id="framing">Framing</h2>
-<p>Unix socket side: djb netstrings (<code>length:data,</code>).</p>
-<p>WebSocket side: standard WebSocket text frames. The server translates
-between the two.</p>
-<h2 id="message-format">Message format</h2>
-<p>Each message has a header line (space-delimited fields) and an optional
-payload after a newline:</p>
+<h1 id="quaoar-wire-protocol">Quaoar Wire Protocol</h1>
+<h2 id="architecture">Architecture</h2>
+<p>Messages flow between applications and the browser through the Quaoar server, which bridges two transports:</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Component</th>
+<th>Transport</th>
+<th>Framing</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Application</td>
+<td><code>libquaoar</code></td>
+<td>Unix domain socket</td>
+<td>djb netstrings (<code>length:data,</code>)</td>
+</tr>
+<tr>
+<td>Bridge</td>
+<td><code>quaoar-server</code></td>
+<td>—</td>
+<td>translates between formats</td>
+</tr>
+<tr>
+<td>Display</td>
+<td>browser client</td>
+<td>WebSocket</td>
+<td>standard text frames</td>
+</tr>
+</tbody>
+</table>
+<h2 id="message-format">Message Format</h2>
+<p>Every message consists of a header line with space-delimited fields, optionally followed by a newline and a payload:</p>
 <pre><code>op field1 field2 ...
 payload (if any)
 </code></pre>
-<h2 id="app-id-routing">App ID routing</h2>
-<p>The server prepends the app ID to messages going to the browser:</p>
-<pre><code>3 window 1 80 60 480 340
-Notepad
-</code></pre>
-<p>The browser prepends the app ID to events going back:</p>
-<pre><code>3 event 2 click
-</code></pre>
-<p>Negative IDs are system channels:</p>
-<pre><code>-1 hello &#47;tmp&#47;quaoar-0       (server → browser)
--1 disconnect 3              (server → browser)
--1 event 0 paste             (browser → server, broadcast to all)
-clipboard text to copy       (any app → browser)
-</code></pre>
-<h2 id="messages-application-display">Messages: application → display</h2>
+<p>The message looks different on each side of the server. Applications send raw commands over the Unix socket. The server prepends an integer app ID for multiplexing before forwarding to the browser over WebSocket:</p>
+<p><strong>Unix socket (application side):</strong></p>
+<table>
+<thead>
+<tr>
+<th><code>op</code></th>
+<th><code>field1 field2 ...</code></th>
+<th><code>
+payload</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>command name</td>
+<td>space-delimited arguments</td>
+<td>optional, after newline</td>
+</tr>
+</tbody>
+</table>
+<p><strong>WebSocket (browser side):</strong></p>
+<table>
+<thead>
+<tr>
+<th><code>appid</code></th>
+<th><code>op</code></th>
+<th><code>field1 field2 ...</code></th>
+<th><code>
+payload</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>integer, always first</td>
+<td>command name</td>
+<td>space-delimited arguments</td>
+<td>optional, after newline</td>
+</tr>
+<tr>
+<td>assigned by server</td>
+<td>same as Unix side</td>
+<td>same as Unix side</td>
+<td>same as Unix side</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example — creating a window (app 3):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Side</th>
+<th>Wire Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>App sends on Unix socket</td>
+<td><code>window 1 80 60 480 340
+Notepad</code></td>
+</tr>
+<tr>
+<td>Browser receives on WebSocket</td>
+<td><code>3 window 1 80 60 480 340
+Notepad</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example — click event routed back:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Side</th>
+<th>Wire Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Browser sends on WebSocket</td>
+<td><code>3 event 2 click</code></td>
+</tr>
+<tr>
+<td>App receives on Unix socket</td>
+<td><code>event 2 click</code></td>
+</tr>
+</tbody>
+</table>
+<p>Applications never see app IDs — the server strips them from incoming browser events and adds them to outgoing application messages.</p>
+<h2 id="system-messages">System Messages</h2>
+<p>Negative app IDs are reserved for system-level messages that are not routed to any application:</p>
+<table>
+<thead>
+<tr>
+<th>Message</th>
+<th>Direction</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>-1 hello &#60;path&#62;</code></td>
+<td>server to browser</td>
+<td>Initialization, reports socket path</td>
+</tr>
+<tr>
+<td><code>-1 disconnect &#60;id&#62;</code></td>
+<td>server to browser</td>
+<td>Application disconnected</td>
+</tr>
+<tr>
+<td><code>-1 event 0 paste</code></td>
+<td>browser to server</td>
+<td>Broadcast event to all applications</td>
+</tr>
+</tbody>
+</table>
+<h2 id="commands-application-to-display">Commands: Application To Display</h2>
 <p><strong>window</strong> <code>id x y w h
 title</code>
-Create a window with titlebar and close button.</p>
+Create a window with a titlebar and close button. The payload is the window title.</p>
 <p><strong>svg</strong> <code>id parent
-&#60;svg markup&#62;</code>
-Insert arbitrary SVG into a parent widget&#8217;s content area. The markup
-is parsed by DOMParser and inserted into the document. SMIL animations
-in the markup execute natively.</p>
+&#60;markup&#62;</code>
+Insert arbitrary SVG into a parent widget&#8217;s content area. The markup is parsed by <code>DOMParser</code> and appended to the document. SMIL animations in the markup execute natively in the browser, requiring no server round-trips.</p>
 <p><strong>textarea</strong> <code>id parent x y w h</code>
-Create a multi-line text input (HTML <code>&#60;textarea&#62;</code> in a <code>&#60;foreignObject&#62;</code>).</p>
+Create a multi-line text input rendered as an HTML <code>&#60;textarea&#62;</code> inside a <code>&#60;foreignObject&#62;</code>.</p>
 <p><strong>listen</strong> <code>id event_type</code>
-Register a DOM event listener on a widget. The event type is any DOM
-event name (<code>click</code>, <code>mouseover</code>, <code>focusout</code>, etc.).</p>
+Register a DOM event listener on a widget. Accepts any DOM event name (e.g. <code>click</code>, <code>mouseover</code>, <code>focusout</code>).</p>
 <p><strong>update</strong> <code>id key
 value</code>
-Update a widget&#8217;s content. For text elements, sets the <code>textContent</code> of
-the first <code>[data-qu-text]</code> descendant (or the element itself if it&#8217;s a
-<code>&#60;text&#62;</code>). For textareas, sets the <code>value</code>.</p>
+Update a widget&#8217;s content. The <code>key</code> field determines what is updated:</p>
+<ul>
+<li><code>text</code> — For textareas, sets the <code>value</code> property. For SVG elements, sets <code>textContent</code> on the first <code>[data-qu-text]</code> descendant (or the element itself if it is a <code>&#60;text&#62;</code> node).</li>
+<li>Any other key — Sets the named attribute on the first <code>[data-qu-&#60;key&#62;]</code> descendant, or on the widget element itself if no such descendant exists.</li>
+</ul>
 <p><strong>remove</strong> <code>id</code>
-Remove a widget from the display.</p>
+Remove a widget and all its children from the display.</p>
 <p><strong>clipboard</strong> <code>
 text</code>
-Write text to the browser clipboard.</p>
-<h2 id="messages-display-application">Messages: display → application</h2>
+Write text to the browser clipboard via the Clipboard API.</p>
+<h2 id="events-display-to-application">Events: Display To Application</h2>
 <p><strong>event</strong> <code>id event_type
-value</code>
-An event occurred on a widget. Event types:</p>
+value</code></p>
+<p>An event fired on a widget. The following event types are defined:</p>
 <table>
 <thead>
 <tr>
@@ -103,17 +229,17 @@ An event occurred on a widget. Event types:</p>
 <tr>
 <td><code>click</code></td>
 <td>(none)</td>
-<td>user clicked the element</td>
+<td>User clicked the element</td>
 </tr>
 <tr>
 <td><code>text</code></td>
 <td>textarea content</td>
-<td>text changed (300ms debounce)</td>
+<td>Text changed (300 ms debounce)</td>
 </tr>
 <tr>
 <td><code>scroll</code></td>
 <td><code>0.0</code> to <code>1.0</code></td>
-<td>scrollbar thumb released</td>
+<td>Scrollbar thumb released</td>
 </tr>
 <tr>
 <td><code>xy</code></td>
@@ -123,37 +249,29 @@ An event occurred on a widget. Event types:</p>
 <tr>
 <td><code>close</code></td>
 <td>(none)</td>
-<td>window close button clicked</td>
+<td>Window close button clicked</td>
 </tr>
 <tr>
 <td><code>paste</code></td>
 <td>clipboard text</td>
-<td>user pasted (Ctrl+V)</td>
+<td>User pasted (Ctrl+V)</td>
 </tr>
 </tbody>
 </table>
-<p>Paste events use widget ID 0 and are broadcast to all apps.</p>
-<h2 id="interaction-attributes">Interaction attributes</h2>
-<p>The display client recognizes <code>data-qu-*</code> attributes on SVG elements
-for client-side interactive behavior:</p>
-<p><strong><code>data-qu-drag="h|v"</code> <code>data-qu-track="N"</code></strong> — Constrained 1D drag.
-The element&#8217;s <code>x</code> or <code>y</code> attribute is updated during drag, clamped to
-<code>[0, N]</code>. On release, a <code>scroll</code> event fires with the normalized
-position.</p>
-<p><strong><code>data-qu-xy</code></strong> — 2D position tracking. The element (typically a
-<code>&#60;circle&#62;</code>) is dragged within its parent&#8217;s bounding box. On release,
-an <code>xy</code> event fires with normalized coordinates. Set
-<code>data-qu-xy-area</code> on a sibling to override the bounding area.</p>
-<p><strong><code>data-qu-text</code></strong> — Marks an SVG element as the text target for
-<code>update</code> messages. The element&#8217;s <code>textContent</code> is replaced.</p>
-<h2 id="adding-new-interaction-classes">Adding new interaction classes</h2>
-<p>To support a new interaction (rotation, resize, rubber-banding):</p>
+<p>Paste events use widget ID 0 and are broadcast to all connected applications.</p>
+<h2 id="interaction-attributes">Interaction Attributes</h2>
+<p>The display client recognizes <code>data-qu-*</code> attributes on SVG elements to provide client-side interactive behavior without server involvement:</p>
+<p><strong><code>data-qu-drag="h|v"</code> with <code>data-qu-track="N"</code></strong> — Constrained one-dimensional drag. The element&#8217;s <code>x</code> or <code>y</code> attribute is updated during the drag, clamped to the range <code>[0, N]</code>. When the user releases, a <code>scroll</code> event fires with the normalized position.</p>
+<p><strong><code>data-qu-xy</code></strong> — Two-dimensional position tracking. The element (typically a <code>&#60;circle&#62;</code>) is dragged within its parent&#8217;s bounding box. On release, an <code>xy</code> event fires with normalized coordinates. Place <code>data-qu-xy-area</code> on a sibling element to override the bounding area.</p>
+<p><strong><code>data-qu-text</code></strong> — Marks an SVG element as the text target for <code>update</code> messages. The element&#8217;s <code>textContent</code> is replaced with the payload.</p>
+<h2 id="adding-new-interaction-types">Adding New Interaction Types</h2>
+<p>To support a new interaction pattern (rotation, resize, rubber-banding, etc.):</p>
 <ol>
-<li>Choose a <code>data-qu-&#60;name&#62;</code> attribute</li>
-<li>Add a mousedown check in the client&#8217;s mousedown handler</li>
-<li>Track state in mousemove</li>
-<li>Send an event on mouseup</li>
-<li>Applications emit SVG with the attribute — no per-widget changes</li>
+<li>Choose a <code>data-qu-&#60;name&#62;</code> attribute.</li>
+<li>Add a <code>mousedown</code> check in the client&#8217;s pointer handler.</li>
+<li>Track state during <code>mousemove</code>.</li>
+<li>Send an event on <code>mouseup</code>.</li>
+<li>Applications emit SVG with the new attribute — no protocol changes required.</li>
 </ol>
 
     </div>

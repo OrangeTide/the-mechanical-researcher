@@ -133,7 +133,7 @@ function handleMessage(raw) {
       addListener(app, +f[2], f[3]);
       break;
     case "update":
-      doUpdate(app, +f[2], body);
+      doUpdate(app, +f[2], f[3] || "text", body);
       break;
     case "remove":
       doRemove(app, +f[2]);
@@ -337,14 +337,22 @@ svg.addEventListener("mousedown", e => {
 });
 
 /* ── Widget updates ───────────────────────────────────────────────────── */
-function doUpdate(app, id, value) {
+function doUpdate(app, id, key, value) {
   const w = widgets.get(wkey(app, id));
   if (!w) return;
-  if (w._ta) { w._ta.value = value; return; }
-  if (w.el) {
-    const t = w.el.querySelector("[data-qu-text]") ||
-              (w.el.tagName === "text" ? w.el : null);
-    if (t) t.textContent = value;
+  if (key === "text") {
+    if (w._ta) { w._ta.value = value; return; }
+    if (w.el) {
+      const t = w.el.querySelector("[data-qu-text]") ||
+                (w.el.tagName === "text" ? w.el : null);
+      if (t) t.textContent = value;
+    }
+  } else {
+    /* Arbitrary property update — set attribute on the widget element */
+    if (w.el) {
+      const t = w.el.querySelector("[data-qu-" + key + "]") || w.el;
+      t.setAttribute(key, value);
+    }
   }
 }
 

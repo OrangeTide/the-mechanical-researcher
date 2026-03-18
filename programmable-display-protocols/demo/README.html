@@ -45,22 +45,31 @@ send structured scene graph operations over a Unix socket; a browser-based
 display server renders them as interactive SVG.</p>
 <p>Named after the trans-Neptunian object.</p>
 <h2 id="quick-start">Quick Start</h2>
+<p>Requires <a href="https://caddyserver.com/">Caddy</a> as a reverse proxy (nginx
+configurations are also provided under <a href="#deployment">Deployment</a>).</p>
 <pre><code>make
+caddy run --adapter caddyfile --config &#60;(printf &#39;:8080 {
+	root * .
+	file_server
+	reverse_proxy &#47;ws :9090
+}
+&#39;) &#38;
 .&#47;quaoar-server &#38;
-# open quaoar-client.html in a browser
-.&#47;notepad
+xdg-open http:&#47;&#47;localhost:8080&#47;quaoar-client.html
+export QUAOAR_DISPLAY=&#47;tmp&#47;quaoar-0
+.&#47;notepad &#38;
 </code></pre>
 <p>The notepad window appears in the browser. Type, click Save&#47;Load, close
 the window — all interactions except typing happen locally in the browser
 with zero network round-trips.</p>
-<pre><code>.&#47;clock
+<pre><code>.&#47;clock &#38;
 </code></pre>
 <p>An analog clock with SMIL-animated hands. The application sends the
 clock face once; the browser animates the sweep natively.</p>
 <h2 id="architecture">Architecture</h2>
 <pre><code>┌─────────────┐   Unix socket    ┌───────────────┐   WebSocket   ┌─────────┐
 │ Application │ ──netstrings──▸  │ quaoar-server │ ────────────▸ │ Browser │
-│ (notepad)   │ ◂──events─────  │   (bridge)    │ ◂──events───  │ (SVG)   │
+│ (notepad)   │ ◂──events─────   │   (bridge)    │ ◂──events───  │ (SVG)   │
 └─────────────┘                  └───────────────┘               └─────────┘
       │                                │
   libquaoar.c                    multiplexes N apps
@@ -139,21 +148,43 @@ for hover effects</li>
 <p>No changes to quaoar-server or quaoar-client.html are needed —
 the application just emits SVG. See <code>clock.c</code> for a complete example.</p>
 <h2 id="deployment">Deployment</h2>
-<p>For localhost development, open <code>quaoar-client.html</code> directly in a
-browser. For production, place quaoar-server behind a reverse proxy
-that handles TLS and optionally WebSocket compression.</p>
+<p>The Quick Start uses Caddy for simplicity. For production, place
+quaoar-server behind any reverse proxy that handles TLS and passes
+through WebSocket connections.</p>
+<h3 id="caddy">Caddy</h3>
+<p>For production, create a Caddyfile that serves the HTML client and proxies
+WebSocket connections to quaoar-server:</p>
+<pre><code>quaoar.example.com {
+    root * &#47;srv&#47;quaoar
+    file_server
+    reverse_proxy &#47;ws 127.0.0.1:9090
+}
+</code></pre>
+<p>Copy <code>quaoar-client.html</code> to the root directory (<code>&#47;srv&#47;quaoar</code> in the
+example above). Caddy handles TLS automatically for named hosts.</p>
 <h3 id="nginx">nginx</h3>
+<p>Copy the HTML client to the web root:</p>
+<pre><code>sudo mkdir -p &#47;srv&#47;quaoar
+sudo cp quaoar-client.html &#47;srv&#47;quaoar&#47;
+</code></pre>
+<p><strong>Dedicated virtual host:</strong></p>
 <pre><code class="language-nginx">server {
+    listen 80;
     listen 443 ssl;
     server_name quaoar.example.com;
+    root &#47;srv&#47;quaoar;
 
-    ssl_certificate     &#47;etc&#47;ssl&#47;certs&#47;quaoar.pem;
-    ssl_certificate_key &#47;etc&#47;ssl&#47;private&#47;quaoar.key;
+    if ($scheme = http) {
+            return 301 https:&#47;&#47;$server_name$request_uri;
+    }
+
+    ssl_certificate     &#47;etc&#47;ssl&#47;certs&#47;yourhost.pem;
+    ssl_certificate_key &#47;etc&#47;ssl&#47;private&#47;yourhost.key;
 
     # Serve the display client
     location &#47; {
-        root &#47;srv&#47;quaoar;
         index quaoar-client.html;
+        try_files $uri $uri =404;
     }
 
     # Proxy WebSocket to quaoar-server
@@ -168,13 +199,34 @@ that handles TLS and optionally WebSocket compression.</p>
     }
 }
 </code></pre>
-<h3 id="other-proxies">Other proxies</h3>
-<pre><code>caddy       — reverse_proxy &#47;ws 127.0.0.1:9090
-haproxy     — tcp mode with WebSocket health checks
-stunnel     — TLS termination at the TCP layer
+<p><strong>Sub-directory on an existing server</strong> (add to your default site):</p>
+<pre><code class="language-nginx">    location &#47;quaoar {
+        root &#47;srv;
+        index quaoar-client.html;
+    }
+
+    location &#47;quaoar&#47;ws {
+        proxy_pass http:&#47;&#47;127.0.0.1:9090;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
 </code></pre>
+<p><strong>Self-signed TLS for testing:</strong></p>
+<pre><code>openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem \
+  -days 365 -nodes -subj &#39;&#47;CN=localhost&#39;
+sudo cp cert.pem &#47;etc&#47;ssl&#47;certs&#47;localhost.pem
+sudo cp key.pem &#47;etc&#47;ssl&#47;private&#47;localhost.key
+</code></pre>
+<h3 id="other-proxies">Other Proxies</h3>
 <p>The server is proxy-agnostic — it performs the HTTP upgrade itself, so
 any proxy that passes through WebSocket connections will work.</p>
+<pre><code>haproxy     — tcp mode with WebSocket health checks
+stunnel     — TLS termination at the TCP layer
+</code></pre>
 <h2 id="not-included">Not included</h2>
 <p>Display manager login (cf. XDMCP), session persistence, and session
 management are left as exercises for the reader.</p>

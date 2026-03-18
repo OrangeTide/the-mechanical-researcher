@@ -29,8 +29,7 @@ printf '%s\n' \
     '' \
     '$ ./quaoar-server &' \
     '[1] 4821' \
-    'quaoar-server: listening on ws://127.0.0.1:9090' \
-    'quaoar-server: socket /tmp/quaoar-0' \
+    'quaoar-server: ws://127.0.0.1:9090  socket=/tmp/quaoar-0' \
     '' \
     '$ ./notepad &' \
     '[2] 4822' \
