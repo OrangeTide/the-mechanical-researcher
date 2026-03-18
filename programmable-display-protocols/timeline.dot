@@ -12,13 +12,19 @@ digraph timeline {
     subgraph {
         rank=same;
         era60 [label="1960s", shape=plaintext, fontsize=12, fontname="IBM Plex Mono", fontcolor="#8B7355"];
-        plato [label="PLATO IV\n1964", fillcolor="#D4A574", color="#8B7355",
-               tooltip="Plasma display terminals, TUTOR language"];
+        plato [label="PLATO\n1960", fillcolor="#D4A574", color="#8B7355",
+               tooltip="Programmable display terminals, TUTOR language, plasma panels"];
+        mac [label="MIT\nProject MAC\n1963", fillcolor="#E8D5B7", color="#8B7355",
+             tooltip="Time-sharing, ARDS terminal, Multics Graphics System"];
+        tek4002 [label="Tektronix\n4002\n1967", fillcolor="#D4A574", color="#8B7355",
+                 tooltip="First Tektronix storage tube graphics terminal"];
     }
 
     subgraph {
         rank=same;
         era68 [label="1968", shape=plaintext, fontsize=12, fontname="IBM Plex Mono", fontcolor="#8B7355"];
+        ards [label="MIT ARDS\n1968", fillcolor="#D4A574", color="#8B7355",
+              tooltip="Storage tube remote graphics terminal, first mouse"];
         demo [label="Mother of\nAll Demos\n1968", fillcolor="#FFF8E7", color="#8B7355",
               tooltip="Engelbart: mouse, hypertext, video conferencing"];
     }

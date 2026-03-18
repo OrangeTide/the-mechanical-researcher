@@ -9,7 +9,9 @@ digraph lineage {
     // Era labels
     subgraph cluster_60s {
         label="1960s"; labeljust=l; style=invis;
-        plato [label="PLATO\n1964", fillcolor="#D4A574"];
+        plato [label="PLATO\n1960", fillcolor="#D4A574"];
+        mac [label="MIT Project MAC\n1963", fillcolor="#E8D5B7"];
+        tek4002 [label="Tektronix 4002\n1967", fillcolor="#D4A574"];
     }
 
     subgraph cluster_70s {
@@ -53,25 +55,45 @@ digraph lineage {
         future [label="  ?  ", fillcolor="#C4956A", fontsize=14, fontname="IBM Plex Sans Bold"];
     }
 
-    // Edges
-    plato -> tek4014 [label="networked\nterminals", style=dashed];
+    // Edges — PLATO lineage (independent of Tektronix)
+    plato -> xerox [label="PARC tour\n1972", style=dashed];
+
+    // Tektronix lineage — from storage oscilloscopes
+    tek4002 -> tek4014 [label="storage tube\nrefinement"];
     tek4014 -> x11 [label="escape seq.\nprotocol", style=dashed];
+    tek4014 -> mgr [label="escape seq.\nprotocol", style=dashed];
+
+    // Project MAC lineage
+    mac -> x11 [label="MAC → LCS\nScheifler 1984", style=dashed];
+
+    // Xerox lineage
     xerox -> ps [label="imaging model"];
     xerox -> blit [label="bitmap display"];
     xerox -> x11 [label="windowing"];
-    tek4014 -> mgr [label="escape seq.\nprotocol", style=dashed];
+
+    // PostScript lineage
     ps -> news [label="full interpreter\nin server"];
     ps -> dps [label="rendering\nonly"];
     ps -> pdf [label="declarative\nsubset"];
+    ps -> svg [label="vector\nprimitives"];
+
+    // NeWS / DPS
     dps -> nextstep;
     news -> java [label="Gosling", style=dashed];
+
+    // Bell Labs
     blit -> plan9 [label="Pike"];
     plan9 -> inferno;
+
+    // X11 successor
     x11 -> wayland [label="lessons\nlearned"];
+
+    // Apple / NeXT
     nextstep -> quartz [label="Apple\nacquires NeXT"];
     pdf -> quartz [label="imaging\nmodel"];
     dps -> quartz [label="API\nstructure"];
-    ps -> svg [label="vector\nprimitives"];
+
+    // Web / modern
     svg -> houdini [label="web platform"];
     svg -> webgpu [label="web platform"];
     wayland -> scenic [label="compositor\nmodel"];

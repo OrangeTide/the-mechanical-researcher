@@ -58,9 +58,13 @@
       var permalinkHtml = data.url
         ? '<a class="card-permalink" href="' + escapeHtml(data.url) + '" title="Permalink">&#x1f517;</a>'
         : '';
+      var revisedHtml = data.revisedDisplay
+        ? '<div class="card-revised">Revised ' + escapeHtml(data.revisedDisplay) + '</div>'
+        : '';
       el.innerHTML =
         '<div class="card-front">' +
         '<div class="card-date">' + escapeHtml(data.dateDisplay) + '</div>' +
+        revisedHtml +
         '<div class="card-category">' + escapeHtml(data.category) + '</div>' +
         '<div class="card-title">' + escapeHtml(data.title) + '</div>' +
         '<div class="card-abstract">' + escapeHtml(data.abstract) + '</div>' +
@@ -439,8 +443,12 @@
       var permalinkHtml = data.url
         ? '<a class="card-permalink" href="' + escapeHtml(data.url) + '" title="Permalink">&#x1f517;</a>'
         : '';
+      var gridRevisedHtml = data.revisedDisplay
+        ? '<div class="card-revised">Revised ' + escapeHtml(data.revisedDisplay) + '</div>'
+        : '';
       el.innerHTML =
         '<div class="card-date">' + escapeHtml(data.dateDisplay) + '</div>' +
+        gridRevisedHtml +
         '<div class="card-category">' + escapeHtml(data.category) + '</div>' +
         '<div class="card-title">' + escapeHtml(data.title) + '</div>' +
         '<div class="card-abstract">' + escapeHtml(data.abstract) + '</div>' +

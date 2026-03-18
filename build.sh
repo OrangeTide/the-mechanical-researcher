@@ -110,6 +110,7 @@ for index_md in */index.md; do
 
     title="$(meta title "$index_md")"
     date="$(meta date "$index_md")"
+    revised="$(meta revised "$index_md")"
     abstract="$(meta abstract "$index_md")"
     category="$(meta category "$index_md")"
 
@@ -119,6 +120,13 @@ for index_md in */index.md; do
     [ -z "$category" ] && category="research"
 
     date_display="$(format_date "$date")"
+    if [ -n "$revised" ]; then
+        revised_display="$(format_date "$revised")"
+        revised_html="<span class=\"article-revised\">Revised <time datetime=\"${revised}\">${revised_display}</time></span>"
+    else
+        revised_display=""
+        revised_html=""
+    fi
 
     # Build article HTML
     article_body="$(body_html "$index_md")"
@@ -148,6 +156,7 @@ for index_md in */index.md; do
                 "TITLE" "${suppl_title:-$rel}" \
                 "DATE" "$date" \
                 "DATE_DISPLAY" "$date_display" \
+                "REVISED" "" \
                 "CATEGORY" "$category" \
                 "SOURCE_ZIP" "" \
                 "ROOT" "$(printf '%s' "$rel" | sed 's|[^/]||g; s|/|../|g').." \
@@ -179,6 +188,7 @@ for index_md in */index.md; do
             "TITLE" "$title" \
             "DATE" "$date" \
             "DATE_DISPLAY" "$date_display" \
+            "REVISED" "$revised_html" \
             "CATEGORY" "$category" \
             "SOURCE_ZIP" "$source_zip_html" \
             "ROOT" ".." \
@@ -212,8 +222,10 @@ for index_md in */index.md; do
     js_category="$(printf '%s' "$category" | sed 's/\\/\\\\/g; s/"/\\"/g')"
 
     # Prefix with date for sorting (newest first); TAB separates date from JSON
+    js_revised_display="$(printf '%s' "$revised_display" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+
     CARDS_UNSORTED="${CARDS_UNSORTED}
-${date}	{\"title\":\"${js_title}\",\"abstract\":\"${js_abstract}\",\"date\":\"${date}\",\"dateDisplay\":\"${date_display}\",\"category\":\"${js_category}\",\"url\":\"${slug}/index.html\"}"
+${date}	{\"title\":\"${js_title}\",\"abstract\":\"${js_abstract}\",\"date\":\"${date}\",\"dateDisplay\":\"${date_display}\",\"revisedDisplay\":\"${js_revised_display}\",\"category\":\"${js_category}\",\"url\":\"${slug}/index.html\"}"
 
     # ZIP source code directories (demo/) for download
     if [ -d "$topic_dir/demo" ]; then
