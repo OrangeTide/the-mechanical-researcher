@@ -15,5 +15,13 @@
       <description>A comparative analysis of build system design — make, tup, Plan 9 mk, Perforce Jam, Ninja, and CMake.</description>
       <category>software engineering</category>
     </item>
+    <item>
+      <title>Programmable Display Protocols</title>
+      <link>https://orangetide.github.io/the-mechanical-researcher/programmable-display-protocols/index.html</link>
+      <guid>https://orangetide.github.io/the-mechanical-researcher/programmable-display-protocols/index.html</guid>
+      <pubDate>Tue, 17 Mar 2026 00:00:00 -0700</pubDate>
+      <description>What would a modern programmable display protocol look like? From PLATO and Tektronix terminals through NeWS, Display PostScript, Plan 9, and Wayland, the history of display systems reveals recurring trade-offs between server intelligence and protocol simplicity that inform four candidate architectures for the future.</description>
+      <category>systems design</category>
+    </item>
   </channel>
 </rss>

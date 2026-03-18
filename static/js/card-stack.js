@@ -38,23 +38,35 @@
 
   // --- Create card DOM elements ---
 
+  // Random card back style
+  var BACK_STYLES = ['lines', 'stain', 'blank', 'blank', 'lines'];
+
+  function randomBack() {
+    return BACK_STYLES[Math.floor(Math.random() * BACK_STYLES.length)];
+  }
+
   function createCardEl(data, index) {
     var el = document.createElement('div');
     el.className = 'index-card' + (data.isEnd ? ' end-card' : '');
     el.dataset.index = index;
 
     if (data.isEnd) {
-      el.innerHTML = '<div class="card-title">' + data.title + '</div>';
+      el.innerHTML =
+        '<div class="card-front"><div class="card-title">' + data.title + '</div></div>' +
+        '<div class="card-back" data-back="blank"></div>';
     } else {
       var permalinkHtml = data.url
         ? '<a class="card-permalink" href="' + escapeHtml(data.url) + '" title="Permalink">&#x1f517;</a>'
         : '';
       el.innerHTML =
+        '<div class="card-front">' +
         '<div class="card-date">' + escapeHtml(data.dateDisplay) + '</div>' +
         '<div class="card-category">' + escapeHtml(data.category) + '</div>' +
         '<div class="card-title">' + escapeHtml(data.title) + '</div>' +
         '<div class="card-abstract">' + escapeHtml(data.abstract) + '</div>' +
-        '<div class="card-footer">' + permalinkHtml + '</div>';
+        '<div class="card-footer">' + permalinkHtml + '</div>' +
+        '</div>' +
+        '<div class="card-back" data-back="' + randomBack() + '"></div>';
     }
 
     if (data.url) {
@@ -312,12 +324,23 @@
 
   function flipAndNavigate(el, url) {
     isAnimating = true;
-    el.style.transition = 'transform 0.5s ease-in-out, opacity 0.3s ease 0.3s';
+    var front = el.querySelector('.card-front');
+    var back = el.querySelector('.card-back');
+
+    el.style.transition = 'transform 0.5s ease-in-out';
     el.style.transformOrigin = 'center center';
     el.style.transform = 'rotateY(-180deg) scale(1.5)';
 
+    // At the halfway point of the flip, swap front/back visibility
     setTimeout(function () {
-      // Fill screen with card color
+      if (front) front.style.visibility = 'hidden';
+      if (back) {
+        back.style.visibility = 'visible';
+        back.style.transform = 'none';
+      }
+    }, 250);
+
+    setTimeout(function () {
       document.body.style.transition = 'background 0.2s';
       document.body.style.background = '#fffef7';
     }, 300);
@@ -325,6 +348,49 @@
     setTimeout(function () {
       window.location.href = url;
     }, 600);
+  }
+
+  // --- Animate to a specific total progress ---
+
+  function animateTo(targetTotal, duration) {
+    if (isAnimating) return;
+    var startTotal = currentIndex * 2 + scrollProgress;
+    if (Math.abs(targetTotal - startTotal) < 0.01) return;
+
+    isAnimating = true;
+    var start = null;
+    duration = duration || 500;
+
+    function step(ts) {
+      if (!start) start = ts;
+      var t = Math.min((ts - start) / duration, 1);
+      var eased = easeInOutCubic(t);
+      var total = startTotal + (targetTotal - startTotal) * eased;
+
+      currentIndex = Math.floor(total / 2);
+      scrollProgress = total - currentIndex * 2;
+      render();
+
+      if (t < 1) {
+        requestAnimationFrame(step);
+      } else {
+        isAnimating = false;
+      }
+    }
+
+    requestAnimationFrame(step);
+  }
+
+  // --- Stack click — bring next card into view ---
+
+  function onStackClick() {
+    if (isAnimating || gridMode) return;
+    var nextIndex = currentIndex + 1;
+    if (nextIndex >= cards.length) return;
+    // Animate to next card fully zoomed (progress = nextIndex * 2 + 1)
+    var target = nextIndex * 2 + 1;
+    target = Math.min(target, (cards.length - 1) * 2 + 1);
+    animateTo(target, 500);
   }
 
   // --- Entry animation ---
@@ -440,6 +506,24 @@
     window.addEventListener('touchstart', onTouchStart, { passive: true });
     window.addEventListener('touchmove', onTouchMove, { passive: false });
 
+    // Stack click → bring next card into view
+    stackEl.addEventListener('click', onStackClick);
+
+    // Click on desk background → send card back to desk
+    document.querySelector('.desk-scene').addEventListener('click', function (e) {
+      // Only respond to clicks on the desk scene itself or desk surface
+      var target = e.target;
+      if (target.closest('.index-card') || target.closest('.mug') ||
+          target.closest('.card-stack') || target.closest('.packages') ||
+          target.closest('.info-btn') || target.closest('.pen') ||
+          target.closest('.grid-overlay') || target.closest('.info-overlay') ||
+          target.closest('.packages-overlay')) return;
+      if (isAnimating || gridMode) return;
+      var totalProgress = currentIndex * 2 + scrollProgress;
+      if (totalProgress < 0.01) return; // already at desk
+      animateTo(0, 500);
+    });
+
     // Mug click → explode to grid
     var mugEl = document.querySelector('.mug');
     if (mugEl) {
@@ -449,6 +533,80 @@
     // Close button → back to stack
     if (gridCloseBtn) {
       gridCloseBtn.addEventListener('click', exitGridMode);
+    }
+
+    // Info button + pen → both open info overlay
+    var infoBtn = document.getElementById('info-btn');
+    var penEl = document.getElementById('pen');
+    var infoOverlay = document.getElementById('info-overlay');
+    var infoClose = document.getElementById('info-close');
+
+    function openInfo() {
+      if (infoOverlay) infoOverlay.classList.add('active');
+    }
+
+    if (infoBtn) infoBtn.addEventListener('click', openInfo);
+    if (penEl) penEl.addEventListener('click', openInfo);
+    if (infoClose && infoOverlay) {
+      infoClose.addEventListener('click', function () {
+        infoOverlay.classList.remove('active');
+      });
+    }
+    if (infoOverlay) {
+      infoOverlay.addEventListener('click', function (e) {
+        if (e.target === infoOverlay) {
+          infoOverlay.classList.remove('active');
+        }
+      });
+    }
+
+    // Packages click → show source downloads modal
+    var packages = window.PACKAGES || [];
+    var pkgEl = document.getElementById('packages');
+    var pkgOverlay = document.getElementById('packages-overlay');
+    var pkgClose = document.getElementById('packages-close');
+    var pkgList = document.getElementById('packages-list');
+
+    function buildPackageCards() {
+      pkgList.innerHTML = '';
+      if (!packages.length) {
+        pkgList.innerHTML = '<p style="color:#8b7a68;font-family:IBM Plex Mono,monospace;font-size:0.85rem;">No source packages available yet.</p>';
+        return;
+      }
+      packages.forEach(function (pkg) {
+        var card = document.createElement('div');
+        card.className = 'pkg-card';
+        card.innerHTML =
+          '<div class="pkg-card-name">' + escapeHtml(pkg.name) + '</div>' +
+          '<div class="pkg-card-meta">' +
+            '<span>' + escapeHtml(pkg.dateDisplay) + '</span>' +
+            '<span>' + escapeHtml(pkg.size) + '</span>' +
+          '</div>' +
+          '<div class="pkg-card-links">' +
+            '<a href="' + escapeHtml(pkg.zip) + '" download>Download ZIP</a>' +
+            '<a href="' + escapeHtml(pkg.article) + '">Read article</a>' +
+          '</div>';
+        pkgList.appendChild(card);
+      });
+    }
+
+    if (pkgEl && pkgOverlay) {
+      pkgEl.addEventListener('click', function () {
+        buildPackageCards();
+        pkgOverlay.classList.add('active');
+      });
+    }
+    if (pkgClose && pkgOverlay) {
+      pkgClose.addEventListener('click', function () {
+        pkgOverlay.classList.remove('active');
+      });
+    }
+    if (pkgOverlay) {
+      pkgOverlay.addEventListener('click', function (e) {
+        if (e.target === pkgOverlay) {
+          pkgOverlay.classList.remove('active');
+        }
+      });
     }
 
     // Resize handler

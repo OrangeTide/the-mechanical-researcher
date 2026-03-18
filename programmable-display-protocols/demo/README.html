@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quaoar — The Mechanical Researcher</title>
+  <link rel="stylesheet" href="../../static/css/article.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Sans+Condensed:wght@400;600&family=IBM+Plex+Mono:wght@400&display=swap">
+</head>
+<body>
+  <nav class="top-bar">
+    <a href="../../index.html" class="back-link">&larr; Back to desk</a>
+  </nav>
+  <article class="research-article">
+    <header>
+      <span class="article-category">systems design</span>
+      <h1>Quaoar</h1>
+      <div class="article-meta">
+        <time datetime="2026-03-17">March 17, 2026</time>
+        <a href="#" class="permalink" title="Copy permalink">&#x1f517;</a>
+        
+      </div>
+    </header>
+    <script>
+      document.querySelector('.permalink').addEventListener('click', function(e) {
+        e.preventDefault();
+        var url = window.location.href.replace(/#.*$/, '');
+        navigator.clipboard.writeText(url).then(function() {
+          var el = e.target;
+          el.textContent = '\u2713';
+          el.classList.add('copied');
+          setTimeout(function() {
+            el.textContent = '\uD83D\uDD17';
+            el.classList.remove('copied');
+          }, 1500);
+        });
+      });
+    </script>
+    <div class="article-body">
+      
+<h1 id="quaoar">Quaoar</h1>
+<p><img src="logo.svg" width="128" height="128" alt="Quaoar logo" align="right"/></p>
+<p>A proof-of-concept SVG thin client display protocol. Remote applications
+send structured scene graph operations over a Unix socket; a browser-based
+display server renders them as interactive SVG.</p>
+<p>Named after the trans-Neptunian object.</p>
+<h2 id="quick-start">Quick Start</h2>
+<pre><code>make
+.&#47;quaoar-server &#38;
+# open quaoar-client.html in a browser
+.&#47;notepad
+</code></pre>
+<p>The notepad window appears in the browser. Type, click Save&#47;Load, close
+the window — all interactions except typing happen locally in the browser
+with zero network round-trips.</p>
+<pre><code>.&#47;clock
+</code></pre>
+<p>An analog clock with SMIL-animated hands. The application sends the
+clock face once; the browser animates the sweep natively.</p>
+<h2 id="architecture">Architecture</h2>
+<pre><code>┌─────────────┐   Unix socket    ┌───────────────┐   WebSocket   ┌─────────┐
+│ Application │ ──netstrings──▸  │ quaoar-server │ ────────────▸ │ Browser │
+│ (notepad)   │ ◂──events─────  │   (bridge)    │ ◂──events───  │ (SVG)   │
+└─────────────┘                  └───────────────┘               └─────────┘
+      │                                │
+  libquaoar.c                    multiplexes N apps
+  (widget API)                   onto 1 WebSocket
+</code></pre>
+<p>Applications link against <strong>libquaoar</strong>, which provides a widget API
+(<code>qu_window</code>, <code>qu_button</code>, <code>qu_label</code>, <code>qu_textarea</code>, <code>qu_scrollbar</code>,
+<code>qu_svg</code>). The library emits SVG+SMIL markup over netstring-framed
+messages to <strong>quaoar-server</strong>, which bridges Unix sockets to a single
+WebSocket connection. The browser loads <strong>quaoar-client.html</strong>, a
+generic SVG insertion engine that lets the browser&#8217;s native SMIL engine
+handle hover effects, press animations, and other declarative behaviors.</p>
+<p>See <a href="PROTOCOL.md">PROTOCOL.md</a> for the wire protocol specification.</p>
+<h2 id="installation">Installation</h2>
+<pre><code>make
+make install          # installs to &#47;usr&#47;local by default
+make install PREFIX=&#47;opt&#47;quaoar
+</code></pre>
+<p>Installs <code>quaoar-server</code>, <code>notepad</code>, and <code>clock</code> to <code>$(PREFIX)&#47;bin</code>,
+and man pages to <code>$(PREFIX)&#47;share&#47;man</code>.</p>
+<h2 id="server">Server</h2>
+<pre><code>quaoar-server [-p port] [-s socket_path]
+</code></pre>
+<p>Defaults: WebSocket on port 9090 (localhost only), Unix socket at
+<code>&#47;tmp&#47;quaoar-0</code>.</p>
+<p>Applications find the display via the <code>QUAOAR_DISPLAY</code> environment
+variable. If unset, they connect to <code>&#47;tmp&#47;quaoar-0</code>.</p>
+<p>quaoar-server is a pure message bridge (~630 lines of C, no
+dependencies). It implements the WebSocket handshake (including
+inline SHA-1 and base64) and frame read&#47;write directly.</p>
+<p>See <code>quaoar-server(1)</code> for details.</p>
+<h2 id="c-library">C Library</h2>
+<p>See <code>libquaoar(3)</code> for the full API reference. Summary:</p>
+<pre><code class="language-c">&#47;* connection *&#47;
+qu_ctx *qu_connect(const char *display);
+void    qu_disconnect(qu_ctx *ctx);
+int     qu_fd(qu_ctx *ctx);
+int     qu_process(qu_ctx *ctx);
+
+&#47;* events *&#47;
+void qu_on_event(qu_ctx *ctx, int id, qu_event_fn fn, void *arg);
+
+&#47;* widgets — all return an integer widget ID *&#47;
+int qu_window(qu_ctx *ctx, const char *title, int x, int y, int w, int h);
+int qu_button(qu_ctx *ctx, int parent, const char *label, int x, int y, int w, int h);
+int qu_label(qu_ctx *ctx, int parent, const char *text, int x, int y);
+int qu_textarea(qu_ctx *ctx, int parent, int x, int y, int w, int h);
+int qu_scrollbar(qu_ctx *ctx, int parent, int x, int y, int w, int h, char orient);
+int qu_svg(qu_ctx *ctx, int parent, const char *markup);
+
+&#47;* updates *&#47;
+void qu_set_text(qu_ctx *ctx, int id, const char *text);
+void qu_set_prop(qu_ctx *ctx, int id, const char *key, const char *value);
+void qu_remove(qu_ctx *ctx, int id);
+void qu_set_clipboard(qu_ctx *ctx, const char *text);
+</code></pre>
+<h3 id="event-loop-pattern">Event loop pattern</h3>
+<pre><code class="language-c">struct pollfd pfd = { .fd = qu_fd(ctx), .events = POLLIN };
+while (!quit &#38;&#38; poll(&#38;pfd, 1, -1) &#62;= 0) {
+    if (pfd.revents &#38; (POLLIN | POLLHUP))
+        if (qu_process(ctx) &#60; 0) break;
+}
+</code></pre>
+<h2 id="custom-svg-widgets">Custom SVG Widgets</h2>
+<p>The convenience functions are thin wrappers around <code>qu_svg()</code>.
+Applications can create any widget by constructing SVG directly:</p>
+<ul>
+<li>Use <code>&#60;g transform="translate(x,y)"&#62;</code> to position widgets</li>
+<li>Use <code>&#60;set attributeName="fill" begin="mouseover" end="mouseout"&#47;&#62;</code>
+for hover effects</li>
+<li>Use <code>&#60;set begin="mousedown" end="mouseup"&#47;&#62;</code> for press effects</li>
+<li>Mark text elements with <code>data-qu-text="1"</code> for <code>qu_set_text()</code></li>
+<li>Use <code>data-qu-drag</code> for 1D constrained drag (sliders, scrollbars)</li>
+<li>Use <code>data-qu-xy</code> for 2D drag (color pickers, position handles)</li>
+</ul>
+<p>No changes to quaoar-server or quaoar-client.html are needed —
+the application just emits SVG. See <code>clock.c</code> for a complete example.</p>
+<h2 id="deployment">Deployment</h2>
+<p>For localhost development, open <code>quaoar-client.html</code> directly in a
+browser. For production, place quaoar-server behind a reverse proxy
+that handles TLS and optionally WebSocket compression.</p>
+<h3 id="nginx">nginx</h3>
+<pre><code class="language-nginx">server {
+    listen 443 ssl;
+    server_name quaoar.example.com;
+
+    ssl_certificate     &#47;etc&#47;ssl&#47;certs&#47;quaoar.pem;
+    ssl_certificate_key &#47;etc&#47;ssl&#47;private&#47;quaoar.key;
+
+    # Serve the display client
+    location &#47; {
+        root &#47;srv&#47;quaoar;
+        index quaoar-client.html;
+    }
+
+    # Proxy WebSocket to quaoar-server
+    location &#47;ws {
+        proxy_pass http:&#47;&#47;127.0.0.1:9090;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+}
+</code></pre>
+<h3 id="other-proxies">Other proxies</h3>
+<pre><code>caddy       — reverse_proxy &#47;ws 127.0.0.1:9090
+haproxy     — tcp mode with WebSocket health checks
+stunnel     — TLS termination at the TCP layer
+</code></pre>
+<p>The server is proxy-agnostic — it performs the HTTP upgrade itself, so
+any proxy that passes through WebSocket connections will work.</p>
+<h2 id="not-included">Not included</h2>
+<p>Display manager login (cf. XDMCP), session persistence, and session
+management are left as exercises for the reader.</p>
+<h2 id="license">License</h2>
+<p>MIT-0 OR Public Domain</p>
+
+    </div>
+  </article>
+  <footer class="bottom-bar">
+    <span class="site-title">The Mechanical Researcher</span>
+  </footer>
+  <script>
+    (function() {
+      var toc = document.querySelector('.toc-list');
+      var cb = document.getElementById('toc-toggle');
+      if (toc && cb) toc.addEventListener('click', function() { cb.checked = false; });
+    })();
+  </script>
+  <script>
+    (function() {
+      var body = document.querySelector('.article-body');
+      if (!body) return;
+      body.addEventListener('click', function(e) {
+        var el = e.target;
+        if (el.tagName !== 'IMG' && el.tagName !== 'svg' && !el.closest('svg')) return;
+        if (el.closest('a') || el.closest('pre')) return;
+        var src = el.closest('svg') || el;
+        var overlay = document.createElement('div');
+        overlay.className = 'img-lightbox';
+        var close = document.createElement('button');
+        close.className = 'close-btn';
+        close.textContent = '\u00d7';
+        var clone = src.cloneNode(true);
+        clone.style.cssText = '';
+        clone.removeAttribute('width');
+        clone.removeAttribute('height');
+        overlay.appendChild(clone);
+        document.body.appendChild(close);
+        document.body.appendChild(overlay);
+        function dismiss() {
+          overlay.remove();
+          close.remove();
+        }
+        close.addEventListener('click', dismiss);
+        overlay.addEventListener('click', function(ev) {
+          if (ev.target === overlay) dismiss();
+        });
+        document.addEventListener('keydown', function esc(ev) {
+          if (ev.key === 'Escape') { dismiss(); document.removeEventListener('keydown', esc); }
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

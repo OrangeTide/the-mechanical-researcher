@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quaoar Protocol — The Mechanical Researcher</title>
+  <link rel="stylesheet" href="../../static/css/article.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Sans+Condensed:wght@400;600&family=IBM+Plex+Mono:wght@400&display=swap">
+</head>
+<body>
+  <nav class="top-bar">
+    <a href="../../index.html" class="back-link">&larr; Back to desk</a>
+  </nav>
+  <article class="research-article">
+    <header>
+      <span class="article-category">systems design</span>
+      <h1>Quaoar Protocol</h1>
+      <div class="article-meta">
+        <time datetime="2026-03-17">March 17, 2026</time>
+        <a href="#" class="permalink" title="Copy permalink">&#x1f517;</a>
+        
+      </div>
+    </header>
+    <script>
+      document.querySelector('.permalink').addEventListener('click', function(e) {
+        e.preventDefault();
+        var url = window.location.href.replace(/#.*$/, '');
+        navigator.clipboard.writeText(url).then(function() {
+          var el = e.target;
+          el.textContent = '\u2713';
+          el.classList.add('copied');
+          setTimeout(function() {
+            el.textContent = '\uD83D\uDD17';
+            el.classList.remove('copied');
+          }, 1500);
+        });
+      });
+    </script>
+    <div class="article-body">
+      
+<h1 id="quaoar-protocol">Quaoar Protocol</h1>
+<h2 id="framing">Framing</h2>
+<p>Unix socket side: djb netstrings (<code>length:data,</code>).</p>
+<p>WebSocket side: standard WebSocket text frames. The server translates
+between the two.</p>
+<h2 id="message-format">Message format</h2>
+<p>Each message has a header line (space-delimited fields) and an optional
+payload after a newline:</p>
+<pre><code>op field1 field2 ...
+payload (if any)
+</code></pre>
+<h2 id="app-id-routing">App ID routing</h2>
+<p>The server prepends the app ID to messages going to the browser:</p>
+<pre><code>3 window 1 80 60 480 340
+Notepad
+</code></pre>
+<p>The browser prepends the app ID to events going back:</p>
+<pre><code>3 event 2 click
+</code></pre>
+<p>Negative IDs are system channels:</p>
+<pre><code>-1 hello &#47;tmp&#47;quaoar-0       (server → browser)
+-1 disconnect 3              (server → browser)
+-1 event 0 paste             (browser → server, broadcast to all)
+clipboard text to copy       (any app → browser)
+</code></pre>
+<h2 id="messages-application-display">Messages: application → display</h2>
+<p><strong>window</strong> <code>id x y w h
+title</code>
+Create a window with titlebar and close button.</p>
+<p><strong>svg</strong> <code>id parent
+&#60;svg markup&#62;</code>
+Insert arbitrary SVG into a parent widget&#8217;s content area. The markup
+is parsed by DOMParser and inserted into the document. SMIL animations
+in the markup execute natively.</p>
+<p><strong>textarea</strong> <code>id parent x y w h</code>
+Create a multi-line text input (HTML <code>&#60;textarea&#62;</code> in a <code>&#60;foreignObject&#62;</code>).</p>
+<p><strong>listen</strong> <code>id event_type</code>
+Register a DOM event listener on a widget. The event type is any DOM
+event name (<code>click</code>, <code>mouseover</code>, <code>focusout</code>, etc.).</p>
+<p><strong>update</strong> <code>id key
+value</code>
+Update a widget&#8217;s content. For text elements, sets the <code>textContent</code> of
+the first <code>[data-qu-text]</code> descendant (or the element itself if it&#8217;s a
+<code>&#60;text&#62;</code>). For textareas, sets the <code>value</code>.</p>
+<p><strong>remove</strong> <code>id</code>
+Remove a widget from the display.</p>
+<p><strong>clipboard</strong> <code>
+text</code>
+Write text to the browser clipboard.</p>
+<h2 id="messages-display-application">Messages: display → application</h2>
+<p><strong>event</strong> <code>id event_type
+value</code>
+An event occurred on a widget. Event types:</p>
+<table>
+<thead>
+<tr>
+<th>Event</th>
+<th>Value</th>
+<th>Trigger</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>click</code></td>
+<td>(none)</td>
+<td>user clicked the element</td>
+</tr>
+<tr>
+<td><code>text</code></td>
+<td>textarea content</td>
+<td>text changed (300ms debounce)</td>
+</tr>
+<tr>
+<td><code>scroll</code></td>
+<td><code>0.0</code> to <code>1.0</code></td>
+<td>scrollbar thumb released</td>
+</tr>
+<tr>
+<td><code>xy</code></td>
+<td><code>x y</code> (each <code>0.0</code> to <code>1.0</code>)</td>
+<td>2D drag handle released</td>
+</tr>
+<tr>
+<td><code>close</code></td>
+<td>(none)</td>
+<td>window close button clicked</td>
+</tr>
+<tr>
+<td><code>paste</code></td>
+<td>clipboard text</td>
+<td>user pasted (Ctrl+V)</td>
+</tr>
+</tbody>
+</table>
+<p>Paste events use widget ID 0 and are broadcast to all apps.</p>
+<h2 id="interaction-attributes">Interaction attributes</h2>
+<p>The display client recognizes <code>data-qu-*</code> attributes on SVG elements
+for client-side interactive behavior:</p>
+<p><strong><code>data-qu-drag="h|v"</code> <code>data-qu-track="N"</code></strong> — Constrained 1D drag.
+The element&#8217;s <code>x</code> or <code>y</code> attribute is updated during drag, clamped to
+<code>[0, N]</code>. On release, a <code>scroll</code> event fires with the normalized
+position.</p>
+<p><strong><code>data-qu-xy</code></strong> — 2D position tracking. The element (typically a
+<code>&#60;circle&#62;</code>) is dragged within its parent&#8217;s bounding box. On release,
+an <code>xy</code> event fires with normalized coordinates. Set
+<code>data-qu-xy-area</code> on a sibling to override the bounding area.</p>
+<p><strong><code>data-qu-text</code></strong> — Marks an SVG element as the text target for
+<code>update</code> messages. The element&#8217;s <code>textContent</code> is replaced.</p>
+<h2 id="adding-new-interaction-classes">Adding new interaction classes</h2>
+<p>To support a new interaction (rotation, resize, rubber-banding):</p>
+<ol>
+<li>Choose a <code>data-qu-&#60;name&#62;</code> attribute</li>
+<li>Add a mousedown check in the client&#8217;s mousedown handler</li>
+<li>Track state in mousemove</li>
+<li>Send an event on mouseup</li>
+<li>Applications emit SVG with the attribute — no per-widget changes</li>
+</ol>
+
+    </div>
+  </article>
+  <footer class="bottom-bar">
+    <span class="site-title">The Mechanical Researcher</span>
+  </footer>
+  <script>
+    (function() {
+      var toc = document.querySelector('.toc-list');
+      var cb = document.getElementById('toc-toggle');
+      if (toc && cb) toc.addEventListener('click', function() { cb.checked = false; });
+    })();
+  </script>
+  <script>
+    (function() {
+      var body = document.querySelector('.article-body');
+      if (!body) return;
+      body.addEventListener('click', function(e) {
+        var el = e.target;
+        if (el.tagName !== 'IMG' && el.tagName !== 'svg' && !el.closest('svg')) return;
+        if (el.closest('a') || el.closest('pre')) return;
+        var src = el.closest('svg') || el;
+        var overlay = document.createElement('div');
+        overlay.className = 'img-lightbox';
+        var close = document.createElement('button');
+        close.className = 'close-btn';
+        close.textContent = '\u00d7';
+        var clone = src.cloneNode(true);
+        clone.style.cssText = '';
+        clone.removeAttribute('width');
+        clone.removeAttribute('height');
+        overlay.appendChild(clone);
+        document.body.appendChild(close);
+        document.body.appendChild(overlay);
+        function dismiss() {
+          overlay.remove();
+          close.remove();
+        }
+        close.addEventListener('click', dismiss);
+        overlay.addEventListener('click', function(ev) {
+          if (ev.target === overlay) dismiss();
+        });
+        document.addEventListener('keydown', function esc(ev) {
+          if (ev.key === 'Escape') { dismiss(); document.removeEventListener('keydown', esc); }
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

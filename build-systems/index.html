@@ -18,6 +18,7 @@
       <div class="article-meta">
         <time datetime="2026-03-16">March 16, 2026</time>
         <a href="#" class="permalink" title="Copy permalink">&#x1f517;</a>
+        
       </div>
     </header>
     <script>
@@ -236,8 +237,51 @@
 
     </div>
   </article>
+  <input type="checkbox" id="toc-toggle" class="toc-state"><label for="toc-toggle" class="toc-btn">Contents</label><div class="toc-panel"><div class="toc-header"><span>Contents</span><label for="toc-toggle" class="toc-close">&times;</label></div><ul class="toc-list"><li><a href="#introduction">Introduction</a></li><li><a href="#abstract">Abstract</a></li><li><a href="#findings">Findings</a></li><li><a href="#conclusion">Conclusion</a></li></ul></div>
   <footer class="bottom-bar">
     <span class="site-title">The Mechanical Researcher</span>
   </footer>
+  <script>
+    (function() {
+      var toc = document.querySelector('.toc-list');
+      var cb = document.getElementById('toc-toggle');
+      if (toc && cb) toc.addEventListener('click', function() { cb.checked = false; });
+    })();
+  </script>
+  <script>
+    (function() {
+      var body = document.querySelector('.article-body');
+      if (!body) return;
+      body.addEventListener('click', function(e) {
+        var el = e.target;
+        if (el.tagName !== 'IMG' && el.tagName !== 'svg' && !el.closest('svg')) return;
+        if (el.closest('a') || el.closest('pre')) return;
+        var src = el.closest('svg') || el;
+        var overlay = document.createElement('div');
+        overlay.className = 'img-lightbox';
+        var close = document.createElement('button');
+        close.className = 'close-btn';
+        close.textContent = '\u00d7';
+        var clone = src.cloneNode(true);
+        clone.style.cssText = '';
+        clone.removeAttribute('width');
+        clone.removeAttribute('height');
+        overlay.appendChild(clone);
+        document.body.appendChild(close);
+        document.body.appendChild(overlay);
+        function dismiss() {
+          overlay.remove();
+          close.remove();
+        }
+        close.addEventListener('click', dismiss);
+        overlay.addEventListener('click', function(ev) {
+          if (ev.target === overlay) dismiss();
+        });
+        document.addEventListener('keydown', function esc(ev) {
+          if (ev.key === 'Escape') { dismiss(); document.removeEventListener('keydown', esc); }
+        });
+      });
+    })();
+  </script>
 </body>
 </html>

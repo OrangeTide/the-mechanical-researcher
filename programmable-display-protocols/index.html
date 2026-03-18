@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Programmable Display Protocols — The Mechanical Researcher</title>
+  <link rel="stylesheet" href="../static/css/article.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Sans+Condensed:wght@400;600&family=IBM+Plex+Mono:wght@400&display=swap">
+</head>
+<body>
+  <nav class="top-bar">
+    <a href="../index.html" class="back-link">&larr; Back to desk</a>
+  </nav>
+  <article class="research-article">
+    <header>
+      <span class="article-category">systems design</span>
+      <h1>Programmable Display Protocols</h1>
+      <div class="article-meta">
+        <time datetime="2026-03-17">March 17, 2026</time>
+        <a href="#" class="permalink" title="Copy permalink">&#x1f517;</a>
+        <a class="source-zip" href="programmable-display-protocols-source.zip" download>Source ZIP</a>
+      </div>
+    </header>
+    <script>
+      document.querySelector('.permalink').addEventListener('click', function(e) {
+        e.preventDefault();
+        var url = window.location.href.replace(/#.*$/, '');
+        navigator.clipboard.writeText(url).then(function() {
+          var el = e.target;
+          el.textContent = '\u2713';
+          el.classList.add('copied');
+          setTimeout(function() {
+            el.textContent = '\uD83D\uDD17';
+            el.classList.remove('copied');
+          }, 1500);
+        });
+      });
+    </script>
+    <div class="article-body">
+      
+<h2 id="introduction">Introduction</h2>
+<p>In 1986, James Gosling built a window system around a radical idea: instead of sending drawing commands to a display server, send <em>programs</em>. The server would execute them — handling events, animating widgets, tracking mouse drags — all without a single network round-trip. That system was NeWS, and it lost the protocol wars to X11 despite being technically superior in almost every measurable dimension.</p>
+<p>Nearly four decades later, we are still living with the consequences of that outcome. Modern display systems have largely converged on the thinnest possible server: Wayland composites pre-rendered buffers; web browsers execute JavaScript in a sandbox walled off from the rendering pipeline; VNC and RDP stream pixels. The &#8220;programmable display server&#8221; is a road not taken.</p>
+<p>But the pressures that motivated NeWS haven&#8217;t disappeared — they&#8217;ve intensified. Cloud rendering, edge computing, collaborative applications, and the growing gap between network latency and display refresh rates all point back to the same question Gosling was asking: <em>what if the display server could think?</em></p>
+<p>This research surveys the historical systems that explored programmable display protocols, distills the features a modern protocol would need, and evaluates four concrete architectural approaches — each making different trade-offs along the axes that have defined this design space since the 1980s.</p>
+<p><img src="lineage.svg" alt="Lineage and influence graph of display protocol technologies from Xerox Alto to the present"></p>
+<h2 id="abstract">Abstract</h2>
+<p>What would a modern programmable display protocol look like? From PLATO and Tektronix terminals through NeWS, Display PostScript, Plan 9, and Wayland, the history of display systems reveals recurring trade-offs between server intelligence and protocol simplicity that inform four candidate architectures for the future.</p>
+<h2 id="the-historical-landscape">The Historical Landscape</h2>
+<p>The history of display protocols is a history of arguments about where computation should live. Every system ever built for putting graphics on a screen has had to answer the same question: how much intelligence belongs in the display server, and how much in the client?</p>
+<p>The answer has shifted back and forth for sixty years. The earliest networked display systems were necessarily &#8220;thick&#8221; — terminals with their own processors, running programs downloaded from a host. As networks got faster and CPUs cheaper, the balance swung toward thin displays and rich clients. Understanding the arc requires starting earlier than the 1980s protocol wars.</p>
+<p><img src="timeline.svg" alt="Timeline of display systems from PLATO (1964) to modern compositors, showing both networked display protocols and local GUI milestones"></p>
+<h3 id="before-the-protocol-wars-terminals-that-could-think">Before the Protocol Wars: Terminals That Could Think</h3>
+<p><strong>PLATO</strong> (Programmed Logic for Automatic Teaching Operations) was perhaps the first system to demonstrate what a programmable display terminal could achieve at scale. Developed at the University of Illinois beginning in 1960, PLATO IV (1972) introduced custom plasma display terminals with 512×512 pixel resolution, built-in character generators, and — remarkably for 1972 — touch-sensitive screens. The terminals were not passive displays: they contained microprocessors that executed display logic locally, including character rendering, animation, and touch input processing. The host communicated with terminals through a proprietary protocol at 1260 baud, sending high-level instructions (&#8220;draw this character at these coordinates&#8221;, &#8220;erase this region&#8221;) rather than raw pixels.</p>
+<p>What made PLATO relevant to display protocol history was TUTOR, the programming language that ran on the host side. TUTOR programs controlled the terminal display through structured commands — <code>at</code>, <code>write</code>, <code>draw</code>, <code>circle</code>, <code>arrow</code> — that the host translated into terminal instructions. Interactive lessons with animated graphics, touch-driven responses, and real-time feedback ran over what was, by modern standards, a vanishingly thin network link. PLATO demonstrated the core principle that NeWS would later articulate: if the terminal is smart enough, you can achieve rich interactivity over a slow connection by pushing behavior to the display side.</p>
+<p>The <strong>Tektronix 4014</strong> (1972) took a different approach to networked graphics. Its storage tube display used a phosphor that retained images until explicitly erased — no refresh circuitry, no frame buffer. Drawing commands arrived as escape sequences over a serial connection: move-to, draw-to, point-plot, and various text modes. The lack of selective erase (you could only clear the entire screen) meant the 4014 was poorly suited for interactive manipulation, but it excelled at what it was designed for: displaying complex scientific and engineering graphics generated by remote programs.</p>
+<p>The 4014 became the <em>de facto</em> standard graphics terminal on ARPANET. Its simple escape-sequence protocol meant that any program capable of writing to a serial port could generate vector graphics — no special libraries required. Plot libraries like DISSPLA, ISSCO TELLAGRAF, and later GNU <code>gnuplot</code> all spoke Tektronix 4014 protocol. When bitmap displays arrived, terminal emulators (notably <code>xterm</code> with its Tektronix mode) kept the protocol alive. The 4014&#8217;s legacy is instructive: a protocol simple enough that <em>any program can speak it</em> achieves a penetration that more capable but more complex protocols cannot.</p>
+<p>Both PLATO and the Tektronix 4014 explored the design space well before NeWS and X11 formalized the arguments. PLATO showed that programmable terminals with local intelligence could deliver rich interactivity over constrained networks. The 4014 showed that a minimal, universally-speakable protocol could become a dominant standard despite severe functional limitations. These are the same trade-offs that would animate the protocol wars of the 1980s — and the same trade-offs we face today.</p>
+<h3 id="news-the-maximalist-answer">NeWS: The Maximalist Answer</h3>
+<p>NeWS was the most ambitious programmable display system ever deployed. Clients uploaded PostScript programs to the server, where they ran with direct access to the display, input events, and other server-side resources. A button&#8217;s hover highlight, a scrollbar&#8217;s drag tracking, a menu&#8217;s cascade animation — all executed inside the server with zero network traffic.</p>
+<p>The design exploited a deep insight about interactive graphics: most UI work is <em>local</em>. A slider doesn&#8217;t need to consult the application on every mouse-move event — it needs to update its visual position, and only notify the application when the user releases it. By running the slider&#8217;s logic server-side, NeWS reduced a stream of hundreds of mouse-motion events to a single &#8220;value changed&#8221; message.</p>
+<p>NeWS extended PostScript with lightweight processes, monitors for synchronization, a canvas hierarchy for windowing, and an event interest system where server-side procedures fired in response to input patterns. Clients registered <em>interests</em> — declarative descriptions of which events to handle — and the server dispatched accordingly, executing PostScript handlers without crossing the network.</p>
+<p>The cost was formidable. PostScript is a stack-based language that most application developers found alien. Debugging server-side PostScript was painful — errors in uploaded code could hang the display server or corrupt other clients&#8217; state. Security was essentially nonexistent; any client could upload code that interfered with any other client&#8217;s windows. And Sun controlled the implementation, which made the rest of the Unix vendor ecosystem nervous.</p>
+<p>NeWS lost to X11 in what Richard Gabriel might call a textbook case of &#8220;worse is better.&#8221; X11 was simpler, open, and good enough. The X Consortium provided neutral governance. Motif and later GTK&#47;Qt gave developers C-level toolkits that were easier to work with than raw PostScript. By 1993, Sun conceded, shipping CDE on X11 as its primary desktop.</p>
+<h3 id="display-postscript-the-pragmatic-middle">Display PostScript: The Pragmatic Middle</h3>
+<p>Adobe&#8217;s Display PostScript took a less radical approach. Where NeWS made PostScript the programming language for the entire window system, DPS used it only for rendering. Applications communicated through <em>wraps</em> — C functions generated by Adobe&#8217;s <code>pswrap</code> tool that, when called, sent pre-compiled PostScript fragments to the server for execution.</p>
+<p>The DPS server maintained persistent execution contexts per client, each with its own graphics state — transformation matrices, clipping paths, colors, fonts. Incremental updates were natural: a client sent a small PostScript program to modify a specific region of its window, and the server applied it within the existing context. Binary object sequences reduced wire overhead by roughly 50% compared to ASCII PostScript.</p>
+<p>NeXTSTEP was DPS&#8217;s showcase. The entire window system was built on it, and the result was remarkable for its time: true WYSIWYG across screen and printer, resolution-independent rendering, and a unified imaging model that made Interface Builder&#8217;s visual design tools possible. Steve Jobs chose DPS specifically because it collapsed the gap between screen and print — a selling point for NeXT&#8217;s target market in desktop publishing and higher education.</p>
+<p>DPS&#8217;s limitations were practical rather than fundamental. Adobe charged significant licensing fees. The PostScript interpreter was entirely software-rendered, with no path to hardware acceleration. On NeXTSTEP&#8217;s 25 MHz 68030 hardware, scrolling and window dragging were noticeably sluggish compared to contemporary X11 systems that could blit bitmaps directly.</p>
+<p>When Apple acquired NeXT in 1997, DPS&#8217;s legacy shaped what came next. Quartz 2D preserved the imaging model — paths, affine transforms, compositing, graphics state objects — while replacing PostScript with PDF as the underlying formalism. The <code>CGContext</code> API maps almost one-to-one onto PostScript operators (<code>CGContextMoveToPoint</code> ≈ <code>moveto</code>, <code>CGContextStrokePath</code> ≈ <code>stroke</code>), but executes as C function calls rather than interpreted code. Apple kept what worked (the imaging model) and discarded what didn&#8217;t (the interpreter, the licensing, the Turing-completeness in the display server).</p>
+<h3 id="the-blit-and-plan-9-programmability-through-composition">The Blit and Plan 9: Programmability Through Composition</h3>
+<p>Rob Pike&#8217;s work at Bell Labs took a different path entirely. The Blit terminal (1982) was a programmable bitmap display with its own 68000 processor. The host Unix system could download small C programs to the terminal, which would then execute locally — handling interactive graphics and text editing without host round-trips. This was NeWS&#8217;s core insight, arrived at independently and four years earlier. Like PLATO&#8217;s plasma terminals, the Blit demonstrated that pushing computation to the display side could transform a network-constrained connection into a responsive interactive experience.</p>
+<p>Plan 9&#8217;s window system, 8½ (and later rio), took the idea further by making it <em>compositional</em> rather than language-based. Each window appeared as a file system — <code>&#47;dev&#47;cons</code>, <code>&#47;dev&#47;mouse</code>, <code>&#47;dev&#47;draw</code> — and the window manager was an ordinary user process that multiplexed these file system interfaces. Any process could act as a window manager by mounting the appropriate interfaces. The display was programmable not because it ran a special language, but because it exposed standard interfaces that ordinary programs could interpose on.</p>
+<p>The draw device (<code>&#47;dev&#47;draw</code>) provided a 2D imaging protocol based on Porter-Duff compositing operations. Applications communicated by writing fixed-format binary messages to the device file — each message began with a single-byte opcode followed by binary parameters. The <code>draw</code> command (<code>d</code>) performed a general compositing operation: source image, mask image, destination image, destination point, source point, mask point — a single operation expressive enough to implement fills, copies, transparency, and masked blits. Line drawing (<code>l</code>, <code>L</code>), ellipses (<code>e</code>), and string rendering (<code>s</code>) provided higher-level primitives. Images were allocated server-side (<code>b</code> to allocate, <code>f</code> to free) and referred to by integer IDs — the same retained-mode pattern that appears in every successful display protocol.</p>
+<p>The elegance was in the uniformity. The entire graphics system reduced to compositing rectangles from one image onto another, with an optional mask — the twelve Porter-Duff operators (clear, SoverD, SatopD, SinD, etc.) as the compositing algebra. There were no special-case drawing modes, no modal state, no graphics context objects. A fill was a compositing operation from a solid-color source. A copy was a compositing operation with a full mask. Text rendering composited glyph images from a font cache. This minimalism made the protocol small enough to implement correctly (the draw device is roughly 2000 lines of C) and general enough to handle all 2D rendering needs.</p>
+<p>Where X11 required the server to implement dozens of drawing operations (lines, arcs, polygons, fills, stipples, tiles, text in multiple encodings) across multiple visuals and color depths — each with modal graphics context state — Plan 9&#8217;s draw device offered one operation that could express all of them. The contrast with X11 is instructive: X11&#8217;s protocol has over 120 request types; Plan 9&#8217;s draw device has roughly 20 message types, most of which are resource management (allocate image, load font, set clipping rectangle). The actual drawing vocabulary is tiny.</p>
+<p>Plan 9&#8217;s approach remains influential as a design philosophy: programmability emerges from composing simple, orthogonal mechanisms rather than from embedding a powerful language in a privileged server. The file system interface made network transparency a solved problem — <code>import</code> a remote machine&#8217;s <code>&#47;dev&#47;draw</code> and you had a remote display, using the same protocol (<code>9P</code>) that moved files, with the same authentication and encryption. No separate display protocol was needed.</p>
+<h3 id="an-aside-the-mgr-window-system">An Aside: The MGR Window System</h3>
+<p>Bellcore&#8217;s MGR (1984) deserves mention as an overlooked middle path. Where NeWS required clients to write PostScript and Plan 9 exposed file system interfaces, MGR used <em>escape sequences</em> — the same mechanism that VT100 terminals used for cursor positioning and text attributes, extended to support bitmap graphics, windows, and menus.</p>
+<p>An MGR client was any program that could write to a terminal. Drawing a line meant printing an escape sequence; creating a menu meant printing another. The entire protocol ran over pseudo-terminals, which meant standard Unix tools — <code>cat</code>, pipes, <code>ssh</code> — worked as transport without modification. A shell script could create windows and draw graphics. The barrier to entry was essentially zero.</p>
+<p>MGR ran on Sun workstations with as little as 1 MB of RAM, serving multiple concurrent clients with bitmap graphics, stacking windows, and mouse input. It supported network transparency through the simple expedient of running over TCP — no special protocol needed, because the protocol <em>was</em> the terminal data stream.</p>
+<p>The lesson from MGR is that protocol simplicity and ecosystem integration can matter more than expressive power. MGR could never match NeWS&#8217;s rendering sophistication, but it could be adopted incrementally by any program that could print to stdout. This principle — that the protocol should meet developers where they are — informs the design of the proof-of-concept that follows.</p>
+<h3 id="the-modern-landscape">The Modern Landscape</h3>
+<p>Today&#8217;s display systems have largely migrated to the opposite end of the spectrum from NeWS.</p>
+<h4 id="wayland-the-triumph-of-buffer-passing">Wayland: The Triumph of Buffer Passing</h4>
+<p>Wayland represents the logical endpoint of a trend that began with X11&#8217;s DRI (Direct Rendering Infrastructure) and Xgl: if clients are already rendering everything themselves using OpenGL or Vulkan, why maintain a server-side drawing protocol at all? Kristian Høgsberg&#8217;s answer, when he started Wayland in 2008, was that you shouldn&#8217;t. The Wayland protocol is deliberately minimal: clients render into buffers (shared memory, GBM, or DMA-BUF backed), attach them to a <code>wl_surface</code>, report which regions changed (<code>damage</code>), and <code>commit</code>. The compositor takes the buffer, composites it with other clients&#8217; buffers, and presents the result. There is no <code>DrawLine</code>, no <code>FillRectangle</code>, no <code>RenderString</code> — no drawing protocol whatsoever.</p>
+<p>The argument for this model is compelling in the local case. Modern GUI toolkits — GTK, Qt, Flutter, Chromium — already perform all rendering client-side using GPU-accelerated pipelines. X11&#8217;s server-side drawing operations had become vestigial; the Xrender extension and Cairo&#8217;s client-side rendering made them unnecessary for everything except legacy applications. By eliminating the drawing protocol entirely, Wayland removes an entire class of server complexity, reduces the attack surface, and lets clients use whatever rendering technology they choose. The compositor&#8217;s job shrinks to what a compositor actually needs to do: combine surfaces, manage input focus, and apply whole-surface transforms.</p>
+<p>But the buffer-passing model makes an implicit trade-off that becomes explicit in several scenarios:</p>
+<p><strong>Network transparency.</strong> Wayland has none. The protocol assumes shared memory or DMA-BUF — mechanisms that require the client and compositor to share a physical address space or GPU. Remote display over Wayland requires external solutions (RDP, VNC, PipeWire screen capture) that stream pixels, losing all structural information. This is a deliberate design choice, not an oversight — the Wayland developers argue that network transparency is better handled at a higher layer — but it means Wayland cannot serve the use case that motivated X11, NeWS, and the Tektronix 4014: a remote application displaying on a local screen.</p>
+<p><strong>Resolution independence.</strong> When a client renders to a buffer, it commits to a specific pixel resolution. Wayland&#8217;s <code>wp_fractional_scale</code> and <code>wp_viewport</code> protocols mitigate this by letting the compositor scale buffers and by informing clients of the desired scale factor, but the fundamental issue remains: the compositor receives pixels, not geometry. It cannot re-render a client&#8217;s output at a different resolution without the client&#8217;s cooperation. A vector-based protocol — even a simple one — would let the display server re-render at any resolution without client involvement.</p>
+<p><strong>Accessibility.</strong> An opaque buffer reveals nothing about its contents. Screen readers cannot inspect a Wayland surface to discover that it contains a button, a menu, or a text field — they must rely on a separate accessibility protocol (AT-SPI over D-Bus) that the client maintains independently. This creates a parallel data path: the visual representation goes through Wayland as pixels, while the semantic representation goes through AT-SPI as structured data. A display protocol that transmits structured scene descriptions would unify these paths, making the scene graph and the accessibility tree aspects of the same data.</p>
+<p><strong>Bandwidth.</strong> A full-screen 4K buffer at 32 bits per pixel is roughly 33 MB per frame. Damage tracking reduces this — only changed regions are transmitted — but even a modestly interactive application (text editor, spreadsheet) may damage a significant fraction of its surface on each keystroke as it re-renders text, updates scrollbars, and repaints selection highlights. A structured protocol that says &#8220;change this text node&#8217;s content to X&#8221; transmits bytes, not megapixels.</p>
+<p>The contrast with a vector-based display protocol is not as stark as it initially appears, however. Both models must ultimately produce pixels on a display; the question is where the rasterization happens and what crosses the interface boundary. Wayland says: rasterize client-side, pass pixels. A vector protocol says: pass geometry, rasterize server-side. The web platform shows that these aren&#8217;t mutually exclusive — HTML Canvas and WebGL are buffer-passing within a system that also supports structured SVG and DOM. A modern display protocol might similarly support both: structured scene graph operations for UI, with an escape hatch to buffer-passing for content that doesn&#8217;t fit the vector model (video, 3D viewports, custom rendering).</p>
+<h4 id="the-web-scenic-and-arcan">The Web, Scenic, and Arcan</h4>
+<p>The web platform occupies a fascinating middle position. The browser is, in effect, a display server that interprets a rich declarative language (HTML&#47;CSS&#47;SVG) and executes uploaded programs (JavaScript). CSS Houdini&#8217;s paint worklets are strikingly close to NeWS&#8217;s model: executable code uploaded to the rendering engine, running in a restricted context with direct access to drawing primitives. WebGPU compute shaders extend this further, allowing client-uploaded programs to execute on the GPU itself.</p>
+<p>Google&#8217;s Fuchsia operating system introduced Scenic, a scene-graph-based compositor where clients submit structured scene graph fragments rather than rendered buffers or drawing commands. Clients interact through FIDL (Fuchsia Interface Definition Language) — a typed IPC protocol with operations like <code>CreateResource</code>, <code>SetTranslation</code>, <code>SetShape</code>, <code>SetMaterial</code>, and <code>AddChild</code>. The compositor retains a tree of nodes — shapes, transforms, materials, clips — and performs rendering itself using Escher, a Vulkan-based renderer. This is neither NeWS&#8217;s &#8220;upload programs&#8221; model nor Wayland&#8217;s &#8220;upload pixels&#8221; model, but a middle ground: upload <em>structured data</em> that the server renders. Scenic evolved from a full 3D scene graph (GFX) to a simplified 2D-focused API (Flatland), suggesting that even purpose-built scene graph protocols benefit from simplification under real-world pressure.</p>
+<p>Arcan is perhaps the most ambitious modern attempt at a programmable display server, directly invoking the spirit of NeWS. Its compositor logic is written entirely in Lua — window management policies, visual effects, input routing, and custom UI elements are all scripts running inside the display server. Arcan&#8217;s A12 network protocol provides built-in network transparency with adaptive encoding: structured commands for UI elements, video codec for media content, with per-frame compression selection based on content type. Combined with its shmif client protocol (which supports structured content types, bidirectional communication, and state serialization), Arcan demonstrates that a modern programmable display server is technically viable — the question is whether it can achieve the ecosystem breadth that NeWS could not.</p>
+<p>Figma&#8217;s multiplayer architecture provides a production-scale data point from a different angle. Figma maintains its own scene graph in WASM memory (a C++ renderer compiled to WebAssembly) and synchronizes it across clients using operational transforms streamed over WebSocket in a compact binary format. The client renders to Canvas using a tile-based pipeline with incremental dirty-region updates. Figma is not a display protocol in the traditional sense, but it demonstrates that structured scene graph synchronization over WebSocket can work at scale with high interactivity — exactly the core mechanism a modern display protocol would need.</p>
+<p>On the rendering side, the Vello project (from the Google Fonts team) has demonstrated that GPU compute shaders can perform high-performance 2D vector rendering — processing path segments in parallel, binning them into tiles, and computing pixel coverage entirely on the GPU. Compiled to WASM with a WebGPU target, Vello makes the browser a viable platform for rendering complex vector scenes at frame rates far beyond what SVG&#8217;s DOM-based pipeline can achieve. This matters for a display protocol because it decouples the question of <em>what the protocol carries</em> (structured scene data) from <em>how it renders</em> (potentially a GPU-accelerated WASM engine rather than the browser&#8217;s native SVG renderer).</p>
+<p><img src="spectrum.svg" alt="Architectural spectrum from thick server (NeWS) to thin server (VNC), showing where each system falls"></p>
+<h2 id="design-requirements">Design Requirements</h2>
+<p>Drawing from the historical record, we can identify a set of capabilities that a modern programmable display protocol should provide. These are not features to be implemented all at once, but rather a minimum viable set that addresses the failure modes of past systems while preserving their strengths.</p>
+<p><strong>Resolution-independent vector imaging.</strong> The PostScript&#47;PDF&#47;SVG imaging model — paths, bezier curves, affine transforms, gradient fills, compositing — has proven durable across four decades. Any modern protocol should speak this language natively. Bitmap-only protocols (VNC) and buffer-only protocols (Wayland) discard semantic information that the server could exploit for caching, scaling, and bandwidth optimization.</p>
+<p><strong>Incremental, streaming updates.</strong> DPS&#8217;s strongest feature was its ability to send small PostScript fragments that modified an existing graphics state. A modern protocol must support fine-grained mutations — inserting a node, changing an attribute, removing a subtree — without retransmitting the entire scene. This is what makes the protocol viable over constrained networks.</p>
+<p><strong>Server-side state retention.</strong> The display server must maintain a persistent representation of the scene between updates. This enables the server to re-render at different resolutions, apply compositor effects (shadows, transparency, animations), and avoid redundant data transfer. Plan 9&#8217;s draw device, Fuchsia&#8217;s Scenic, and every browser&#8217;s DOM all demonstrate the value of retained-mode graphics.</p>
+<p><strong>Declarative animation and transition.</strong> NeWS showed that interactive behaviors can execute server-side to eliminate round-trips. But uploading Turing-complete programs raises security and complexity concerns. A modern protocol should support <em>declarative</em> animations and transitions — descriptions of motion that the server executes autonomously. SVG&#8217;s SMIL animations and CSS transitions are existence proofs that this works.</p>
+<p><strong>Sandboxed server-side computation.</strong> This is the NeWS feature that no successor has satisfactorily replaced. Some class of computation <em>must</em> run server-side for latency-critical interactions — hit testing, constraint resolution, scroll physics, gesture recognition. The key is sandboxing: the uploaded code must be memory-safe, time-bounded, and incapable of accessing other clients&#8217; state. WebAssembly provides the execution model; capability-based security provides the access model.</p>
+<p><strong>Structured event flow.</strong> NeWS&#8217;s event interest system was elegant: clients declared patterns describing which events to receive, and the server dispatched accordingly. A modern protocol should support event filtering, coalescing, and server-side preprocessing — reducing raw input streams to semantic events before they cross the wire.</p>
+<p><strong>Accessibility as a first-class concern.</strong> No historical display protocol addressed accessibility adequately. A modern protocol that transmits structured scene descriptions (rather than pixels) has a natural advantage: the scene graph <em>is</em> the accessibility tree, or can be mapped to one without screen-scraping heuristics.</p>
+<h2 id="candidate-architectures">Candidate Architectures</h2>
+<p>With these requirements established, we can evaluate concrete architectures. Each approach makes different trade-offs along the fundamental axes: server complexity vs. network efficiency, security vs. programmability, and adoption feasibility vs. architectural purity.</p>
+<p><img src="approaches.svg" alt="Four architectural approaches: SVG Streaming, Scene Graph Protocol, Reactive Dataflow, and WASM Programmable Compositor"></p>
+<h3 id="approach-a-svg-streaming-protocol">Approach A: SVG Streaming Protocol</h3>
+<p>The most conservative approach builds directly on SVG, the web&#8217;s existing vector graphics standard. An SVG streaming protocol would define a wire format for incremental mutations to an SVG document — insert element, set attribute, remove element, reorder children — transmitted over a persistent connection.</p>
+<p>The client maintains the authoritative application state and generates SVG mutations. The server (a browser, a dedicated renderer, or a compositor) maintains a retained SVG DOM and applies mutations as they arrive. SMIL animations handle declarative motion server-side. CSS custom properties provide a thin parameterization channel — the client can update a handful of numeric values and let CSS rules propagate the visual consequences.</p>
+<p><strong>Strengths.</strong> Adoption is the overwhelming advantage. SVG is a W3C standard implemented in every browser. The tooling ecosystem — editors, debuggers, accessibility tools — already exists. The gap between &#8220;SVG streaming protocol&#8221; and &#8220;what browsers already do&#8221; is small enough that a polyfill could demonstrate the concept. Accessibility comes nearly for free: SVG elements carry ARIA roles and the DOM is already exposed to screen readers.</p>
+<p><strong>Weaknesses.</strong> SVG&#8217;s DOM is not designed for high-frequency updates. Each mutation triggers style recalculation, layout, and repaint through the browser&#8217;s rendering pipeline — a pipeline optimized for document rendering, not interactive graphics. At thousands of mutations per second, this becomes a bottleneck. SVG also lacks a mechanism for server-side computation: there is no way to upload a hit-testing function or a scroll-physics routine. The protocol would be purely declarative, with all logic remaining client-side.</p>
+<p>The wire format presents a design choice. XML-based diffs are human-readable but verbose. A binary encoding (similar to DPS&#8217;s binary object sequences) would be more efficient but would sacrifice SVG&#8217;s inspectability. A hybrid approach — binary transport with XML-equivalent semantics — is possible but adds complexity.</p>
+<p><strong>Best suited for:</strong> applications where visual fidelity and accessibility matter more than interactive performance — dashboards, data visualizations, document rendering, collaborative whiteboards with moderate update rates.</p>
+<h3 id="approach-b-scene-graph-protocol">Approach B: Scene Graph Protocol</h3>
+<p>This approach defines a custom binary protocol for submitting and mutating a retained scene graph on the compositor. The scene graph consists of typed nodes — shapes, groups, transforms, clips, materials, text runs — organized in a tree. Clients submit subtrees and subsequent mutations; the compositor retains the tree and renders it.</p>
+<p>This is closest to what Fuchsia&#8217;s Scenic does. The protocol is structured: each operation targets a node by ID and specifies a typed mutation (set transform, change fill color, append child). The compositor owns the rendering pipeline and can optimize aggressively — batching draw calls, caching rasterized subtrees, applying resolution-appropriate level-of-detail.</p>
+<p><strong>Strengths.</strong> A purpose-built binary protocol can be extremely bandwidth-efficient. Node-level granularity allows the compositor to cache and invalidate precisely. The typed node model enables the compositor to understand the <em>structure</em> of the scene, not just its pixel output — enabling semantic zoom, compositor-driven animation, and principled accessibility tree generation. GPU acceleration is straightforward because the compositor controls the rendering pipeline end-to-end.</p>
+<p><strong>Weaknesses.</strong> A new protocol means a new ecosystem — renderers, debuggers, profilers, accessibility bridges — all must be built from scratch. This is the cost that killed Fresco&#47;Berlin in the 1990s and has slowed Scenic&#8217;s adoption outside Fuchsia. The protocol must be versioned carefully; adding new node types or mutation operations is a compatibility event. And like Approach A, there is no mechanism for server-side computation beyond what the compositor natively supports.</p>
+<p>Interoperability with the web is a challenge. A scene graph protocol could be bridged to SVG or Canvas, but the impedance mismatch would lose much of the performance advantage. Applications targeting this protocol would need dedicated client libraries rather than leveraging existing web APIs.</p>
+<p><strong>Best suited for:</strong> operating system-level display servers where the protocol can be mandated (as in Fuchsia), embedded systems with constrained bandwidth, and remote display scenarios where structured scene data dramatically outperforms pixel streaming.</p>
+<h3 id="approach-c-reactive-dataflow-protocol">Approach C: Reactive Dataflow Protocol</h3>
+<p>Rather than sending imperative mutations, this approach has the client declare <em>relationships</em> — reactive bindings and constraints that the server maintains autonomously. A slider&#8217;s thumb position is bound to a numeric value; the value is constrained to a range; the track fill width is derived from the value. The client sends the constraint graph; the server solves it continuously.</p>
+<p>This draws inspiration from constraint-based systems like TeX&#8217;s box-and-glue model, Apple&#8217;s Auto Layout (based on the Cassowary constraint solver), and reactive programming frameworks. The protocol transmits a dataflow graph: nodes are values, edges are derivation functions. The display server evaluates the graph, renders the visual result, and re-evaluates when inputs change — whether from client updates or from user input processed server-side.</p>
+<p><strong>Strengths.</strong> Reactive dataflow naturally handles the interactions that are most painful over a network: dragging, scrolling, resizing, animation. The server maintains the constraint graph and can resolve user input locally without round-trips. The declarative nature makes the protocol inspectable and debuggable — the constraint graph is a meaningful artifact, not an opaque stream of mutations. Animations are implicit: changing a constraint&#8217;s input triggers re-evaluation, and the server can interpolate between states.</p>
+<p><strong>Weaknesses.</strong> Constraint solving is computationally expensive. General constraint systems can have exponential worst-case behavior; even Cassowary (linear arithmetic constraints) adds meaningful overhead per constraint. A display server running constraint solvers for hundreds of clients must either limit expressiveness or accept variable frame rates. The protocol is also unfamiliar — there is no large developer community experienced with constraint-based UI beyond Auto Layout, and even Auto Layout is widely regarded as difficult to debug.</p>
+<p>The expressive boundary is the critical design challenge. Which constraints can the server solve? Linear arithmetic? Affine transforms? Arbitrary functions? Each extension makes the server more powerful but harder to implement, harder to sandbox, and harder to reason about. A reactive dataflow protocol risks becoming either too limited to be useful or too complex to be tractable.</p>
+<p><strong>Best suited for:</strong> form-heavy applications with structured layouts, responsive design across heterogeneous displays, and scenarios where the server must adapt the UI to local conditions (screen size, accessibility settings, user preferences) without client involvement.</p>
+<h3 id="approach-d-wasm-programmable-compositor">Approach D: WASM Programmable Compositor</h3>
+<p>This is the direct descendant of NeWS: clients upload executable code to the display server, where it runs with access to drawing primitives and input events. The critical difference from NeWS is the execution environment. Where NeWS used PostScript (Turing-complete, no memory safety, no isolation), this approach uses WebAssembly — a sandboxed, memory-safe, time-boundable bytecode format designed for exactly this kind of untrusted-code execution.</p>
+<p>A client submits a WASM module along with a capability manifest declaring what resources it needs: a drawing surface of specified dimensions, input events of specified types, a timer, access to specific shared state. The compositor validates the manifest against security policy, instantiates the module in a sandbox, and begins dispatching events to it. The module renders into its allocated surface using a drawing API exposed through WASM imports. The compositor composites all clients&#8217; surfaces into the final display.</p>
+<p><strong>Strengths.</strong> This is the only approach that fully addresses server-side computation. Hit testing, scroll physics, gesture recognition, text input handling, and custom animation curves can all execute server-side at native speed. WASM&#8217;s sandbox provides memory safety and can be time-bounded (fuel metering) to prevent runaway modules from starving other clients. The capability model provides principled security — a module can only access resources explicitly granted by its manifest. And WASM is language-agnostic: clients can write their rendering code in Rust, C, Go, or any language with a WASM target.</p>
+<p><strong>Weaknesses.</strong> Complexity is the dominant concern. The compositor becomes a WASM runtime, a capability manager, a resource allocator, and a rendering engine — a substantial surface area for bugs and security vulnerabilities. The WASM module itself is opaque to the compositor: unlike a scene graph or SVG DOM, the compositor cannot inspect the module&#8217;s visual output for accessibility, cannot apply compositor-level effects (shadows, transparency) to sub-elements, and cannot rerender at a different resolution without the module&#8217;s cooperation.</p>
+<p>Debugging is harder than in any other approach. When a visual glitch appears, is it in the client&#8217;s application logic, the WASM module&#8217;s rendering code, the compositor&#8217;s surface management, or the WASM runtime itself? Each layer has its own tooling and failure modes.</p>
+<p>The &#8220;opaque surface&#8221; problem deserves emphasis. NeWS&#8217;s great advantage over X11 was that the server <em>understood</em> what was being drawn — it could apply server-side logic to the scene&#8217;s structure. A WASM module that renders to a bitmap surface loses this advantage. The mitigation is a hybrid model: the module submits structured scene graph data <em>and</em> receives a drawing API for custom rendering within specific nodes. This is essentially how browsers work today (DOM for structure, Canvas for custom rendering), but formalized as a protocol.</p>
+<p><strong>Best suited for:</strong> latency-critical interactive applications (games, creative tools, collaborative editors), scenarios where server-side computation provides a measurable UX improvement, and systems where the compositor&#8217;s trust boundary is well-defined.</p>
+<h2 id="trade-off-analysis">Trade-off Analysis</h2>
+<p>The four approaches occupy different positions in the design space, and no single approach dominates across all dimensions.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>SVG Streaming</th>
+<th>Scene Graph</th>
+<th>Reactive Dataflow</th>
+<th>WASM Compositor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Network efficiency</strong></td>
+<td>Moderate (XML overhead)</td>
+<td>High (binary, structured)</td>
+<td>High (only changed inputs)</td>
+<td>Variable (depends on module)</td>
+</tr>
+<tr>
+<td><strong>Server-side computation</strong></td>
+<td>None</td>
+<td>Limited (built-in only)</td>
+<td>Constraint solving</td>
+<td>Full (sandboxed WASM)</td>
+</tr>
+<tr>
+<td><strong>Accessibility</strong></td>
+<td>Excellent (DOM-native)</td>
+<td>Good (structured tree)</td>
+<td>Good (constraint graph)</td>
+<td>Poor (opaque surfaces)</td>
+</tr>
+<tr>
+<td><strong>Security model</strong></td>
+<td>Trivial (no code exec)</td>
+<td>Trivial (no code exec)</td>
+<td>Moderate (constraint scope)</td>
+<td>Complex (WASM sandbox + capabilities)</td>
+</tr>
+<tr>
+<td><strong>Adoption path</strong></td>
+<td>Easy (extend existing web)</td>
+<td>Hard (new ecosystem)</td>
+<td>Medium (novel but declarative)</td>
+<td>Hard (new runtime)</td>
+</tr>
+<tr>
+<td><strong>Interactive latency</strong></td>
+<td>High (client round-trip)</td>
+<td>High (client round-trip)</td>
+<td>Low (server-side solving)</td>
+<td>Lowest (server-side code)</td>
+</tr>
+<tr>
+<td><strong>Debugging</strong></td>
+<td>Easy (browser DevTools)</td>
+<td>Moderate (new tooling)</td>
+<td>Hard (constraint debugging)</td>
+<td>Hardest (multi-layer)</td>
+</tr>
+<tr>
+<td><strong>GPU acceleration</strong></td>
+<td>Limited (browser pipeline)</td>
+<td>Natural (compositor-owned)</td>
+<td>Possible (solver output)</td>
+<td>Natural (module or compositor)</td>
+</tr>
+</tbody>
+</table>
+<p>The most revealing axis is the tension between <strong>interactive latency</strong> and <strong>accessibility</strong>. Approaches that move computation server-side (C, D) reduce latency but make the display server&#8217;s output harder to inspect semantically. Approaches that keep the display server purely declarative (A, B) are inherently inspectable but cannot eliminate client round-trips for interactive behaviors.</p>
+<p>This tension echoes the original NeWS vs. X11 trade-off, but modern technology offers partial resolutions that weren&#8217;t available in the 1980s. WASM sandboxing addresses NeWS&#8217;s security problems. Capability-based access control addresses its isolation problems. And a hybrid approach — structured scene graph <em>plus</em> sandboxed computation within designated nodes — could address the accessibility gap by ensuring that the overall scene structure remains inspectable even when individual elements are rendered by opaque code.</p>
+<h2 id="a-pragmatic-synthesis">A Pragmatic Synthesis</h2>
+<p>The historical record suggests that architectural purity is less important than ecosystem fit. NeWS was technically superior to X11 but lost because X11 was simpler, open, and had more vendors behind it. DPS was elegant but lost to bitmap-based rendering because hardware got fast enough to make brute force viable. Plan 9&#8217;s compositional approach was the most principled of all but never reached critical mass outside Bell Labs.</p>
+<p>A modern programmable display protocol that aims for adoption should probably be a <strong>layered architecture</strong> rather than a monolithic one:</p>
+<p><strong>Layer 1 — Structured scene graph.</strong> A retained tree of typed nodes (shapes, text, groups, clips, transforms) with a binary wire protocol for incremental mutations. This provides the baseline: resolution-independent rendering, compositor-level effects, accessibility, and efficient bandwidth usage. This layer can function standalone as a display protocol — equivalent to Approach B.</p>
+<p><strong>Layer 2 — Declarative behaviors.</strong> Animations, transitions, constraints, and event filters that execute server-side without uploaded code. This layer reduces round-trips for common interactive patterns (scrolling, resizing, hover effects, layout reflow) while remaining inspectable and safe. Built atop the scene graph as annotations on nodes.</p>
+<p><strong>Layer 3 — Sandboxed computation.</strong> WASM modules that execute within designated scene graph nodes, receiving drawing APIs and input events through capabilities. This layer is optional — clients that don&#8217;t need server-side computation never touch it. Clients that do get NeWS-class latency reduction within a modern security model.</p>
+<p>This layering has a direct historical parallel. It&#8217;s how the web platform evolved: HTML provides the scene graph (Layer 1), CSS provides declarative behaviors (Layer 2), and JavaScript provides programmable computation (Layer 3). The web&#8217;s success suggests that this layered approach — where each layer is independently useful and adoption is incremental — is more viable than any monolithic design.</p>
+<p>The key difference from the web platform would be that all three layers are designed as a <em>protocol</em> from the start, rather than evolving organically from a document format. The scene graph is binary and structured, not XML. The declarative behaviors are defined in terms of scene graph operations, not text styling. And the sandboxed computation layer is integrated with the compositor&#8217;s rendering pipeline, not walled off in a separate VM.</p>
+<h2 id="proof-of-concept-quaoar">Proof of Concept: Quaoar</h2>
+<p>The preceding analysis is necessarily abstract — four architectures evaluated against seven requirements across eight dimensions. To ground it, consider a concrete application of these ideas: an <strong>SVG-based thin client</strong> running in a web browser, serving the same role that X terminals and NeWS terminals once served.</p>
+<h3 id="the-model">The Model</h3>
+<p>The architecture mirrors X11&#8217;s <code>DISPLAY</code> model, but with modern materials:</p>
+<p>A user opens a browser tab pointing at a remote host. The browser loads a small JavaScript (or WASM) client — the <strong>display server</strong> — which opens a WebSocket connection back to the host. Remote applications on that host connect to the display server through a local socket or environment variable (analogous to <code>$DISPLAY</code>), and send scene graph operations over the WebSocket. The browser-side display server maintains a retained SVG DOM, applies mutations as they arrive, and routes user input events back to the applications.</p>
+<p>The key insight, borrowed directly from NeWS: <strong>widget libraries on the application side should push behavior to the display server</strong>. When an application creates a button, the widget library doesn&#8217;t just send &#8220;draw a rectangle with text&#8221; — it sends a self-contained declaration of the button&#8217;s visual states (idle, hover, pressed, focused, disabled), its transitions between states, and its event bindings. The display server handles hover highlighting, press animation, and focus indication locally, only sending a &#8220;clicked&#8221; event back to the application when the user completes the interaction.</p>
+<p>This is what NeWS did with PostScript programs uploaded to the display server. The difference is in the mechanism: instead of uploading Turing-complete PostScript, the widget library sends declarative descriptions — SVG elements with CSS state rules, SMIL or Web Animations API transitions, and event filter specifications. The display server executes these using the browser&#8217;s native capabilities, which are already optimized for exactly this kind of work.</p>
+<h3 id="what-travels-over-the-wire">What Travels Over the Wire</h3>
+<p>The protocol would define a small set of operations, encoded in a compact binary format:</p>
+<p><strong>Scene graph mutations:</strong> insert element (with full attribute set), remove element, set attribute, reorder children, set CSS custom property. Each element gets a protocol-level ID for subsequent reference. Subtrees can be sent as pre-composed fragments — a widget library would define a button template once, then instantiate it by reference with parameter bindings.</p>
+<p><strong>Behavior declarations:</strong> CSS rules scoped to a subtree, animation definitions (keyframes, timing, triggers), event interest registrations (which events to capture, whether to coalesce, whether to handle locally or forward to the application). A scroll container, for example, would declare scroll physics, overflow behavior, and scroll-position-to-transform bindings — the display server handles smooth scrolling locally, only notifying the application when it needs to load more content.</p>
+<p><strong>Resource management:</strong> font declarations, image data (or URLs for images the display server should fetch), gradient and pattern definitions. These are defined once and referenced by ID, avoiding redundant transmission.</p>
+<p><strong>Events flowing back:</strong> semantic events (button clicked, text entered, scroll position changed, selection made), not raw input. The display server coalesces mouse-move events, handles keyboard repeat, and resolves hit testing locally. The application receives high-level events with the relevant context attached.</p>
+<h3 id="the-widget-library">The Widget Library</h3>
+<p>On the application side, a widget library provides the programming interface. An application developer writes code like:</p>
+<pre><code>window = display.window("My Application", width=800, height=600)
+toolbar = window.toolbar()
+toolbar.button("Save", icon="disk", on_click=save_handler)
+toolbar.button("Undo", icon="arrow-left", on_click=undo_handler)
+
+canvas = window.canvas()
+canvas.on_draw(render_document)
+</code></pre>
+<p>The widget library translates this into protocol messages. <code>toolbar.button()</code> generates an SVG subtree (rectangle, icon, label), CSS rules for hover&#47;active&#47;focus states, animation definitions for press feedback, and an event interest for click events. The entire button — visuals, behavior, and interaction — crosses the wire as a single declarative bundle.</p>
+<p>For custom drawing (the <code>canvas.on_draw</code> case), the widget library provides a drawing API that generates SVG elements — paths, shapes, text, groups with transforms. The application builds its scene using this API, and the library batches the resulting SVG mutations into efficient protocol messages. Incremental updates after the initial draw send only the changed elements.</p>
+<h3 id="what-this-gains-over-pixel-streaming">What This Gains Over Pixel Streaming</h3>
+<p>The advantage over VNC or RDP-style pixel streaming is significant for the class of applications this targets — productivity tools, development environments, dashboards, administrative interfaces:</p>
+<p><strong>Bandwidth.</strong> A button widget is perhaps 200 bytes of protocol data. Its pixel representation at 2x DPI is thousands of bytes even with aggressive compression. An application with 50 widgets on screen might require 10 KB of protocol data for the initial layout, versus hundreds of KB for a compressed framebuffer. Subsequent updates are even more efficient — changing a label is a single set-attribute operation.</p>
+<p><strong>Latency perception.</strong> Because hover effects, press animations, focus indicators, scroll physics, and text cursor blinking all execute locally in the browser, the UI <em>feels</em> local even over a high-latency connection. The user sees immediate feedback for their interactions; only the semantic result (&#8220;user clicked Save&#8221;) needs to round-trip to the server. This is exactly the advantage NeWS demonstrated over X11 in the 1980s.</p>
+<p><strong>Resolution independence.</strong> The SVG scene scales perfectly to any display DPI. A user on a 4K display and a user on a 1080p display receive the same protocol data; the browser handles rendering at the appropriate resolution. No server-side awareness of client display characteristics is needed.</p>
+<p><strong>Accessibility.</strong> The SVG DOM in the browser is exposed to screen readers, supports keyboard navigation, and respects user preferences for reduced motion, high contrast, and font size. The application developer gets accessibility largely for free from the widget library&#8217;s semantic SVG output.</p>
+<p><strong>Searchability.</strong> Text in the remote application is real text in the browser&#8217;s DOM. The user can Ctrl+F to search, select and copy text, and use browser translation tools — none of which work with pixel-streamed remote desktops.</p>
+<h3 id="what-this-loses">What This Loses</h3>
+<p>The model has genuine limitations:</p>
+<p><strong>Arbitrary rendering.</strong> Applications that need pixel-level control — image editors, 3D viewports, video players — cannot be served purely through SVG. The protocol would need an escape hatch: a &#8220;surface&#8221; element where the application streams compressed image data (H.264, WebP) for content that doesn&#8217;t fit the vector model. This is the same hybrid approach that RDP and SPICE use — structured commands for UI chrome, pixel streaming for media content.</p>
+<p><strong>Performance ceiling.</strong> SVG DOM performance in browsers tops out at roughly 5,000–10,000 elements before style recalculation and layout become bottlenecks. A complex application (a large spreadsheet, a densely populated IDE) might exceed this. Mitigations include viewport-aware culling (only elements in view are in the DOM), element recycling for scrolling lists, and canvas-rendered regions for dense data.</p>
+<p><strong>Application ecosystem.</strong> This model requires applications to be written against the widget library, or for existing GUI toolkits to gain a new backend that speaks the protocol. This is the same adoption challenge that faced NeWS (requiring PostScript UI code), Broadway (requiring GTK), and every other remote display system. The most practical path is to target an existing toolkit — a Qt or GTK backend that outputs protocol messages rather than rendering locally — so that existing applications can participate without modification.</p>
+<h3 id="historical-precedent">Historical Precedent</h3>
+<p>This scenario is not as novel as it might appear. GTK&#8217;s Broadway backend already does something similar — it renders GTK applications to HTML5 Canvas commands streamed over WebSocket, allowing any GTK application to display in a browser. Broadway proves the model works but uses Canvas (immediate-mode, pixel-oriented) rather than SVG (retained-mode, structured). An SVG-based approach would inherit Broadway&#8217;s demonstrated viability while gaining the bandwidth, accessibility, and resolution-independence advantages of structured vector graphics.</p>
+<p>NoMachine&#8217;s NX protocol took a related approach for X11 — proxying and compressing X11&#8217;s structured drawing commands rather than streaming pixels. NX achieved order-of-magnitude bandwidth reductions over raw X11 forwarding for typical desktop applications, demonstrating the value of preserving semantic structure in the wire protocol.</p>
+<p>The Arcan display server&#8217;s A12 network protocol is perhaps the most forward-looking precedent. A12 supports adaptive encoding — structured commands for UI elements, video codec for media content — with built-in encryption and content-type awareness. Combined with Arcan&#8217;s Lua-scriptable compositor, A12 demonstrates that a modern network display protocol can be both structured and adaptive.</p>
+<p>What none of these precedents attempted is the NeWS-style behavior offloading — pushing interactive widget logic to the display server. That is the distinctive feature of the SVG thin client model, and it&#8217;s enabled by a coincidence of modern capabilities: browsers already implement a rich, optimized rendering engine with declarative animation, event handling, and accessibility support. The display protocol merely needs to expose these capabilities to remote applications in a structured way.</p>
+<h3 id="quaoar-a-proof-of-concept">Quaoar: A Proof of Concept</h3>
+<p>To test whether the SVG thin client model is viable beyond paper analysis, we built a minimal working prototype called <strong>Quaoar</strong> (named after the trans-Neptunian object). The system consists of four components:</p>
+<p><strong>quaoar-server</strong> — a C daemon (~300 lines) that bridges WebSocket and Unix socket connections. It accepts one WebSocket connection from a browser and multiplexes Unix socket connections from applications. On the Unix side, messages use djb netstring framing (<code>length:data,</code>) — simple, self-delimiting, and trivial to implement in C. On the WebSocket side, the built-in framing handles delimitation. The server performs the HTTP upgrade handshake itself (including a minimal inline SHA-1 for the <code>Sec-WebSocket-Accept</code> computation), making it proxy-agnostic — it works standalone for development and behind nginx, caddy, haproxy, or even stunnel for production TLS termination.</p>
+<p><strong>libquaoar</strong> — a C client library (~385 lines) that connects to the Unix socket and provides a widget API. An application creates windows and widgets with simple function calls, registers event callbacks, and runs an event loop. The library handles netstring framing, message formatting, and event dispatch. Widget convenience functions (buttons, labels, scrollbars) emit complete SVG markup with SMIL animations for hover and press states — the display server receives self-contained visual declarations rather than abstract widget types. The API:</p>
+<pre><code class="language-c">qu_ctx *ctx = qu_connect(NULL); &#47;* reads QUAOAR_DISPLAY env *&#47;
+
+int win = qu_window(ctx, "Notepad", 80, 60, 480, 340);
+int btn = qu_button(ctx, win, "Save", 10, 10, 70, 28);
+int ta  = qu_textarea(ctx, win, 10, 48, 460, 272);
+
+qu_on_event(ctx, btn, on_save, NULL);
+qu_on_event(ctx, ta,  on_text, NULL);
+
+struct pollfd pfd = { .fd = qu_fd(ctx), .events = POLLIN };
+while (poll(&#38;pfd, 1, -1) &#62;= 0)
+    if (qu_process(ctx) &#60; 0) break;
+</code></pre>
+<p><strong>quaoar-client.html</strong> — the browser-based display server (~320 lines of JavaScript). It connects via WebSocket, maintains an SVG scene, and acts as a generic SVG insertion engine: it parses incoming SVG markup (via <code>DOMParser</code>) and inserts it into the document. Because the C library emits complete SVG+SMIL declarations, the client needs no widget-specific rendering code — button hover effects, scrollbar drag behavior, and press animations all execute through the browser&#8217;s native SVG&#47;SMIL engine with zero network round-trips. Only semantic events (&#8220;button clicked&#8221;, &#8220;text changed&#8221;, &#8220;window closed&#8221;) are sent back to applications. A status overlay shows connection state and provides a hamburger menu for connect&#47;disconnect.</p>
+<p><strong>notepad</strong> — a sample application (~50 lines of C) that creates a window with Save and Load buttons and a text area. It demonstrates the complete round-trip: the widget library sends scene graph operations to the browser, the browser handles all interactive behavior locally, and the application only sees high-level events like &#8220;save button clicked&#8221; or &#8220;text content changed.&#8221;</p>
+<p>The full source is in the <code>demo&#47;</code> directory. Build with <code>make</code>, run <code>quaoar-server</code>, open <code>quaoar-client.html</code> in a browser, and launch <code>notepad</code>. Deployment behind a reverse proxy is documented in <code>nginx.conf.example</code>.</p>
+<p>The protocol uses a header+payload format: the first line is space-delimited metadata, and everything after the newline is raw payload (SVG markup, text content, etc.). This avoids the double-escaping problem that plagues JSON-wrapped SVG — the SVG passes through untouched:</p>
+<pre><code>window 1 80 60 480 340
+Notepad
+</code></pre>
+<pre><code>svg 2 1
+&#60;g transform="translate(10,10)" style="cursor:pointer"&#62;
+  &#60;rect width="70" height="28" rx="4" fill="#5a5a62"&#62;
+    &#60;set attributeName="fill" to="#6a6a72"
+         begin="mouseover" end="mouseout"&#47;&#62;
+    &#60;set attributeName="fill" to="#4a4a52"
+         begin="mousedown" end="mouseup"&#47;&#62;
+  &#60;&#47;rect&#62;
+  &#60;text x="35" y="18" fill="#eee" font-size="12"
+        text-anchor="middle"&#62;Save&#60;&#47;text&#62;
+&#60;&#47;g&#62;
+</code></pre>
+<pre><code>listen 2 click
+</code></pre>
+<p>The button&#8217;s hover highlight and press depression are SMIL <code>&#60;set&#62;</code> animations — they execute in the browser&#8217;s SVG engine with no JavaScript and no network traffic. The display client doesn&#8217;t know what a &#8220;button&#8221; is; it just inserts SVG and wires up event listeners as instructed.</p>
+<p>Events flowing back are equally simple:</p>
+<pre><code>1 event 2 click
+1 event 3 text
+user typed this
+</code></pre>
+<p>The server prepends the application ID (first token) so the display client can route events to the correct Unix socket connection. Payloads (like text content) appear after the newline.</p>
+<p>The prototype validates the core thesis: a browser-based display server receiving structured SVG scene operations over WebSocket can provide a responsive interactive experience for remote applications, with behavior offloading that eliminates round-trips for common interactions. At ~1000 lines of C and ~320 lines of JavaScript — with no external dependencies — the implementation cost is modest.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>The dream of a programmable display server — computation living where the pixels are — has resurfaced in fragments across the modern landscape. CSS Houdini paint worklets upload rendering code to the browser. WebGPU compute shaders execute client-authored programs on the GPU. Fuchsia&#8217;s Scenic retains a server-side scene graph. Arcan scripts its compositor in Lua. Each is a partial answer to the question NeWS asked in 1986.</p>
+<p>What emerges from this survey is that the question was never really &#8220;should the display server be programmable?&#8221; — every successful display system has been programmable to some degree. The question is <em>how much</em> programmability, <em>what kind</em>, and <em>with what safety guarantees</em>. NeWS answered &#8220;total programmability, through a general-purpose language, with no safety guarantees&#8221; — and lost. The web answered &#8220;total programmability, through a sandboxed language, with significant safety guarantees&#8221; — and won, but not as a display protocol; as something much larger and stranger.</p>
+<p>A modern programmable display protocol would thread the needle: structured scene data for inspectability and accessibility, declarative behaviors for common interactions, sandboxed computation for everything else. The pieces exist. The imaging model is SVG&#47;PDF&#8217;s, proven across four decades. The scene graph structure is Scenic&#8217;s, designed for compositors. The declarative behaviors are CSS&#8217;s, battle-tested in billions of documents. The sandboxed computation is WASM&#8217;s, designed for untrusted code. What&#8217;s missing is not technology but <em>assembly</em> — the work of combining these pieces into a coherent protocol with a single wire format, a single security model, and a single compositor architecture.</p>
+<p>Whether that assembly happens depends less on technical merit than on the same forces that shaped the protocol wars of the 1980s: openness, governance, ecosystem breadth, and the willingness of enough vendors to commit to a shared standard. NeWS teaches us that being right is not enough. X11 teaches us that being simple and open can compensate for being wrong. The web teaches us that layered, incrementally-adoptable architectures outlast monolithic designs. A modern programmable display protocol should learn from all three.</p>
+
+    </div>
+  </article>
+  <input type="checkbox" id="toc-toggle" class="toc-state"><label for="toc-toggle" class="toc-btn">Contents</label><div class="toc-panel"><div class="toc-header"><span>Contents</span><label for="toc-toggle" class="toc-close">&times;</label></div><ul class="toc-list"><li><a href="#introduction">Introduction</a></li><li><a href="#abstract">Abstract</a></li><li><a href="#the-historical-landscape">The Historical Landscape</a></li><li><a href="#design-requirements">Design Requirements</a></li><li><a href="#candidate-architectures">Candidate Architectures</a></li><li><a href="#trade-off-analysis">Trade-off Analysis</a></li><li><a href="#a-pragmatic-synthesis">A Pragmatic Synthesis</a></li><li><a href="#proof-of-concept-quaoar">Proof of Concept: Quaoar</a></li><li><a href="#conclusion">Conclusion</a></li></ul></div>
+  <footer class="bottom-bar">
+    <span class="site-title">The Mechanical Researcher</span>
+  </footer>
+  <script>
+    (function() {
+      var toc = document.querySelector('.toc-list');
+      var cb = document.getElementById('toc-toggle');
+      if (toc && cb) toc.addEventListener('click', function() { cb.checked = false; });
+    })();
+  </script>
+  <script>
+    (function() {
+      var body = document.querySelector('.article-body');
+      if (!body) return;
+      body.addEventListener('click', function(e) {
+        var el = e.target;
+        if (el.tagName !== 'IMG' && el.tagName !== 'svg' && !el.closest('svg')) return;
+        if (el.closest('a') || el.closest('pre')) return;
+        var src = el.closest('svg') || el;
+        var overlay = document.createElement('div');
+        overlay.className = 'img-lightbox';
+        var close = document.createElement('button');
+        close.className = 'close-btn';
+        close.textContent = '\u00d7';
+        var clone = src.cloneNode(true);
+        clone.style.cssText = '';
+        clone.removeAttribute('width');
+        clone.removeAttribute('height');
+        overlay.appendChild(clone);
+        document.body.appendChild(close);
+        document.body.appendChild(overlay);
+        function dismiss() {
+          overlay.remove();
+          close.remove();
+        }
+        close.addEventListener('click', dismiss);
+        overlay.addEventListener('click', function(ev) {
+          if (ev.target === overlay) dismiss();
+        });
+        document.addEventListener('keydown', function esc(ev) {
+          if (ev.key === 'Escape') { dismiss(); document.removeEventListener('keydown', esc); }
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

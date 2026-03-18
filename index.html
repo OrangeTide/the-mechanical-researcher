@@ -11,8 +11,13 @@
 <body>
   <div class="desk-scene">
     <div class="desk-surface">
-      <div class="mug"><span class="mug-base"></span></div>
-      <div class="pen"></div>
+      <div class="mug"><span class="mug-chip"></span><span class="mug-base"></span></div>
+      <div class="pen" id="pen"></div>
+      <div class="packages" id="packages" title="Source downloads">
+        <div class="package package-bottom"></div>
+        <div class="package package-top"></div>
+      </div>
+      <button class="info-btn" id="info-btn" title="About this site">?</button>
       <div class="card-stack" id="card-stack">
         <!-- card stack visual (decorative) -->
       </div>
@@ -25,6 +30,23 @@
     <div class="grid-container" id="grid-container"></div>
   </div>
   <button class="grid-close" id="grid-close">&times;</button>
+  <div class="packages-overlay" id="packages-overlay">
+    <div class="packages-modal">
+      <button class="packages-close" id="packages-close">&times;</button>
+      <h2 class="packages-title">Source Downloads</h2>
+      <div class="packages-list" id="packages-list"></div>
+    </div>
+  </div>
+  <div class="info-overlay" id="info-overlay">
+    <div class="info-card">
+      <button class="info-close" id="info-close">&times;</button>
+      <p>The concept I had for this blog was that you can read an article while drinking your coffee or tea.</p>
+      <p>The articles themselves are based on my box of note cards with random ideas I never got around to doing. I have perhaps 50+ potential topics in my index cards and moleskine alone, collected over about 25 years.</p>
+      <p>And realistically I&rsquo;m not going to do any of them. So I&rsquo;ve fed into the AI slop machine to construct something that readers might find entertaining and informative and maybe even insightful.</p>
+      <p>Perhaps if one of these research topics yields something interesting that will inspire someone to dive into it further.</p>
+      <p class="info-hint">(try clicking the coffee cup to begin)</p>
+    </div>
+  </div>
   <footer class="bottom-bar">
     <span class="site-title">The Mechanical Researcher</span>
     <a href="feed.xml" class="rss-link" title="RSS Feed">
@@ -36,7 +58,10 @@
   </footer>
   <script>
     window.CARDS = [
-      {"title":"Build Systems","abstract":"A comparative analysis of build system design — make, tup, Plan 9 mk, Perforce Jam, Ninja, and CMake.","date":"2026-03-16","dateDisplay":"March 16, 2026","category":"software engineering","url":"build-systems/index.html"}
+      {"title":"Programmable Display Protocols","abstract":"What would a modern programmable display protocol look like? From PLATO and Tektronix terminals through NeWS, Display PostScript, Plan 9, and Wayland, the history of display systems reveals recurring trade-offs between server intelligence and protocol simplicity that inform four candidate architectures for the future.","date":"2026-03-17","dateDisplay":"March 17, 2026","category":"systems design","url":"programmable-display-protocols/index.html"},{"title":"Build Systems","abstract":"A comparative analysis of build system design — make, tup, Plan 9 mk, Perforce Jam, Ninja, and CMake.","date":"2026-03-16","dateDisplay":"March 16, 2026","category":"software engineering","url":"build-systems/index.html"}
+    ];
+    window.PACKAGES = [
+      {"name":"Programmable Display Protocols","zip":"programmable-display-protocols/programmable-display-protocols-source.zip","date":"2026-03-17","dateDisplay":"March 17, 2026","size":"30 KB","article":"programmable-display-protocols/index.html"}
     ];
   </script>
   <script src="static/js/card-stack.js"></script>
