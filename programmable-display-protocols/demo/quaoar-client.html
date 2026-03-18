@@ -1,0 +1,375 @@
+<!-- quaoar-client.html : browser-based display server for quaoar protocol -->
+<!-- Copyright (c) 2026 — MIT-0 OR Public Domain -->
+<!-- Written with AI assistance (Claude, Anthropic) -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quaoar Display</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #2a2a2e; font-family: system-ui, sans-serif; }
+
+#display { width: 100%; height: 100%; }
+
+/* Status overlay */
+#status { position: fixed; top: 8px; right: 8px; display: flex; align-items: center; gap: 8px; z-index: 9999;
+  background: rgba(0,0,0,0.6); border-radius: 6px; padding: 4px 10px; color: #ccc; font-size: 13px; }
+#status-light { width: 10px; height: 10px; border-radius: 50%; background: #c44; transition: background 0.3s; }
+#status-light.on { background: #4c4; }
+#hamburger { cursor: pointer; font-size: 18px; color: #aaa; user-select: none; }
+#hamburger:hover { color: #fff; }
+#menu { display: none; position: fixed; top: 36px; right: 8px; background: #3a3a3e; border: 1px solid #555;
+  border-radius: 6px; padding: 8px 0; z-index: 9999; min-width: 180px; color: #ddd; font-size: 13px; }
+#menu.show { display: block; }
+#menu div { padding: 6px 14px; cursor: pointer; }
+#menu div:hover { background: #505058; }
+
+/* Window chrome */
+.qu-titlebar { cursor: grab; }
+.qu-titlebar:active { cursor: grabbing; }
+.qu-close:hover rect { fill: #e44; }
+</style>
+</head>
+<body>
+<svg id="display" xmlns="http://www.w3.org/2000/svg"></svg>
+
+<div id="status">
+  <span id="hamburger" onclick="toggleMenu()">&#9776;</span>
+  <span id="status-text">disconnected</span>
+  <span id="status-light"></span>
+</div>
+<div id="menu">
+  <div onclick="doConnect()">Connect</div>
+  <div onclick="doDisconnect()">Disconnect</div>
+</div>
+
+<script>
+"use strict";
+
+/* ── Configuration ────────────────────────────────────────────────────── */
+const WS_URL = (location.protocol === "https:" ? "wss:" : "ws:") + "//" + location.host + "/ws";
+const WS_URL_DEV = "ws://127.0.0.1:9090";
+
+/* ── State ────────────────────────────────────────────────────────────── */
+let ws = null;
+const widgets = new Map();
+const svg = document.getElementById("display");
+let dragState = null;
+let quDrag = null;
+let quXY = null;
+
+/* ── Status bar ───────────────────────────────────────────────────────── */
+const statusLight = document.getElementById("status-light");
+const statusText = document.getElementById("status-text");
+const menu = document.getElementById("menu");
+
+function setConnected(on) {
+  statusLight.classList.toggle("on", on);
+  statusText.textContent = on ? "connected" : "disconnected";
+}
+
+function toggleMenu() { menu.classList.toggle("show"); }
+document.addEventListener("click", e => {
+  if (!e.target.closest("#hamburger") && !e.target.closest("#menu")) menu.classList.remove("show");
+});
+
+/* ── WebSocket ────────────────────────────────────────────────────────── */
+function doConnect() {
+  menu.classList.remove("show");
+  if (ws && ws.readyState <= 1) return;
+  tryConnect(WS_URL, () => tryConnect(WS_URL_DEV, () => {
+    statusText.textContent = "connection failed";
+  }));
+}
+
+function tryConnect(url, onFail) {
+  const s = new WebSocket(url);
+  s.onopen = () => { ws = s; setConnected(true); setupWS(s); };
+  s.onerror = () => { s.close(); if (onFail) onFail(); };
+}
+
+function setupWS(s) {
+  s.onmessage = e => handleMessage(e.data);
+  s.onclose = () => { ws = null; setConnected(false); clearAll(); };
+}
+
+function doDisconnect() {
+  menu.classList.remove("show");
+  if (ws) ws.close();
+}
+
+function sendEvent(app, id, event, value) {
+  if (!ws) return;
+  let msg = app + " event " + id + " " + event;
+  if (value !== undefined) msg += "\n" + value;
+  ws.send(msg);
+}
+
+/* ── Protocol handler (header + payload, space-delimited) ─────────────── */
+function handleMessage(raw) {
+  const nl = raw.indexOf("\n");
+  const hdr = nl >= 0 ? raw.substring(0, nl) : raw;
+  const body = nl >= 0 ? raw.substring(nl + 1) : "";
+  const f = hdr.split(" ");
+  const app = +f[0], op = f[1];
+
+  switch (op) {
+    case "hello":
+      document.title = "Quaoar \u2014 QUAOAR_DISPLAY=" + f.slice(2).join(" ");
+      statusText.textContent = "connected \u2014 " + f.slice(2).join(" ");
+      break;
+    case "window":
+      mkWindow(app, +f[2], +f[3], +f[4], +f[5], +f[6], body);
+      break;
+    case "textarea":
+      mkTextArea(app, +f[2], +f[3], +f[4], +f[5], +f[6], +f[7]);
+      break;
+    case "svg":
+      mkSvg(app, +f[2], +f[3], body);
+      break;
+    case "listen":
+      addListener(app, +f[2], f[3]);
+      break;
+    case "update":
+      doUpdate(app, +f[2], f[3] || "text", body);
+      break;
+    case "remove":
+      doRemove(app, +f[2]);
+      break;
+    case "clipboard":
+      navigator.clipboard.writeText(body).catch(() => {});
+      break;
+    case "disconnect":
+      removeApp(+f[2]);
+      break;
+  }
+}
+
+function wkey(app, id) { return app + "-" + id; }
+
+function clearAll() {
+  for (const [k, w] of widgets) { if (w.el && w.el.parentNode) w.el.parentNode.removeChild(w.el); }
+  widgets.clear();
+}
+
+function removeApp(app) {
+  for (const [k, w] of widgets) {
+    if (w.app === app) { if (w.el && w.el.parentNode) w.el.parentNode.removeChild(w.el); widgets.delete(k); }
+  }
+}
+
+function doRemove(app, id) {
+  const key = wkey(app, id);
+  const w = widgets.get(key);
+  if (w && w.el && w.el.parentNode) w.el.parentNode.removeChild(w.el);
+  widgets.delete(key);
+}
+
+/* ── SVG insertion (widgets rendered by the C library) ────────────────── */
+function mkSvg(app, id, parent, markup) {
+  const key = wkey(app, id);
+  const ns = "http://www.w3.org/2000/svg";
+  const doc = new DOMParser().parseFromString(
+    `<svg xmlns="${ns}">${markup}</svg>`, "image/svg+xml");
+  const parsed = doc.documentElement.firstChild;
+  if (!parsed) return;
+  const el = document.importNode(parsed, true);
+  el.id = "qu-" + key;
+  appendToParent(app, parent, el);
+  widgets.set(key, { app, id, el });
+}
+
+function addListener(app, id, event) {
+  const el = document.getElementById("qu-" + wkey(app, id));
+  if (!el) return;
+  el.addEventListener(event, e => {
+    e.stopPropagation();
+    sendEvent(app, id, event);
+  });
+}
+
+/* ── Typed widgets (window, textarea) ─────────────────────────────────── */
+function svgEl(tag, attrs) {
+  const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const [k, v] of Object.entries(attrs || {})) el.setAttribute(k, v);
+  return el;
+}
+
+function appendToParent(app, parent, el) {
+  if (!parent) { svg.appendChild(el); return; }
+  const pw = widgets.get(wkey(app, parent));
+  if (pw && pw.content) pw.content.appendChild(el);
+  else if (pw && pw.el) pw.el.appendChild(el);
+  else svg.appendChild(el);
+}
+
+function mkWindow(app, id, x, y, w, h, title) {
+  const key = wkey(app, id);
+  const TITLE_H = 30;
+  const g = svgEl("g", { transform: `translate(${x},${y})` });
+  g.style.filter = "drop-shadow(2px 4px 8px rgba(0,0,0,0.5))";
+
+  g.appendChild(svgEl("rect", { width: w, height: h + TITLE_H, rx: 6, fill: "#3c3c40", stroke: "#555", "stroke-width": 1 }));
+
+  const tb = svgEl("g", { class: "qu-titlebar" });
+  tb.appendChild(svgEl("rect", { width: w, height: TITLE_H, rx: 6, fill: "#505058" }));
+  tb.appendChild(svgEl("rect", { y: TITLE_H - 6, width: w, height: 6, fill: "#505058" }));
+  tb.appendChild(svgEl("text", { x: 10, y: 20, fill: "#eee", "font-size": 13, "font-family": "system-ui, sans-serif", "pointer-events": "none" })).textContent = title || "Window";
+
+  const cls = svgEl("g", { class: "qu-close", transform: `translate(${w - 26}, 5)` });
+  cls.appendChild(svgEl("rect", { width: 20, height: 20, rx: 3, fill: "#666", cursor: "pointer" }));
+  cls.appendChild(svgEl("text", { x: 6, y: 15, fill: "#ddd", "font-size": 14, "pointer-events": "none" })).textContent = "\u00d7";
+  cls.addEventListener("click", () => sendEvent(app, id, "close"));
+  tb.appendChild(cls);
+  g.appendChild(tb);
+
+  let ox, oy, sx, sy;
+  tb.addEventListener("mousedown", e => {
+    if (e.target.closest(".qu-close")) return;
+    e.preventDefault();
+    const t = g.getAttribute("transform").match(/translate\(([^,]+),([^)]+)\)/);
+    ox = parseFloat(t[1]); oy = parseFloat(t[2]);
+    sx = e.clientX; sy = e.clientY;
+    dragState = { g, ox, oy, sx, sy };
+    svg.appendChild(g);
+  });
+
+  const content = svgEl("g", { transform: `translate(0,${TITLE_H})` });
+  g.appendChild(content);
+  svg.appendChild(g);
+  widgets.set(key, { app, id, el: g, content });
+}
+
+function mkTextArea(app, id, parent, x, y, w, h) {
+  const key = wkey(app, id);
+  const fo = svgEl("foreignObject", { x, y, width: w, height: h });
+  const ta = document.createElement("textarea");
+  ta.style.cssText = `width:100%;height:100%;resize:none;border:1px solid #666;border-radius:4px;
+    background:#2a2a2e;color:#eee;font-family:monospace;font-size:13px;padding:6px;outline:none;box-sizing:border-box;`;
+  let timer = null;
+  ta.addEventListener("input", () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => sendEvent(app, id, "text", ta.value), 300);
+  });
+  fo.appendChild(ta);
+  appendToParent(app, parent, fo);
+  widgets.set(key, { app, id, el: fo, _ta: ta });
+}
+
+/* ── Drag handling ────────────────────────────────────────────────────── */
+document.addEventListener("mousemove", e => {
+  if (dragState) {
+    const dx = e.clientX - dragState.sx, dy = e.clientY - dragState.sy;
+    dragState.g.setAttribute("transform", `translate(${dragState.ox + dx},${dragState.oy + dy})`);
+  }
+  if (quDrag) {
+    const d = quDrag;
+    const delta = (d.vert ? e.clientY : e.clientX) - d.startMouse;
+    const pos = Math.max(0, Math.min(d.trackLen, d.startPos + delta));
+    d.el.setAttribute(d.vert ? "y" : "x", pos);
+  }
+  if (quXY) {
+    const d = quXY;
+    const rect = d.area.getBoundingClientRect();
+    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+    d.el.setAttribute("cx", x * rect.width);
+    d.el.setAttribute("cy", y * rect.height);
+  }
+});
+
+document.addEventListener("mouseup", () => {
+  if (quDrag) {
+    const d = quDrag;
+    const pos = parseFloat(d.el.getAttribute(d.vert ? "y" : "x"));
+    const value = d.trackLen > 0 ? pos / d.trackLen : 0;
+    const w = findWidget(d.el);
+    if (w) sendEvent(w.app, w.id, "scroll", String(value));
+    quDrag = null;
+  }
+  if (quXY) {
+    const d = quXY;
+    const rect = d.area.getBoundingClientRect();
+    const x = parseFloat(d.el.getAttribute("cx")) / rect.width;
+    const y = parseFloat(d.el.getAttribute("cy")) / rect.height;
+    const w = findWidget(d.el);
+    if (w) sendEvent(w.app, w.id, "xy", x.toFixed(4) + " " + y.toFixed(4));
+    quXY = null;
+  }
+  dragState = null;
+});
+
+/** Walk up from an element to find its owning widget. */
+function findWidget(el) {
+  let cur = el.parentElement;
+  while (cur && cur !== svg) {
+    if (cur.id && cur.id.startsWith("qu-")) return widgets.get(cur.id.substring(3));
+    cur = cur.parentElement;
+  }
+  return null;
+}
+
+/* Generic drag for data-qu-drag elements (scrollbar thumbs, etc.) */
+svg.addEventListener("mousedown", e => {
+  const target = e.target.closest("[data-qu-drag]");
+  if (target) {
+    e.preventDefault();
+    e.stopPropagation();
+    const axis = target.getAttribute("data-qu-drag");
+    const vert = axis === "v";
+    quDrag = {
+      el: target, vert,
+      trackLen: parseInt(target.getAttribute("data-qu-track") || "100"),
+      startPos: parseFloat(target.getAttribute(vert ? "y" : "x")),
+      startMouse: vert ? e.clientY : e.clientX,
+    };
+    return;
+  }
+  const xyTarget = e.target.closest("[data-qu-xy]");
+  if (xyTarget) {
+    e.preventDefault();
+    e.stopPropagation();
+    const area = xyTarget.parentElement.querySelector("[data-qu-xy-area]") || xyTarget.parentElement;
+    quXY = { el: xyTarget, area };
+  }
+});
+
+/* ── Widget updates ───────────────────────────────────────────────────── */
+function doUpdate(app, id, key, value) {
+  const w = widgets.get(wkey(app, id));
+  if (!w) return;
+  if (key === "text") {
+    if (w._ta) { w._ta.value = value; return; }
+    if (w.el) {
+      const t = w.el.querySelector("[data-qu-text]") ||
+                (w.el.tagName === "text" ? w.el : null);
+      if (t) t.textContent = value;
+    }
+  } else {
+    /* Arbitrary property update — set attribute on the widget element */
+    if (w.el) {
+      const t = w.el.querySelector("[data-qu-" + key + "]") || w.el;
+      t.setAttribute(key, value);
+    }
+  }
+}
+
+/* ── Clipboard paste handling ─────────────────────────────────────────── */
+document.addEventListener("paste", e => {
+  if (!ws) return;
+  /* don't intercept paste into textarea/input elements */
+  if (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT") return;
+  const text = (e.clipboardData || window.clipboardData).getData("text");
+  if (!text) return;
+  e.preventDefault();
+  /* broadcast paste to all connected apps via system channel */
+  ws.send("-1 event 0 paste\n" + text);
+});
+
+/* ── Auto-connect on load ─────────────────────────────────────────────── */
+doConnect();
+</script>
+</body>
+</html>

@@ -1,0 +1,99 @@
+.\" quaoar-server.1 : man page for quaoar-server
+.\" Written with AI assistance (Claude, Anthropic)
+.TH QUAOAR-SERVER 1 "2026-03-17" "Quaoar" "User Commands"
+.SH NAME
+quaoar-server \- WebSocket-to-Unix-socket bridge for the Quaoar display protocol
+.SH SYNOPSIS
+.B quaoar-server
+.RB [ \-p
+.IR port ]
+.RB [ \-s
+.IR socket_path ]
+.SH DESCRIPTION
+.B quaoar-server
+is a message bridge that connects applications using the Quaoar display
+protocol to a browser-based SVG renderer.
+It accepts one WebSocket connection from a browser and multiple Unix socket
+connections from applications, routing messages between them.
+.PP
+Applications send netstring-framed messages over the Unix socket.
+The server translates these to WebSocket text frames, prepending the
+application ID for routing.
+Events from the browser are routed back to the appropriate application.
+.PP
+The server implements the WebSocket handshake (including SHA-1 and base64)
+and frame encoding directly, with no external dependencies.
+.SH OPTIONS
+.TP
+.BI \-p " port"
+WebSocket listen port.
+Default: 9090.
+Binds to localhost only.
+.TP
+.BI \-s " socket_path"
+Unix socket path for application connections.
+Default:
+.IR /tmp/quaoar\-0 .
+.SH ENVIRONMENT
+.TP
+.B QUAOAR_DISPLAY
+Applications use this variable to locate the Unix socket.
+If unset, they connect to
+.IR /tmp/quaoar\-0 .
+.SH PROTOCOL
+Messages between applications and the server use djb netstring framing
+.RI ( length:data, ).
+Each message has a header line with space-delimited fields and an optional
+payload after a newline.
+.PP
+The server prepends the application ID to messages forwarded to the browser
+and strips it from messages coming back.
+Negative application IDs are reserved for system channels:
+.TP
+.B \-1 hello \fIsocket_path\fR
+Sent to the browser when a WebSocket connection is established.
+.TP
+.B \-1 disconnect \fIapp_id\fR
+Sent to the browser when an application disconnects.
+.PP
+Messages from the browser with negative application IDs are broadcast to
+all connected applications.
+.SH DEPLOYMENT
+For localhost development, open
+.B quaoar-client.html
+in a browser and connect to
+.BR ws://127.0.0.1:9090 .
+.PP
+For production, place
+.B quaoar-server
+behind a reverse proxy (nginx, caddy, haproxy) that handles TLS and
+optionally WebSocket compression via permessage-deflate.
+.SH EXAMPLES
+Start the server with default settings:
+.PP
+.RS
+.nf
+quaoar-server
+.fi
+.RE
+.PP
+Start on a custom port and socket:
+.PP
+.RS
+.nf
+quaoar-server -p 8080 -s /tmp/quaoar-test
+.fi
+.RE
+.PP
+Run a client application:
+.PP
+.RS
+.nf
+export QUAOAR_DISPLAY=/tmp/quaoar-0
+notepad
+.fi
+.RE
+.SH SEE ALSO
+.BR libquaoar (3)
+.SH LICENSE
+MIT-0 OR Public Domain

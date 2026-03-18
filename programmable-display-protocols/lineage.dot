@@ -1,0 +1,83 @@
+digraph lineage {
+    rankdir=TB;
+    node [shape=box, style="rounded,filled", fontname="IBM Plex Sans", fontsize=11, margin="0.15,0.08"];
+    edge [fontname="IBM Plex Sans", fontsize=9, color="#555555"];
+
+    // Color scheme: warm palette
+    node [fillcolor="#FFF8E7", color="#8B7355"];
+
+    // Era labels
+    subgraph cluster_60s {
+        label="1960s"; labeljust=l; style=invis;
+        plato [label="PLATO\n1964", fillcolor="#D4A574"];
+    }
+
+    subgraph cluster_70s {
+        label="1970s"; labeljust=l; style=invis;
+        tek4014 [label="Tektronix 4014\n1972", fillcolor="#D4A574"];
+        xerox [label="Xerox Alto\n1973", fillcolor="#F5E6CC"];
+    }
+
+    subgraph cluster_80s {
+        label="1980s"; labeljust=l; style=invis;
+        ps [label="PostScript\n1984", fillcolor="#E8D5B7"];
+        blit [label="Blit Terminal\n1982", fillcolor="#E8D5B7"];
+        mgr [label="MGR\n1984", fillcolor="#D4A574"];
+        x11 [label="X11\n1987", fillcolor="#E8D5B7"];
+        news [label="NeWS\n1986", fillcolor="#D4A574"];
+        dps [label="Display PostScript\n1988", fillcolor="#D4A574"];
+        nextstep [label="NeXTSTEP\n1988", fillcolor="#D4A574"];
+    }
+
+    subgraph cluster_90s {
+        label="1990s"; labeljust=l; style=invis;
+        plan9 [label="Plan 9 8½/rio\n1991", fillcolor="#E8D5B7"];
+        pdf [label="PDF\n1993", fillcolor="#F5E6CC"];
+        inferno [label="Inferno/Styx\n1995", fillcolor="#E8D5B7"];
+        java [label="Java AWT\n1995", fillcolor="#F5E6CC"];
+    }
+
+    subgraph cluster_00s {
+        label="2000s"; labeljust=l; style=invis;
+        quartz [label="Quartz 2D\n2001", fillcolor="#D4A574"];
+        svg [label="SVG 1.0\n2001", fillcolor="#F5E6CC"];
+        wayland [label="Wayland\n2008", fillcolor="#E8D5B7"];
+    }
+
+    subgraph cluster_10s {
+        label="2010s–present"; labeljust=l; style=invis;
+        webgpu [label="WebGPU\n2017+", fillcolor="#F5E6CC"];
+        houdini [label="CSS Houdini\n2016+", fillcolor="#F5E6CC"];
+        scenic [label="Fuchsia Scenic\n2016+", fillcolor="#D4A574"];
+        arcan [label="Arcan\n2012+", fillcolor="#D4A574"];
+        future [label="  ?  ", fillcolor="#C4956A", fontsize=14, fontname="IBM Plex Sans Bold"];
+    }
+
+    // Edges
+    plato -> tek4014 [label="networked\nterminals", style=dashed];
+    tek4014 -> x11 [label="escape seq.\nprotocol", style=dashed];
+    xerox -> ps [label="imaging model"];
+    xerox -> blit [label="bitmap display"];
+    xerox -> x11 [label="windowing"];
+    tek4014 -> mgr [label="escape seq.\nprotocol", style=dashed];
+    ps -> news [label="full interpreter\nin server"];
+    ps -> dps [label="rendering\nonly"];
+    ps -> pdf [label="declarative\nsubset"];
+    dps -> nextstep;
+    news -> java [label="Gosling", style=dashed];
+    blit -> plan9 [label="Pike"];
+    plan9 -> inferno;
+    x11 -> wayland [label="lessons\nlearned"];
+    nextstep -> quartz [label="Apple\nacquires NeXT"];
+    pdf -> quartz [label="imaging\nmodel"];
+    dps -> quartz [label="API\nstructure"];
+    ps -> svg [label="vector\nprimitives"];
+    svg -> houdini [label="web platform"];
+    svg -> webgpu [label="web platform"];
+    wayland -> scenic [label="compositor\nmodel"];
+    wayland -> arcan [label="rethinking\ndisplay"];
+    scenic -> future;
+    arcan -> future;
+    houdini -> future;
+    webgpu -> future;
+}

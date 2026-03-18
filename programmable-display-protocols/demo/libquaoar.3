@@ -1,0 +1,229 @@
+.\" libquaoar.3 : man page for the libquaoar client library
+.\" Written with AI assistance (Claude, Anthropic)
+.TH LIBQUAOAR 3 "2026-03-17" "Quaoar" "Library Functions"
+.SH NAME
+libquaoar \- client library for the Quaoar display protocol
+.SH SYNOPSIS
+.B #include \(dqlibquaoar.h\(dq
+.PP
+.BI "qu_ctx *qu_connect(const char *" display );
+.br
+.BI "void qu_disconnect(qu_ctx *" ctx );
+.br
+.BI "int qu_fd(qu_ctx *" ctx );
+.br
+.BI "int qu_process(qu_ctx *" ctx );
+.PP
+.BI "void qu_on_event(qu_ctx *" ctx ", int " id ", qu_event_fn " fn ", void *" arg );
+.PP
+.BI "int qu_window(qu_ctx *" ctx ", const char *" title ", int " x ", int " y ", int " w ", int " h );
+.br
+.BI "int qu_button(qu_ctx *" ctx ", int " parent ", const char *" label ", int " x ", int " y ", int " w ", int " h );
+.br
+.BI "int qu_label(qu_ctx *" ctx ", int " parent ", const char *" text ", int " x ", int " y );
+.br
+.BI "int qu_textarea(qu_ctx *" ctx ", int " parent ", int " x ", int " y ", int " w ", int " h );
+.br
+.BI "int qu_scrollbar(qu_ctx *" ctx ", int " parent ", int " x ", int " y ", int " w ", int " h ", char " orient );
+.br
+.BI "int qu_svg(qu_ctx *" ctx ", int " parent ", const char *" markup );
+.PP
+.BI "void qu_set_text(qu_ctx *" ctx ", int " id ", const char *" text );
+.br
+.BI "void qu_set_prop(qu_ctx *" ctx ", int " id ", const char *" key ", const char *" value );
+.br
+.BI "void qu_remove(qu_ctx *" ctx ", int " id );
+.br
+.BI "void qu_set_clipboard(qu_ctx *" ctx ", const char *" text );
+.SH DESCRIPTION
+.B libquaoar
+provides a C API for building applications that use the Quaoar display
+protocol.
+Applications create widgets by calling library functions, which emit
+SVG+SMIL markup over a netstring-framed Unix socket connection to
+.BR quaoar-server (1).
+.SS Connection
+.TP
+.BI qu_connect( display )
+Connect to a Quaoar display server.
+If
+.I display
+is NULL, the
+.B QUAOAR_DISPLAY
+environment variable is used; if that is also unset, the default
+.I /tmp/quaoar\-0
+is used.
+Returns a context pointer on success, NULL on failure.
+.TP
+.BI qu_disconnect( ctx )
+Close the connection and free all resources.
+.TP
+.BI qu_fd( ctx )
+Return the socket file descriptor for use with
+.BR poll (2)
+or
+.BR select (2).
+.TP
+.BI qu_process( ctx )
+Read pending data from the socket and dispatch events to registered
+handlers.
+Returns 0 on success, \-1 on disconnect.
+.SS Event handling
+The event callback type is:
+.PP
+.RS
+.nf
+typedef void (*qu_event_fn)(qu_ctx *ctx, int id,
+    const char *event, const char *value, void *arg);
+.fi
+.RE
+.TP
+.BI qu_on_event( "ctx, id, fn, arg" )
+Register callback
+.I fn
+for events on widget
+.IR id .
+Use widget ID 0 for global events (paste).
+The
+.I event
+parameter is one of:
+.BR click ,
+.BR text ,
+.BR scroll ,
+.BR xy ,
+.BR close ,
+or
+.BR paste .
+The
+.I value
+parameter is event-specific (textarea content, scroll position, etc.)
+or NULL.
+.SS Widget creation
+All widget creation functions return an integer widget ID.
+.TP
+.BI qu_window( "ctx, title, x, y, w, h" )
+Create a window with a titlebar and close button at position
+.RI ( x , y )
+with dimensions
+.IR w \(mu h .
+.TP
+.BI qu_button( "ctx, parent, label, x, y, w, h" )
+Create a button with
+.I label
+inside
+.IR parent .
+Hover and press effects are handled client-side via SMIL.
+A click listener is registered automatically.
+.TP
+.BI qu_label( "ctx, parent, text, x, y" )
+Create a text label inside
+.IR parent .
+.TP
+.BI qu_textarea( "ctx, parent, x, y, w, h" )
+Create a multi-line text input area inside
+.IR parent .
+Text changes fire
+.B text
+events with 300ms debounce.
+.TP
+.BI qu_scrollbar( "ctx, parent, x, y, w, h, orient" )
+Create a scrollbar inside
+.IR parent .
+.I orient
+is
+.B \(aqv\(aq
+for vertical or
+.B \(aqh\(aq
+for horizontal.
+Fires
+.B scroll
+events with a normalized position (0.0 to 1.0).
+.TP
+.BI qu_svg( "ctx, parent, markup" )
+Insert raw SVG
+.I markup
+into
+.IR parent .
+This is the general-purpose widget creation function used by the
+convenience wrappers.
+Applications can construct arbitrary SVG with SMIL animations,
+.B data\-qu\-*
+interaction attributes, and event listeners.
+.SS Widget updates
+.TP
+.BI qu_set_text( "ctx, id, text" )
+Update the text content of widget
+.IR id .
+.TP
+.BI qu_set_prop( "ctx, id, key, value" )
+Set an arbitrary property on widget
+.IR id .
+.TP
+.BI qu_remove( "ctx, id" )
+Remove widget
+.I id
+from the display.
+.TP
+.BI qu_set_clipboard( "ctx, text" )
+Write
+.I text
+to the browser clipboard.
+.SH CUSTOM WIDGETS
+The convenience functions are thin wrappers that emit SVG markup.
+Applications can create arbitrary widgets by sending SVG directly.
+Use
+.B data\-qu\-text
+attributes on SVG elements to mark them as text targets for
+.BR qu_set_text .
+Use
+.B data\-qu\-drag
+for 1D constrained drag (sliders) and
+.B data\-qu\-xy
+for 2D drag (color pickers, position handles).
+.SH EXAMPLE
+.nf
+#include "libquaoar.h"
+#include <poll.h>
+
+static int quit = 0;
+
+static void
+on_close(qu_ctx *ctx, int id, const char *event,
+         const char *value, void *arg)
+{
+    (void)ctx; (void)id; (void)event; (void)value; (void)arg;
+    quit = 1;
+}
+
+int
+main(void)
+{
+    qu_ctx *ctx = qu_connect(NULL);
+    if (!ctx) return 1;
+
+    int win = qu_window(ctx, "Hello", 100, 100, 300, 200);
+    qu_label(ctx, win, "Hello, world!", 20, 20);
+    qu_on_event(ctx, win, on_close, NULL);
+
+    struct pollfd pfd = { .fd = qu_fd(ctx), .events = POLLIN };
+    while (!quit && poll(&pfd, 1, \-1) >= 0) {
+        if (pfd.revents & (POLLIN | POLLHUP))
+            if (qu_process(ctx) < 0) break;
+    }
+
+    qu_disconnect(ctx);
+    return 0;
+}
+.fi
+.PP
+Compile with:
+.PP
+.RS
+.nf
+cc \-o hello hello.c libquaoar.c
+.fi
+.RE
+.SH SEE ALSO
+.BR quaoar-server (1)
+.SH LICENSE
+MIT-0 OR Public Domain

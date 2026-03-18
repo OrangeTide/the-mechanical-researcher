@@ -1,0 +1,54 @@
+digraph approaches {
+    rankdir=TB;
+    node [shape=box, style="rounded,filled", fontname="IBM Plex Sans", fontsize=10, margin="0.15,0.08"];
+    edge [fontname="IBM Plex Sans", fontsize=8, color="#8B7355"];
+    graph [bgcolor="transparent", compound=true];
+
+    subgraph cluster_a {
+        label="Approach A\nSVG Streaming";
+        labeljust=c; fontname="IBM Plex Sans Bold"; fontsize=11;
+        style="rounded,filled"; fillcolor="#FFF8E7"; color="#8B7355";
+
+        a_client [label="Client App", fillcolor="#E8D5B7"];
+        a_proto [label="SVG Fragment\nDiff Stream\n(WebSocket)", fillcolor="#D4A574"];
+        a_server [label="Browser / Renderer\n(DOM + SMIL)", fillcolor="#C4956A"];
+
+        a_client -> a_proto -> a_server;
+    }
+
+    subgraph cluster_b {
+        label="Approach B\nScene Graph Protocol";
+        labeljust=c; fontname="IBM Plex Sans Bold"; fontsize=11;
+        style="rounded,filled"; fillcolor="#FFF8E7"; color="#8B7355";
+
+        b_client [label="Client App", fillcolor="#E8D5B7"];
+        b_proto [label="Structured Scene\nOperations\n(Binary Protocol)", fillcolor="#D4A574"];
+        b_server [label="Compositor\n(Retained Tree + GPU)", fillcolor="#C4956A"];
+
+        b_client -> b_proto -> b_server;
+    }
+
+    subgraph cluster_c {
+        label="Approach C\nReactive Dataflow";
+        labeljust=c; fontname="IBM Plex Sans Bold"; fontsize=11;
+        style="rounded,filled"; fillcolor="#FFF8E7"; color="#8B7355";
+
+        c_client [label="Client App", fillcolor="#E8D5B7"];
+        c_proto [label="Reactive Bindings\n+ Constraint\nDeclarations", fillcolor="#D4A574"];
+        c_server [label="Display Server\n(Constraint Solver\n+ Renderer)", fillcolor="#C4956A"];
+
+        c_client -> c_proto -> c_server;
+    }
+
+    subgraph cluster_d {
+        label="Approach D\nWASM Programmable\nCompositor";
+        labeljust=c; fontname="IBM Plex Sans Bold"; fontsize=11;
+        style="rounded,filled"; fillcolor="#FFF8E7"; color="#8B7355";
+
+        d_client [label="Client App", fillcolor="#E8D5B7"];
+        d_proto [label="WASM Module\n+ Scene Data\n(Capability-gated)", fillcolor="#D4A574"];
+        d_server [label="Compositor\n(WASM Sandbox\n+ GPU Access)", fillcolor="#C4956A"];
+
+        d_client -> d_proto -> d_server;
+    }
+}
