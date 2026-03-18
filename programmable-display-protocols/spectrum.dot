@@ -1,0 +1,37 @@
+digraph spectrum {
+    rankdir=LR;
+    node [shape=box, style="rounded,filled", fontname="IBM Plex Sans", fontsize=10, margin="0.12,0.06"];
+    edge [fontname="IBM Plex Sans", fontsize=8, color="#8B7355"];
+    graph [bgcolor="transparent"];
+
+    // Spectrum axis
+    subgraph cluster_spectrum {
+        label="Architectural Spectrum: Where Does Computation Live?";
+        labeljust=c;
+        labelloc=t;
+        fontname="IBM Plex Sans Bold";
+        fontsize=12;
+        style="rounded";
+        color="#8B7355";
+        bgcolor="#FFF8E7";
+
+        // Left: thick server
+        thick [label="Thick Server\n─────────\nFull programs\nrun server-side\n\nNeWS", fillcolor="#C4956A", fontcolor="#3A2A1A"];
+        drawing [label="Drawing Commands\n─────────\nServer interprets\nrendering ops\n\nDPS · X11", fillcolor="#D4A574", fontcolor="#3A2A1A"];
+        scene [label="Scene Graph\n─────────\nServer manages\nretained tree\n\nFuchsia Scenic", fillcolor="#E8D5B7", fontcolor="#3A2A1A"];
+        buffer [label="Buffer Sharing\n─────────\nClient renders,\nserver composites\n\nWayland", fillcolor="#F0E4CE", fontcolor="#3A2A1A"];
+        pixel [label="Pixel Streaming\n─────────\nClient renders,\nsend pixels\n\nVNC · RDP", fillcolor="#FFF8E7", fontcolor="#3A2A1A"];
+
+        thick -> drawing [label="less\nserver logic"];
+        drawing -> scene [label="structured\nnot imperative"];
+        scene -> buffer [label="client owns\nrendering"];
+        buffer -> pixel [label="no protocol,\njust pixels"];
+    }
+
+    // Annotations
+    net_eff [label="← Higher network efficiency", shape=plaintext, fontname="IBM Plex Mono", fontsize=9, fontcolor="#6B4226"];
+    simplicity [label="Simpler server →", shape=plaintext, fontname="IBM Plex Mono", fontsize=9, fontcolor="#6B4226"];
+
+    net_eff -> thick [style=invis];
+    pixel -> simplicity [style=invis];
+}

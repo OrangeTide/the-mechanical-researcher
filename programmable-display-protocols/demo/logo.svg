@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#1a1028"/>
+      <stop offset="100%" stop-color="#08060e"/>
+    </radialGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#7b5ea7" stop-opacity="0"/>
+      <stop offset="20%" stop-color="#7b5ea7" stop-opacity="0.5"/>
+      <stop offset="50%" stop-color="#9b7ec7" stop-opacity="0.55"/>
+      <stop offset="80%" stop-color="#9b7ec7" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#7b5ea7" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="qface" cx="40%" cy="38%" r="50%">
+      <stop offset="0%" stop-color="#b89adc"/>
+      <stop offset="60%" stop-color="#7b5ea7"/>
+      <stop offset="100%" stop-color="#3d2d54"/>
+    </radialGradient>
+    <!-- clip to hide ring behind Q body -->
+    <clipPath id="ring-front">
+      <rect width="256" height="256"/>
+    </clipPath>
+  </defs>
+
+  <!-- background -->
+  <rect width="256" height="256" fill="url(#bg)"/>
+
+  <!-- stars -->
+  <circle cx="32" cy="24" r="1" fill="#fff" opacity="0.7"/>
+  <circle cx="198" cy="18" r="0.7" fill="#fff" opacity="0.5"/>
+  <circle cx="240" cy="52" r="0.8" fill="#fff" opacity="0.6"/>
+  <circle cx="15" cy="88" r="0.6" fill="#fff" opacity="0.4"/>
+  <circle cx="52" cy="198" r="0.8" fill="#fff" opacity="0.6"/>
+  <circle cx="220" cy="180" r="1" fill="#fff" opacity="0.5"/>
+  <circle cx="78" cy="42" r="0.5" fill="#fff" opacity="0.3"/>
+  <circle cx="170" cy="232" r="0.7" fill="#fff" opacity="0.5"/>
+  <circle cx="235" cy="120" r="0.6" fill="#fff" opacity="0.4"/>
+  <circle cx="24" cy="150" r="0.7" fill="#fff" opacity="0.5"/>
+  <circle cx="112" cy="14" r="0.5" fill="#fff" opacity="0.3"/>
+  <circle cx="42" cy="234" r="0.6" fill="#fff" opacity="0.4"/>
+  <circle cx="210" cy="238" r="0.5" fill="#fff" opacity="0.3"/>
+  <circle cx="18" cy="42" r="0.5" fill="#fff" opacity="0.35"/>
+  <circle cx="242" cy="210" r="0.6" fill="#fff" opacity="0.4"/>
+
+  <!-- ring — back half (behind Q) -->
+  <ellipse cx="128" cy="148" rx="105" ry="20"
+    transform="rotate(-15 128 148)"
+    fill="none" stroke="url(#ring)" stroke-width="7"
+    stroke-dasharray="165 165" stroke-dashoffset="0"/>
+
+  <!-- Q body — thicker annulus (outer r=60, inner r=28) -->
+  <circle cx="128" cy="132" r="60"
+    fill="url(#qface)"
+    stroke="#c9a84c" stroke-width="2.5"/>
+
+  <circle cx="128" cy="132" r="28"
+    fill="url(#bg)"
+    stroke="#c9a84c" stroke-width="1.5"/>
+
+  <!-- Q tail — curved sweep -->
+  <path d="M148,162 Q158,178 180,194"
+    fill="none"
+    stroke="#c9a84c" stroke-width="9"
+    stroke-linecap="round"/>
+  <path d="M148,162 Q158,178 180,194"
+    fill="none"
+    stroke="#7b5ea7" stroke-width="5"
+    stroke-linecap="round"/>
+
+  <!-- ring — front half (crosses over Q) -->
+  <ellipse cx="128" cy="148" rx="105" ry="20"
+    transform="rotate(-15 128 148)"
+    fill="none" stroke="url(#ring)" stroke-width="7"
+    stroke-dasharray="165 165" stroke-dashoffset="165"/>
+</svg>

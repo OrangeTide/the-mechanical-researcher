@@ -1,0 +1,106 @@
+digraph timeline {
+    rankdir=LR;
+    node [shape=box, style="rounded,filled", fontname="IBM Plex Sans", fontsize=10, margin="0.12,0.06"];
+    edge [style=invis];  // edges only for ordering within ranks
+
+    // Color coding
+    // Networked/display protocols: warm brown
+    // Non-networked GUIs: cream
+    // Milestones: light tan
+
+    // Force chronological ordering with invisible edges between era groups
+    subgraph {
+        rank=same;
+        era60 [label="1960s", shape=plaintext, fontsize=12, fontname="IBM Plex Mono", fontcolor="#8B7355"];
+        plato [label="PLATO IV\n1964", fillcolor="#D4A574", color="#8B7355",
+               tooltip="Plasma display terminals, TUTOR language"];
+    }
+
+    subgraph {
+        rank=same;
+        era68 [label="1968", shape=plaintext, fontsize=12, fontname="IBM Plex Mono", fontcolor="#8B7355"];
+        demo [label="Mother of\nAll Demos\n1968", fillcolor="#FFF8E7", color="#8B7355",
+              tooltip="Engelbart: mouse, hypertext, video conferencing"];
+    }
+
+    subgraph {
+        rank=same;
+        era70s [label="1970s", shape=plaintext, fontsize=12, fontname="IBM Plex Mono", fontcolor="#8B7355"];
+        tek4014 [label="Tektronix\n4014\n1972", fillcolor="#D4A574", color="#8B7355",
+                 tooltip="Vector storage tube terminal, ARPANET graphics"];
+        alto [label="Xerox\nAlto\n1973", fillcolor="#FFF8E7", color="#8B7355",
+              tooltip="First GUI workstation, bitmap display"];
+    }
+
+    subgraph {
+        rank=same;
+        era80a [label="1982–84", shape=plaintext, fontsize=12, fontname="IBM Plex Mono", fontcolor="#8B7355"];
+        blit [label="Blit\nTerminal\n1982", fillcolor="#D4A574", color="#8B7355",
+              tooltip="Programmable bitmap terminal, 68000 CPU"];
+        sun1 [label="Sun-1\n1982", fillcolor="#FFF8E7", color="#8B7355",
+              tooltip="Unix workstation, networked from birth"];
+        lisa [label="Apple\nLisa\n1983", fillcolor="#FFF8E7", color="#8B7355",
+             tooltip="First commercial GUI computer"];
+        mgr [label="MGR\n1984", fillcolor="#D4A574", color="#8B7355",
+             tooltip="Escape-sequence window system"];
+        ps [label="PostScript\n1984", fillcolor="#E8D5B7", color="#8B7355",
+            tooltip="Page description language"];
+    }
+
+    subgraph {
+        rank=same;
+        era80b [label="1985–88", shape=plaintext, fontsize=12, fontname="IBM Plex Mono", fontcolor="#8B7355"];
+        win1 [label="Windows\n1.0\n1985", fillcolor="#FFF8E7", color="#8B7355",
+              tooltip="Microsoft's first GUI"];
+        news [label="NeWS\n1986", fillcolor="#D4A574", color="#8B7355",
+              tooltip="PostScript window system"];
+        x11 [label="X11\n1987", fillcolor="#D4A574", color="#8B7355",
+             tooltip="MIT X Window System"];
+        dps [label="Display\nPostScript\n1988", fillcolor="#D4A574", color="#8B7355",
+             tooltip="Adobe rendering protocol"];
+        nextstep [label="NeXTSTEP\n1988", fillcolor="#E8D5B7", color="#8B7355",
+                  tooltip="DPS-based desktop"];
+    }
+
+    subgraph {
+        rank=same;
+        era90s [label="1990s", shape=plaintext, fontsize=12, fontname="IBM Plex Mono", fontcolor="#8B7355"];
+        plan9 [label="Plan 9\n8½/rio\n1991", fillcolor="#D4A574", color="#8B7355",
+               tooltip="Draw device, file system interface"];
+        pdf [label="PDF\n1993", fillcolor="#E8D5B7", color="#8B7355",
+             tooltip="Declarative PostScript subset"];
+    }
+
+    subgraph {
+        rank=same;
+        era00s [label="2000s", shape=plaintext, fontsize=12, fontname="IBM Plex Mono", fontcolor="#8B7355"];
+        quartz [label="Quartz 2D\n2001", fillcolor="#E8D5B7", color="#8B7355",
+                tooltip="macOS PDF-based rendering"];
+        svg [label="SVG 1.0\n2001", fillcolor="#E8D5B7", color="#8B7355",
+             tooltip="W3C vector graphics"];
+        wayland [label="Wayland\n2008", fillcolor="#D4A574", color="#8B7355",
+                 tooltip="Buffer-passing compositor"];
+    }
+
+    subgraph {
+        rank=same;
+        era10s [label="2010s+", shape=plaintext, fontsize=12, fontname="IBM Plex Mono", fontcolor="#8B7355"];
+        arcan [label="Arcan\n2012+", fillcolor="#D4A574", color="#8B7355",
+               tooltip="Lua-scriptable display server"];
+        scenic [label="Fuchsia\nScenic\n2016+", fillcolor="#D4A574", color="#8B7355",
+                tooltip="Scene graph compositor"];
+    }
+
+    // Chronological ordering
+    era60 -> era68 -> era70s -> era80a -> era80b -> era90s -> era00s -> era10s;
+
+    // Legend
+    subgraph cluster_legend {
+        label=""; labeljust=l; style=invis;
+        rank=sink;
+        leg_proto [label="Display protocol /\nnetworked system", fillcolor="#D4A574", color="#8B7355", fontsize=9];
+        leg_tech [label="Imaging technology /\nstandard", fillcolor="#E8D5B7", color="#8B7355", fontsize=9];
+        leg_gui [label="Local GUI\nmilestone", fillcolor="#FFF8E7", color="#8B7355", fontsize=9];
+        leg_proto -> leg_tech -> leg_gui [style=invis];
+    }
+}

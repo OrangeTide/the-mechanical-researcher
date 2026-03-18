@@ -9,8 +9,8 @@ A collection of research topics, primarily gathered through agentic AI sessions,
 
 ## Topics
 
-<!-- Add topics here as they are published, e.g.: -->
-<!-- - [Topic Title](topic-slug/) -->
+- [Build Systems](build-systems/)
+- [Programmable Display Protocols](programmable-display-protocols/)
 
 ## Build & Deploy
 
