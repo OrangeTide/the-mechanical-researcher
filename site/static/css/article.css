@@ -125,6 +125,7 @@ body {
   margin-top: 2.5rem;
   margin-bottom: 0.75rem;
   color: #1a1512;
+  scroll-margin-top: 1rem;
 }
 
 .article-body p {
