@@ -9,6 +9,7 @@ A collection of research topics, primarily gathered through agentic AI sessions,
 
 ## Topics
 
+- [Anatomy of a Microkernel](microkernel-architecture/)
 - [Build Systems](build-systems/)
 - [Programmable Display Protocols](programmable-display-protocols/)
 
