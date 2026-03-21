@@ -6,6 +6,10 @@
   padding: 0;
 }
 
+html {
+  scroll-padding-top: 3.5rem;
+}
+
 body {
   font-family: 'IBM Plex Sans Condensed', sans-serif;
   background: #f5f0e8;
@@ -125,7 +129,6 @@ body {
   margin-top: 2.5rem;
   margin-bottom: 0.75rem;
   color: #1a1512;
-  scroll-margin-top: 1rem;
 }
 
 .article-body p {

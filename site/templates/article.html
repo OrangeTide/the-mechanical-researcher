@@ -49,7 +49,14 @@
     (function() {
       var toc = document.querySelector('.toc-list');
       var cb = document.getElementById('toc-toggle');
-      if (toc && cb) toc.addEventListener('click', function() { cb.checked = false; });
+      if (toc && cb) toc.addEventListener('click', function(e) {
+        var a = e.target.closest('a');
+        if (!a) return;
+        e.preventDefault();
+        cb.checked = false;
+        var target = document.querySelector(a.getAttribute('href'));
+        if (target) target.scrollIntoView({ block: 'start' });
+      });
     })();
   </script>
   <script>
