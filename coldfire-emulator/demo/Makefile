@@ -14,6 +14,7 @@ M68K_LD     = -T link.ld
 HARNESS     = test_harness
 SMOKE       = smoke_test
 TEST_ELF    = test_program.elf
+QEMU_VALID  = qemu_validate
 
 all: $(HARNESS) $(TEST_ELF)
 
@@ -45,16 +46,19 @@ disasm: $(TEST_ELF)
 sections: $(TEST_ELF)
 	m68k-linux-gnu-readelf -S $(TEST_ELF)
 
-# Validate against QEMU (if available)
-validate: $(TEST_ELF)
-	@echo "QEMU validation requires manual comparison"
-	@echo "Run: qemu-m68k $(TEST_ELF)"
+# Cross: build QEMU validation program (no libc)
+$(QEMU_VALID): qemu_validate.c
+	$(M68K_CC) $(M68K_CFLAGS) -fno-builtin -o $@ $<
+
+# Validate against QEMU (requires cross-compiler and qemu-m68k)
+validate: $(QEMU_VALID)
+	qemu-m68k -cpu cfv4e ./$(QEMU_VALID)
 
 # Memory check
 valgrind: $(HARNESS) $(TEST_ELF)
 	valgrind --leak-check=full ./$(HARNESS) $(TEST_ELF)
 
 clean:
-	rm -f $(HARNESS) $(SMOKE) $(TEST_ELF)
+	rm -f $(HARNESS) $(SMOKE) $(TEST_ELF) $(QEMU_VALID)
 
 .PHONY: all test smoke disasm sections validate valgrind clean

@@ -29,7 +29,7 @@ fibonacci(uint32_t n)
     return fibonacci(n - 1) + fibonacci(n - 2);
 }
 
-/* GCD — tests REMS.L, loops, conditional branch */
+/* GCD — tests REMU.L, loops, conditional branch */
 static uint32_t
 gcd(uint32_t a, uint32_t b)
 {

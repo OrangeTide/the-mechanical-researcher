@@ -605,8 +605,6 @@ static void exec_move(cf_cpu *cpu, uint16_t op, int sz)
 
 static void exec_group4(cf_cpu *cpu, uint16_t op)
 {
-    int subop;
-
     /* HALT : 0100 1010 1100 1000 — must check before TST */
     if (op == 0x4AC8) {
         cpu->halted = 1;
@@ -986,8 +984,7 @@ static void exec_group4(cf_cpu *cpu, uint16_t op)
         int is_signed = (ext >> 11) & 1;
         int quot_reg = (ext >> 12) & 7;
         int rem_reg = ext & 7;
-        int is_rem = (ext >> 10) & 1; /* bit 10 distinguishes */
-        /* Actually: if quot_reg != rem_reg, it's rem:quot pair */
+        /* If quot_reg != rem_reg, it's a rem:quot pair */
         int mode = (op >> 3) & 7;
         int reg = op & 7;
         ea_loc loc = decode_ea(cpu, mode, reg, SZ_LONG);
