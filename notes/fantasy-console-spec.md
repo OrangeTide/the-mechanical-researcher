@@ -371,19 +371,38 @@ No cartridge slot — the console is disc/HDD-based (like PlayStation or Dreamca
 
 4 MB NOR flash mapped at 0x00E00000–0x00FFFFFF. Execute-in-place (XIP) — the ColdFire can execute code directly from NOR without copying to RAM first. This is how the Mac Classic, many routers, and embedded systems of the era worked.
 
-**Contents:**
+**Layout:**
+
+```
+0x00E00000 - 0x00E7FFFF  Recovery loader (512 KB) — write-protected
+0x00E80000 - 0x00F7FFFF  OS / BIOS (3 MB) — updatable
+0x00F80000 - 0x00FFFFFF  Asset partition (512 KB) — FAT16
+```
+
+**Recovery loader** (512 KB, hardware write-protected):
 - Reset vector and exception table (ColdFire vector table at base)
-- Boot ROM / BIOS (~32 KB) — hardware init, POST, peripheral detection
-- System shell / OS (~1–2 MB) — file manager, memory card manager, CD player, settings
-- System font(s) and UI graphics (~256 KB)
-- SCSI driver, filesystem driver (FAT16 or custom), CD-ROM ISO 9660 driver
-- Glide library (the console's "SDK runtime") — linked into flash for games that call via trap
+- Hardware init, POST, peripheral detection
+- Can boot a CD-ROM and reflash the OS/BIOS region
+- Also serves as development monitor (ELF loader for Part 2)
+- Never overwritten — a bad firmware update cannot brick the console
+
+**OS / BIOS** (3 MB, updatable via recovery loader):
+- System shell / 3D menu environment
+- SCSI driver, CD-ROM ISO 9660 driver, HDD driver
+- MMC/SPI driver, FAT16 filesystem
+- Glide runtime library (callable via TRAP #1)
 - Audio driver / mixer engine
-- Spare / updateable region (~1 MB) — firmware updates written via SCSI or MMC
+- System font(s) and UI graphics
 
-NOR flash is read-only during normal operation. Firmware updates would use a special boot mode that writes to flash (sector erase + program), gated by a physical button or MMC-based updater. In emulation, the flash image is a 4 MB file.
+**Asset partition** (512 KB, FAT16):
+- Controller button graphics (multiple controller types)
+- System sound effects
+- UI templates
+- Patchable by emulator to match host controller
 
-**Technology context:** In 2000, 4 MB NOR flash (e.g., AMD Am29F032B, Intel 28F320) was standard for embedded firmware. The Dreamcast had 2 MB flash for its BIOS. Routers, set-top boxes, and network appliances commonly ran Linux or custom OS entirely from 2–8 MB NOR flash via XIP or copy-to-RAM.
+NOR flash write-protection: the recovery loader region has its WP pin tied high — only the OS/BIOS and asset regions are writable during firmware updates. Updates are initiated from the recovery loader's boot menu using a CD-ROM image.
+
+**Technology context:** In 2000, 4 MB NOR flash (e.g., AMD Am29F032B, Intel 28F320) was standard for embedded firmware. The Dreamcast had 2 MB flash for its BIOS. Routers, set-top boxes, and network appliances commonly ran Linux or custom OS entirely from 2–8 MB NOR flash via XIP or copy-to-RAM. Hardware write-protect on flash sectors was common practice for boot loaders (routers used it to prevent bricking).
 
 ### Boot Sequence
 
@@ -558,6 +577,125 @@ distinguish the source. Each channel has an independent COMPLETE flag.
 - Input devices (gamepad, mouse, keyboard)
 - System shell / boot firmware
 - A small demo game to tie it all together
+
+## System Firmware — OS API Requirements
+
+The system firmware provides runtime services to games via TRAP vectors. Games
+call OS functions the way PlayStation 1 games call BIOS routines — a stable ABI
+that lets the OS evolve without breaking games.
+
+### NOR Flash Layout (Revised)
+
+The 4 MB NOR flash is split into three regions:
+
+```
+0x00E00000 - 0x00E7FFFF  Recovery loader (512 KB) — write-protected
+0x00E80000 - 0x00F7FFFF  OS / BIOS (3 MB) — updatable via recovery loader
+0x00F80000 - 0x00FFFFFF  Asset partition (512 KB) — FAT16 filesystem
+```
+
+The **recovery loader** (512 KB, write-protected) is the first code that runs
+after reset. It can boot a CD-ROM and flash the OS/BIOS region — the only
+way to update firmware. Write-protection is hardware-enforced (WP pin on the
+NOR flash IC), so a bad firmware update can never brick the console. The
+recovery loader also contains the Part 2 monitor ROM functionality (ELF
+loader for development).
+
+The **OS / BIOS** (3 MB, updatable) contains the full system firmware:
+drivers, system shell, Glide runtime, fonts, audio mixer, 3D menu environment.
+This region can be reflashed by the recovery loader from a CD-ROM image.
+
+The **asset partition** (512 KB) is a tiny FAT16 volume containing
+system-provided resources that games can read: controller graphics, fonts,
+sound effects, UI templates. The emulator can patch this FAT16 image before
+boot to substitute assets — e.g., replacing Saturn-style controller button
+graphics with Xbox or DualShock button icons matching the gamepad actually
+attached to the host.
+
+On real hardware, the asset partition lives in the updatable region of NOR
+flash (written during firmware updates alongside the OS). The emulator treats
+it as a patchable file that can be regenerated per-session.
+
+### Controller Abstraction
+
+Games should not hardcode button graphics or labels. Instead, they query the OS:
+
+- **Button metadata**: name, position on controller diagram, color
+- **Button graphics**: pre-rendered sprites for each button (A, B, C, X, Y, Z,
+  L, R, Start) at standard sizes (16×16, 32×32)
+- **Controller diagram**: full controller outline graphic for help screens
+- **Button mapping**: current assignment of physical buttons to logical actions
+
+The OS reads these from the asset partition. The emulator patches the partition
+to match the host controller — a player using an Xbox controller sees Xbox
+button icons in every game's help screen, without any game code changes.
+
+**Precedent:** The Dreamcast VMU displayed game-specific icons downloaded from
+the console. Xbox 360 had system-level button glyph APIs. The Triton does
+something similar but at the asset level rather than the API level.
+
+### System Menu
+
+The system menu is the first thing users see after boot (once the full firmware
+replaces the Part 2 monitor ROM).
+
+**Design direction:** An immersive 3D low-poly environment rather than a flat
+2D menu. This fits the Silicon Valley startup energy of 2001 — a company trying
+to make a statement with their boot experience the way the PS2's towers or the
+GameCube's animation did. The 3D environment doubles as a tech demo for the
+Glide GPU.
+
+**Possible concepts:**
+- A virtual living room / game shelf (walk up to a game, pick it up)
+- An abstract geometric space (floating platforms, portals to games)
+- A workshop / garage (scrappy startup vibe — games on a workbench)
+- A record store / jukebox for the CD player mode
+
+**Menu functions** (accessible from the 3D environment):
+- Boot game from CD-ROM
+- Browse / launch installed games (HDD)
+- Memory card manager (copy, delete, format)
+- CD audio player
+- Controller configuration (button remapping)
+- Video / audio settings
+- System info / about
+
+### OS API Catalog (Growing)
+
+Services the OS exposes to games via TRAP interface. This list will grow as
+game requirements are identified.
+
+| Category | Function | Description |
+|---|---|---|
+| **Controller** | `sys_get_button_name` | Get display name for a button ID |
+| **Controller** | `sys_get_button_glyph` | Get sprite pointer for a button ID at given size |
+| **Controller** | `sys_get_controller_diagram` | Get full controller outline graphic |
+| **Controller** | `sys_get_button_mapping` | Get current logical→physical mapping |
+| **Controller** | `sys_set_button_mapping` | Set custom mapping (saved to memory card) |
+| **Assets** | `sys_open_asset` | Open a file from the asset partition by path |
+| **Assets** | `sys_read_asset` | Read bytes from an open asset |
+| **Assets** | `sys_close_asset` | Close an asset handle |
+| **Memory** | `sys_save_open` | Open a save file on memory card or HDD |
+| **Memory** | `sys_save_read` | Read from save file |
+| **Memory** | `sys_save_write` | Write to save file |
+| **Memory** | `sys_save_close` | Close save file |
+| **Display** | `sys_get_font` | Get pointer to system font at given size |
+| **Display** | `sys_draw_text` | Render text string using system font |
+| **Audio** | `sys_play_sfx` | Play a system sound effect (menu click, error, etc.) |
+| **System** | `sys_return_to_menu` | Exit game, return to system menu |
+| **System** | `sys_get_region` | Get console region (NTSC-U, NTSC-J, PAL) |
+
+### TRAP Vector Assignment
+
+```
+TRAP #0  — reserved (halt in monitor ROM)
+TRAP #1  — OS syscall dispatcher (function number in D0, args in D1-D4/A0-A1)
+TRAP #2  — reserved (debugger breakpoint)
+TRAP #3-#15 — available for games / future OS use
+```
+
+The syscall convention mirrors classic 68K OS designs (AmigaOS, Human68k):
+register-based argument passing, return value in D0, error code in D1.
 
 ## Reference Materials
 
