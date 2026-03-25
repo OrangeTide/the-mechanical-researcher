@@ -11,6 +11,7 @@ A collection of research topics, primarily gathered through agentic AI sessions,
 
 - [Anatomy of a Microkernel](microkernel-architecture/)
 - [Build Systems](build-systems/)
+- [Building a ColdFire V4e Emulator](coldfire-emulator/)
 - [Programmable Display Protocols](programmable-display-protocols/)
 - [Virtual Machine Bytecodes](vm-bytecodes/)
 
