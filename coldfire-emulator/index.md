@@ -29,7 +29,7 @@ The selection criteria reflect a specific use case — embedding a CPU into a la
 |---|---|---|
 | Address space | >64 KB, ideally >1 MB | Programs larger than a single 64 KB bank |
 | Arithmetic | Hardware multiply + divide | Avoid libgcc software emulation |
-| Implementation budget | 1,500–3,000 LOC | One developer, embeddable in a larger codebase |
+| Implementation budget | 1,500–3,000 LOC | One developer; embeddable as a component in a larger project |
 | Real toolchain | GCC or LLVM cross-compiler | Users write C, not custom assembly |
 | Sandboxing | Easy to isolate guest from host | Memory bus callbacks, no host pointers leaked |
 | Developer experience | Orthogonal, enjoyable to program | Registers, addressing modes, clean encoding |
@@ -113,6 +113,8 @@ The same source file, the same optimization level (`-O2`), four different target
 | float add | **libgcc** | **libgcc** | `fsadd` | `fadd` |
 | float multiply | **libgcc** | **libgcc** | `fsmul` | `fmul` |
 | float divide | **libgcc** | **libgcc** | `fsdiv` | `fdiv` |
+
+The `fs`-prefix instructions (`fsadd`, `fsmul`, `fsdiv`) are the V4e's single-precision FPU operations — the test used `float` types. Double-precision equivalents use an `fd` prefix (`fdadd`, `fdmul`, `fddiv`). Both map to the same FPU hardware; the prefix selects the rounding precision.
 
 **ColdFire V4e is the only target where every operation compiles to a single hardware instruction.** No library calls, no multi-instruction sequences, no accumulator register shuffling. The 68000 compiles everything except addition to libgcc calls — it has no 32-bit multiply, no 32-bit divide, and no FPU. ColdFire V2 gains 32-bit multiply but still lacks divide and FPU. The SH-4 has a capable FPU, but integer divide is a libgcc call that internally uses the FPU's reciprocal instruction (`__sdivsi3_i4i`), and multiply results land in the MACL accumulator register rather than a general-purpose register.
 
@@ -211,7 +213,7 @@ The V4e FPU is the sweet spot: enough for IEEE-754 arithmetic without the comple
 
 ### Historical Context
 
-The 68000 family powered five major gaming platforms between 1988 and 1994:
+The 68000 was the game console CPU. From 1988 to 1994, it powered five major platforms — and then it disappeared from the console world entirely:
 
 | Console | Release | CPU | Clock |
 |---|---|---|---|
@@ -221,9 +223,9 @@ The 68000 family powered five major gaming platforms between 1988 and 1994:
 | Atari Jaguar | Nov 1993 US | Motorola 68000 | 13.295 MHz |
 | Sega Saturn | Nov 1994 JP | Motorola 68EC000 (sound) | 11.3 MHz |
 
-ColdFire emerged from this lineage. Introduced in 1994, the V2 core shipped in commercial products by 1996. The V4e core was announced at Microprocessor Forum in October 2000 — contemporary with the PlayStation 2 launch — adding FPU, MMU, and EMAC to a "100% synthesizable and highly configurable" core designed for custom SoCs. The first V4e silicon (MCF547x/MCF548x) shipped in 2004 from Freescale (spun off from Motorola in July 2004), running at up to 266 MHz and delivering 410 Dhrystone 2.1 MIPS.
+ColdFire was the 68000's embedded successor — introduced in 1994, the same year the Saturn shipped its last 68K. The V2 core shipped in commercial products by 1996. The V4e core was announced at Microprocessor Forum in October 2000 — contemporary with the PlayStation 2 launch — adding FPU, MMU, and EMAC to a "100% synthesizable and highly configurable" core designed for custom SoCs. The first V4e silicon (MCF547x/MCF548x) shipped in 2004 from Freescale (spun off from Motorola in July 2004), running at up to 266 MHz and delivering 410 Dhrystone 2.1 MIPS.
 
-ColdFire was never used in a game console. Its markets stayed industrial — factory automation, medical instrumentation, robotics, POS terminals. But the V4e's design was suited for it: 68K backward compatibility for the Genesis developer ecosystem, an integrated FPU for 3D math, EMAC for audio mixing, and MMU for sandboxing game code. NXP acquired Freescale in 2015, and ColdFire became a legacy product line.
+But ColdFire never crossed back into gaming. Its markets stayed industrial — factory automation, medical instrumentation, robotics, POS terminals. The V4e had everything a console CPU needed: 68K backward compatibility for the Genesis developer ecosystem, an integrated FPU for 3D math, EMAC for audio mixing, and MMU for sandboxing game code. It was a console CPU that never got a console. NXP acquired Freescale in 2015, and ColdFire became a legacy product line.
 
 ### Musashi Comparison
 
@@ -327,7 +329,7 @@ Group A. Bits 8–6 = 101 selects MOV3Q (vs. EMAC). Bits 11–9 = 001 is the 3-b
 
 ### CPU State
 
-The entire emulator state lives in a single `cf_cpu` struct, owned and allocated by the caller:
+The entire emulator state lives in a single `cf_cpu` struct, owned and allocated by the caller (abbreviated — the full header includes additional stub registers for cache control, FP instruction address, and accumulator extensions):
 
 ```c
 typedef struct cf_cpu {
@@ -509,11 +511,14 @@ static int eval_cc(cf_cpu *cpu, int cc)
     case 0x5: return c;             /* CS (carry set) */
     case 0x6: return !z;            /* NE */
     case 0x7: return z;             /* EQ */
+    case 0x8: return !v;            /* VC (overflow clear) */
+    case 0x9: return v;             /* VS (overflow set) */
+    case 0xA: return !n;            /* PL (plus / positive) */
+    case 0xB: return n;             /* MI (minus / negative) */
     case 0xC: return n == v;        /* GE (signed) */
     case 0xD: return n != v;        /* LT (signed) */
     case 0xE: return !z && (n==v);  /* GT (signed) */
     case 0xF: return z || (n!=v);   /* LE (signed) */
-    /* ... plus PL, MI, VC, VS ... */
     }
 }
 ```
@@ -814,9 +819,30 @@ All five tests pass:
 
 The emulator executes 1,528 instructions to complete all five tests. The majority are in the fibonacci function, which makes 177 recursive calls to compute fib(10).
 
+### QEMU Validation
+
+To validate the emulator against an independent implementation, we compiled the same test functions into a standalone ColdFire binary and ran it under QEMU 8.2's user-mode emulation with the `cfv4e` CPU model:
+
+```
+$ qemu-m68k -cpu cfv4e ./qemu_validate
+QEMU ColdFire V4e validation
+----------------------------
+  fibonacci(10)  got 55  expected 55  PASS
+  gcd(252, 105)  got 21  expected 21  PASS
+  sum_to(100)  got 5050  expected 5050  PASS
+  bit_test(0xAB)  got 2645  expected 2645  PASS
+  sqrt(2)*1000  got 1414  expected 1414  PASS
+
+5/5 passed
+```
+
+All five results match between our emulator, the smoke test, and QEMU. The QEMU validation program uses raw Linux syscalls instead of libc to avoid glibc alignment faults — ColdFire enforces word and long alignment on memory accesses, and the standard m68k glibc contains unaligned access patterns from the 68020 (which relaxed the 68000's alignment requirement).
+
 ## Conclusion
 
 The ColdFire V4e emulator is 2,239 lines of C — within the original 2,080–3,120 LOC estimate. It implements the integer core (eight data registers, eight address registers, sixteen opcode groups), an IEEE-754 double-precision FPU mapped directly to host `double` operations, EMAC stubs, and full exception handling. The memory bus uses callbacks for complete isolation between emulator and host. There is no heap allocation.
+
+What the emulator intentionally omits: the EMAC multiply-accumulate unit raises a line-A exception instead of executing (the stub is sufficient for GCC-compiled code, which does not emit EMAC instructions without explicit intrinsics). The MMU, cache control, and debug module are not implemented — `MOVEC` handles control register reads/writes, but the registers themselves are stubs. The ISA_C additions FF1 and BYTEREV are recognized by the decoder but not yet implemented. These omissions reflect the emulator's scope: running GCC-compiled bare-metal C programs, not booting an operating system.
 
 The GCC codegen test was the decisive factor in architecture selection. Fourteen candidates were evaluated; five reached the final round; only ColdFire V4e produced clean single-instruction output for every arithmetic operation tested. The SH-4 was the closest competitor but fell short on integer divide (a libgcc call) and carried additional complexity in delay slots, literal pools, and FPSCR bank-switching.
 
@@ -824,9 +850,10 @@ The emulator is designed as a building block. GCC, LLVM, and Free Pascal all pro
 
 ### Sources
 
-- ColdFire Family Programmer's Reference Manual, Rev. 3 (03/2005), Freescale Semiconductor
+- *ColdFire Family Programmer's Reference Manual*, Rev. 3 (CFPRM, document CFPRMRev3), Freescale Semiconductor, 03/2005
+- *MCF5475 Reference Manual* (MCF5475RM), Freescale Semiconductor, Rev. 4
+- *MCF547x/MCF548x ColdFire Microprocessor Family Data Sheet* (MCF5475DE), Freescale Semiconductor, 05/2004
 - Motorola V4e core announcement, Microprocessor Forum, October 11, 2000
-- Freescale MCF547x/MCF548x announcement, May 2004
-- MCF5475 Reference Manual, Freescale Semiconductor
-- Karl Stenerud, [Musashi](https://github.com/kstenerud/Musashi), 68K emulator
-- Console architectures: [copetti.org](https://www.copetti.org/writings/consoles/)
+- Karl Stenerud, [Musashi](https://github.com/kstenerud/Musashi), 68000/68010/68020/68EC020 emulator used in MAME
+- Rodrigo Copetti, Console architecture analyses: [Sega Mega Drive](https://www.copetti.org/writings/consoles/mega-drive-genesis/), [Sega Saturn](https://www.copetti.org/writings/consoles/sega-saturn/), [Sega Dreamcast](https://www.copetti.org/writings/consoles/dreamcast/)
+- *The M68000 Family Reference Manual* (M68000PM/AD), Motorola, 1992
