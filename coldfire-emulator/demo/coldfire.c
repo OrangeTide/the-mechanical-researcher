@@ -1390,6 +1390,10 @@ static void exec_groupA(cf_cpu *cpu, uint16_t op)
         }
         set_flags_move(cpu, (uint32_t)val, SZ_LONG);
     } else {
+        /* Hypercall: intercept LINE_A before raising exception */
+        if (cpu->hypercall &&
+            cpu->hypercall(cpu, op, cpu->hypercall_ctx) == 0)
+            return;
         /* EMAC instructions use line-A encoding */
         /* TODO: Implement MAC.L, MSAC.L, MOVE ACC/MACSR/MASK */
         cf_exception(cpu, CF_VEC_LINE_A);
@@ -2234,3 +2238,9 @@ void cf_set_sr(cf_cpu *cpu, uint32_t val)
 
 double cf_get_fp(cf_cpu *cpu, int n) { return cpu->fp[n & 7]; }
 void cf_set_fp(cf_cpu *cpu, int n, double val) { cpu->fp[n & 7] = val; }
+
+void cf_set_hypercall(cf_cpu *cpu, cf_hypercall_fn fn, void *ctx)
+{
+    cpu->hypercall = fn;
+    cpu->hypercall_ctx = ctx;
+}

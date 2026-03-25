@@ -14,6 +14,12 @@
 typedef uint32_t (*cf_read_fn)(void *ctx, uint32_t addr);
 typedef void (*cf_write_fn)(void *ctx, uint32_t addr, uint32_t val);
 
+/* Hypercall callback: invoked on LINE_A opcodes that are not MOV3Q.
+ * The full opword is passed — bits 11-0 encode the function ID.
+ * Return 0 if handled, nonzero to fall through to LINE_A exception. */
+struct cf_cpu;
+typedef int (*cf_hypercall_fn)(struct cf_cpu *cpu, uint16_t opword, void *ctx);
+
 typedef struct cf_cpu {
     /* Integer core */
     uint32_t d[8];          /* D0-D7 data registers */
@@ -45,6 +51,10 @@ typedef struct cf_cpu {
     cf_read_fn  read8, read16, read32;
     cf_write_fn write8, write16, write32;
     void *bus_ctx;          /* opaque pointer passed to callbacks */
+
+    /* Hypercall interface (LINE_A intercept) */
+    cf_hypercall_fn hypercall;
+    void *hypercall_ctx;    /* opaque pointer passed to hypercall */
 } cf_cpu;
 
 /****************************************************************
@@ -90,6 +100,13 @@ void cf_init(cf_cpu *cpu,
              void *bus_ctx);
 
 void cf_reset(cf_cpu *cpu);
+
+/* Install a hypercall handler (LINE_A intercept for host-native calls).
+ * Non-MOV3Q LINE_A opcodes are passed to the callback before raising
+ * a LINE_A exception. The callback reads args from cpu->d[]/a[]/fp[]
+ * and writes return values back. Returns with no guest-side overhead
+ * beyond the opword fetch+decode. */
+void cf_set_hypercall(cf_cpu *cpu, cf_hypercall_fn fn, void *ctx);
 
 /* Execute one instruction. Returns 0 on success, -1 on halt/stop. */
 int cf_step(cf_cpu *cpu);

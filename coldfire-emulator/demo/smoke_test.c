@@ -474,11 +474,80 @@ struct smoke_check {
     uint32_t expected;
 };
 
+/****************************************************************
+ * Hypercall test
+ ****************************************************************
+ * A tiny hand-assembled program that:
+ *   1. Loads D0 = 7, D1 = 8
+ *   2. Executes LINE_A opcode 0xA001 (hypercall #1: multiply)
+ *   3. Stores D0 to a result address
+ *   4. Executes TRAP #0 to halt
+ *
+ * The host-side handler multiplies D0 * D1 and returns the
+ * result in D0.
+ ****************************************************************/
+
+#define HC_LOAD_ADDR  0x00020000
+#define HC_RESULT_ADDR 0x00020100
+
+static const uint8_t hc_test_image[] = {
+    0x70,0x07,              /* moveq  #7,%d0        */
+    0x72,0x08,              /* moveq  #8,%d1        */
+    0xa0,0x01,              /* .short 0xa001        (hypercall #1) */
+    0x23,0xc0,              /* movel  %d0,<abs.l>   */
+    0x00,0x02,0x01,0x00,    /*         0x00020100   */
+    0x4e,0x40,              /* trap   #0            */
+};
+
+static int
+test_hypercall(cf_cpu *cpu, uint16_t opword, void *ctx)
+{
+    int func = opword & 0xFFF;
+    (void)ctx;
+
+    switch (func) {
+    case 1: /* multiply D0 * D1 -> D0 */
+        cpu->d[0] = cpu->d[0] * cpu->d[1];
+        return 0;
+    default:
+        return -1; /* unhandled — fall through to LINE_A exception */
+    }
+}
+
+static int
+run_hypercall_test(void)
+{
+    cf_cpu cpu;
+    uint32_t result;
+
+    memset(mem, 0, MEM_SIZE);
+    memcpy(mem + HC_LOAD_ADDR, hc_test_image, sizeof(hc_test_image));
+
+    /* Vector table */
+    mem_write32(NULL, 0x00, MEM_SIZE);
+    mem_write32(NULL, 0x04, HC_LOAD_ADDR);
+    mem_write32(NULL, 32 * 4, 0x00000200);  /* TRAP #0 vector */
+    mem_write16(NULL, 0x200, 0x4AC8);       /* HALT */
+
+    cf_init(&cpu, mem_read8, mem_read16, mem_read32,
+            mem_write8, mem_write16, mem_write32, NULL);
+    cf_set_hypercall(&cpu, test_hypercall, NULL);
+    cf_reset(&cpu);
+    cf_run(&cpu, 100);
+
+    result = mem_read32(NULL, HC_RESULT_ADDR);
+    return result == 56; /* 7 * 8 = 56 */
+}
+
+/****************************************************************
+ * Main
+ ****************************************************************/
+
 int
 main(void)
 {
     cf_cpu cpu;
-    int executed, passed, failed, i;
+    int executed, passed, failed, i, ok;
 
     struct smoke_check checks[] = {
         { "fibonacci(10)", 0x000103c2, 55 },
@@ -512,7 +581,7 @@ main(void)
     failed = 0;
     for (i = 0; i < nchecks; i++) {
         uint32_t actual = mem_read32(NULL, checks[i].addr);
-        int ok = (actual == checks[i].expected);
+        ok = (actual == checks[i].expected);
         printf("  %-20s got %-10u expected %-10u %s\n",
                checks[i].name, actual, checks[i].expected,
                ok ? "PASS" : "FAIL");
@@ -521,8 +590,19 @@ main(void)
         else
             failed++;
     }
+
+    /* Hypercall test */
+    ok = run_hypercall_test();
+    printf("  %-20s got %-10u expected %-10u %s\n",
+           "hypercall(7*8)", ok ? 56u : 0u, 56u,
+           ok ? "PASS" : "FAIL");
+    if (ok)
+        passed++;
+    else
+        failed++;
+
     printf("%d/%d smoke tests passed (%d instructions)\n",
-           passed, nchecks, executed);
+           passed, nchecks + 1, executed);
 
     return failed > 0 ? 1 : 0;
 }

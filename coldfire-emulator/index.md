@@ -734,6 +734,52 @@ void cf_exception(cf_cpu *cpu, int vector)
 
 The exception frame pushed to the supervisor stack contains the saved PC, saved SR, and a ColdFire-format word (format 4, distinct from the 68000's format 0). The test harness uses `TRAP #0` (vector 32) to signal program completion — the trap vector points to a `HALT` instruction, which sets the `halted` flag and stops execution.
 
+### Hypercalls
+
+When the emulator is embedded in a larger system, guest code often needs to call into the host — for GPU commands, audio mixing, file I/O, or debugging. The standard 68K mechanism is a TRAP instruction, but TRAPs carry overhead: the CPU pushes an exception frame (PC, SR, format word), looks up a vector table entry, jumps to the handler, and returns via RTE. For functions called thousands of times per frame — like a 3D graphics API — this overhead adds up.
+
+The emulator provides a lighter mechanism: *hypercalls* via LINE_A intercept. On the classic 68000, any opword starting with `1010` (group A) triggers a LINE_A exception. ColdFire repurposes part of this space for MOV3Q (bits 8–6 = `101`), but the rest remains undefined — EMAC instructions that the emulator stubs. Hypercalls claim this space: when the decoder hits a non-MOV3Q LINE_A opword, it calls a host-provided callback *before* raising the LINE_A exception. If the callback handles the opword, execution continues with no exception frame, no vector lookup, no RTE — just fetch, decode, callback, next instruction.
+
+The encoding gives 12 bits of function ID (the low 12 bits of the opword, minus the MOV3Q range):
+
+```
+  1010  NNNN NNNN NNNN     (bits 8-6 != 101)
+  group  function ID
+```
+
+The host registers a single callback that dispatches on the function ID:
+
+```c
+static int
+my_hypercall(cf_cpu *cpu, uint16_t opword, void *ctx)
+{
+    int func = opword & 0xFFF;
+
+    switch (func) {
+    case 1: /* multiply D0 * D1 -> D0 */
+        cpu->d[0] = cpu->d[0] * cpu->d[1];
+        return 0;  /* handled */
+    default:
+        return -1; /* unhandled — raise LINE_A exception */
+    }
+}
+
+cf_set_hypercall(&cpu, my_hypercall, NULL);
+```
+
+Arguments and return values pass through the CPU registers directly — D0–D7, A0–A6, FP0–FP7 are all accessible to the callback. The calling convention is whatever the host and guest agree on. For a Glide-style graphics API with ~45 functions, hand-written dispatchers are straightforward: each function reads its arguments from specific registers, calls native host code, and writes return values back.
+
+Guest-side assembly to invoke a hypercall is a single instruction:
+
+```asm
+    move.l  #7, %d0        | argument 1
+    move.l  #8, %d1        | argument 2
+    .short  0xA001          | hypercall #1
+    | D0 now contains the result
+```
+
+The `.short` directive emits the raw opword — the assembler does not need to know about hypercalls. GCC inline assembly can wrap this in a C-callable function with minimal effort.
+
 ## Testing and Validation
 
 ### The Test Program
