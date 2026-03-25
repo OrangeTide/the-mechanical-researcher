@@ -1,2 +1,5 @@
 _build/
 notes/pdfs
+coldfire-emulator/demo/smoke_test
+coldfire-emulator/demo/test_harness
+coldfire-emulator/demo/test_program.elf
