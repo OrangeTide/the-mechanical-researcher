@@ -54,6 +54,23 @@ fi
 TMPDIR="$(mktemp -d)"
 cp -r "$BUILD_DIR"/. "$TMPDIR/"
 
+# Remove unpublished articles from the deploy copy
+PUBLISHED_FILE="$SITE_DIR/published.txt"
+if [ -f "$PUBLISHED_FILE" ]; then
+    PUBLISHED_LIST="$(sed 's/#.*//' "$PUBLISHED_FILE" | awk 'NF{$1=$1; print}' | tr '\n' ' ')"
+    for dir in "$TMPDIR"/*/; do
+        [ -d "$dir" ] || continue
+        slug="$(basename "$dir")"
+        # Skip non-article dirs (static assets)
+        [ "$slug" = "static" ] && continue
+        case " $PUBLISHED_LIST " in
+            *" $slug "*) ;;  # published — keep it
+            *) echo "  excluding unpublished: $slug"
+               rm -rf "$dir" ;;
+        esac
+    done
+fi
+
 # Create or switch to gh-pages
 if git show-ref --verify --quiet refs/heads/gh-pages; then
     git checkout gh-pages --quiet
