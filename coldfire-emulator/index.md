@@ -7,7 +7,7 @@ category: systems
 
 ## Introduction
 
-When a project needs an embedded CPU — a fantasy console, a retro computing emulator, a sandboxed plugin system — there are two paths. One is to invent a bytecode virtual machine: define an instruction set, write an assembler, build a compiler backend. The other is to emulate a real architecture: pick an existing ISA with existing toolchains, existing documentation, and decades of existing software to test against. This article takes the second path.
+When a project needs an embedded CPU — a control system simulator, a retro computing emulator, a sandboxed plugin system — there are two paths. One is to invent a bytecode virtual machine: define an instruction set, write an assembler, build a compiler backend. The other is to emulate a real architecture: pick an existing ISA with existing toolchains, existing documentation, and decades of existing software to test against. This article takes the second path.
 
 The trade-off is straightforward. A custom bytecode VM can be arbitrarily simple — the Quake 3 VM is 60 opcodes and 2,000 lines of C — but it requires building an entire toolchain from scratch. A real ISA comes with GCC, LLVM, debuggers, and disassemblers out of the box, but it carries decades of design decisions that the emulator must faithfully reproduce. The question is which real architecture minimizes that burden while maximizing what the toolchain can do.
 
@@ -213,25 +213,46 @@ The V4e FPU is the sweet spot: enough for IEEE-754 arithmetic without the comple
 
 ### Historical Context
 
-The 68000 was the game console CPU. From 1988 to 1994, it powered five major platforms — and then it disappeared from the console world entirely:
+The 68000 family was one of the most widely used CPU architectures in the history of computing. Beyond the personal computers it powered — Macintosh, Amiga, Atari ST — the 68000 dominated arcade hardware and home consoles for over a decade.
+
+**Arcade platforms.** The 68000 became the standard arcade CPU from the mid-1980s through the late 1990s. Major arcade boards include:
+
+| Board | Year | CPU | Notable Games |
+|---|---|---|---|
+| Atari System 1 | 1984 | 68010 @ 7.2 MHz | Marble Madness, Road Blasters |
+| Sega System 16 | 1985 | 68000 @ 10 MHz | Shinobi, Golden Axe, Altered Beast |
+| Sega X-Board | 1987 | 2× 68000 @ 12.5 MHz | After Burner, Thunder Blade |
+| Sega Y-Board | 1988 | 3× 68000 @ 12.5 MHz | Galaxy Force, Power Drift |
+| Capcom CPS-1 | 1988 | 68000 @ 10 MHz | Final Fight, Street Fighter II |
+| Namco System 21 | 1988 | 2× 68000 + 68020 | Winning Run, Starblade |
+| SNK Neo Geo MVS | 1990 | 68000 @ 12 MHz | Fatal Fury, King of Fighters, Metal Slug |
+| Toaplan Version 2 | 1991 | 68000 @ 16 MHz | Truxton II, Batsugun |
+| Capcom CPS-2 | 1993 | 68000 @ 16 MHz | Super Street Fighter II, Marvel vs. Capcom |
+| CAVE 68000 | 1994 | 68000 @ 16 MHz | DonPachi, DoDonPachi, ESP Ra.De. |
+
+Sega's Y-Board was the most architecturally ambitious — three 68000 CPUs working in parallel for sprite scaling and rotation. Namco's System 21 paired dual 68000s with a 68020 and TMS320C25 DSPs for early polygon 3D. CAVE's hardware pushed the 68000 to its limits for bullet-hell shooters well into the late 1990s.
+
+**Home consoles.**
 
 | Console | Release | CPU | Clock |
 |---|---|---|---|
 | Sega Genesis / Mega Drive | 1988 JP | Motorola 68000 | 7.67 MHz |
-| SNK Neo Geo (MVS/AES) | 1990 | Motorola 68HC000 | 12 MHz |
+| SNK Neo Geo AES | 1990 | Motorola 68000 | 12 MHz |
 | Amiga CD32 | Sep 1993 EU | Motorola 68EC020 | 14.28 MHz |
 | Atari Jaguar | Nov 1993 US | Motorola 68000 | 13.295 MHz |
 | Sega Saturn | Nov 1994 JP | Motorola 68EC000 (sound) | 11.3 MHz |
 
-ColdFire was the 68000's embedded successor — introduced in 1994, the same year the Saturn shipped its last 68K. The V2 core shipped in commercial products by 1996. The V4e core was announced at Microprocessor Forum in October 2000 — contemporary with the PlayStation 2 launch — adding FPU, MMU, and EMAC to a "100% synthesizable and highly configurable" core designed for custom SoCs. The first V4e silicon (MCF547x/MCF548x) shipped in 2004 from Freescale (spun off from Motorola in July 2004), running at up to 266 MHz and delivering 410 Dhrystone 2.1 MIPS.
+**ColdFire's lineage.** ColdFire emerged from this ecosystem — introduced in 1994, the same year the Saturn shipped. The V2 core shipped in commercial products by 1996. The V4e core was announced at Microprocessor Forum in October 2000, adding FPU, MMU, and EMAC to a "100% synthesizable and highly configurable" core designed for custom SoCs. The first V4e silicon (MCF547x/MCF548x) shipped in 2004 from Freescale (spun off from Motorola in July 2004), running at up to 266 MHz and delivering 410 Dhrystone 2.1 MIPS.
 
-But ColdFire never crossed back into gaming. Its markets stayed industrial — factory automation, medical instrumentation, robotics, POS terminals. The V4e had everything a console CPU needed: 68K backward compatibility for the Genesis developer ecosystem, an integrated FPU for 3D math, EMAC for audio mixing, and MMU for sandboxing game code. It was a console CPU that never got a console. NXP acquired Freescale in 2015, and ColdFire became a legacy product line.
+**ColdFire in the field.** ColdFire found its market in embedded systems and networking equipment. The SnapGear firewall/VPN appliance line (SG560, SG565, SG580) ran uClinux on a ColdFire MCF5272 at 66 MHz — a complete network security appliance on a single-chip CPU. NetBurner built an entire product line of ColdFire-based embedded modules (MOD5270, MOD5282, MOD54415) used as OEM building blocks for industrial automation, medical devices, and IoT appliances. Freescale published reference designs targeting VPN routers (MCF5272), medical monitoring gateways (MCF5275), HVAC control panels (MCF5282), and factory automation with dual-CAN and dual-Ethernet (MCF548x). Stanford's SLAC National Accelerator Laboratory used the MCF5282 in low-level RF control systems for the Linac Coherent Light Source. NASA JPL flew a ColdFire-based electronic nose instrument on the International Space Station. Freescale claimed over 500 million 68K/ColdFire units shipped across the family's lifetime.
+
+NXP acquired Freescale in 2015, and ColdFire became a legacy product line — still supported but no longer actively developed.
 
 ### Musashi Comparison
 
 The gold standard for 68K emulation is Karl Stenerud's [Musashi](https://github.com/kstenerud/Musashi), used in MAME and numerous retro computing projects. Musashi covers the full 68000/68010/68020/68EC020 instruction set across approximately 6,500 lines of C generated from a code generator that processes instruction tables. It aims for cycle-accurate emulation of the classic 68K family.
 
-Our emulator has a different goal. It implements the ColdFire V4e ISA specifically — the simplified instruction set with its restrictions and additions — in 2,239 lines of handwritten C. It does not aim for cycle accuracy. It provides a callback-based memory bus for embedding, zero heap allocation, and enough fidelity to run GCC-compiled bare-metal programs. Where Musashi emulates the past, this emulator targets a platform that never existed.
+Our emulator has a different goal. It implements the ColdFire V4e ISA specifically — the simplified instruction set with its restrictions and additions — in 2,239 lines of handwritten C. It does not aim for cycle accuracy. It provides a callback-based memory bus for embedding, zero heap allocation, and enough fidelity to run GCC-compiled bare-metal programs. Where Musashi emulates vintage hardware for preservation, this emulator is designed for embedding a real ISA into new projects — control system simulators, sandboxed plugin environments, or any application where users need to write C for a target that the host fully controls.
 
 ## Instruction Encoding
 
@@ -892,7 +913,7 @@ What the emulator intentionally omits: the EMAC multiply-accumulate unit raises 
 
 The GCC codegen test was the decisive factor in architecture selection. Fourteen candidates were evaluated; five reached the final round; only ColdFire V4e produced clean single-instruction output for every arithmetic operation tested. The SH-4 was the closest competitor but fell short on integer divide (a libgcc call) and carried additional complexity in delay slots, literal pools, and FPSCR bank-switching.
 
-The emulator is designed as a building block. GCC, LLVM, and Free Pascal all produce code for ColdFire targets — the emulator runs whatever these compilers generate. In Part 2, it becomes the CPU of the Triton, a fantasy game console that explores the alternate history where Sega chose ColdFire V4e over SH-4: maintaining 68K binary compatibility with the Genesis while gaining a modern FPU, multiply-accumulate for audio, and an MMU for sandboxing game code.
+The emulator is designed as a building block. GCC, LLVM, and Free Pascal all produce code for ColdFire targets — the emulator runs whatever these compilers generate. The callback-based memory bus means the host defines what the address space looks like: flat RAM for a simulator, memory-mapped I/O for a virtual control system, or a complete peripheral set for a system emulator. The hypercall mechanism provides a zero-overhead path from guest code to host-native functions, suitable for high-frequency interfaces like graphics APIs or hardware abstraction layers. The result is a 2,246-line library that turns any C program into an embeddable CPU.
 
 ### Sources
 

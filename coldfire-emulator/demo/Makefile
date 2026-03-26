@@ -1,5 +1,5 @@
 # Makefile for ColdFire V4e emulator demo
-# Copyright (c) 2026 Jon Mayo — MIT-0 OR Public Domain
+# Copyright (c) 2026 Jon Mayo - MIT-0 OR Public Domain
 
 # Host compiler
 CC      = gcc
