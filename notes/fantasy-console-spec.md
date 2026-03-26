@@ -24,14 +24,15 @@ Vertex Technologies leans hard into the underdog narrative. Their marketing is t
 
 ### Concept
 
-The Triton is a fantasy game console that never existed — built by Vertex Technologies, a scrappy Silicon Valley startup that bet on commodity hardware and off-the-shelf 1990s inventory to undercut Sony, Nintendo, and Sega. Launched for Christmas 2001 at $199, the Triton pairs a Motorola ColdFire V4e CPU with a Voodoo-class 3D GPU, targeting developers who already know the 68K architecture and the Glide API.
+The Triton is a fantasy game console that never existed — built by Vertex Technologies, a scrappy Silicon Valley startup that bet on commodity hardware and off-the-shelf 1990s inventory to undercut Sony, Nintendo, and Sega. Launched for Christmas 2001 at $199, the Triton pairs a Motorola ColdFire V4e CPU with a Voodoo Banshee-derived GPU (integrated 2D + 3D), targeting developers who already know the 68K architecture and the Glide API.
 
 ### Company: Vertex Technologies
 
 - Founded ~1999, San Jose, CA (down the street from 3Dfx's old office at 4435 Fortran Drive)
 - ~50–100 engineers, VC-funded during the dot-com bubble's tail
 - Philosophy: "The best technology from 5 years ago, at today's prices, with a modern CPU"
-- Licensed the ColdFire V4e core from Motorola (Q1 2000), licensed SST-1 rasterizer IP from Nvidia after 3Dfx acquisition (Q1 2001)
+- Licensed the ColdFire V4e core from Motorola (Q1 2000), licensed Voodoo Banshee (SST-2) IP from Nvidia after 3Dfx acquisition (Q1 2001)
+- Nvidia's motivation: flat licensing fee for IP they weren't using (Banshee was EOL), plus a foothold in the console industry after NV1 flopped and NV2/Dreamcast fell through. If Triton succeeds, Nvidia has royalties and a console platform. If it fails, they already have the NRE payment. Jensen doesn't make speculative bets — he takes guaranteed money.
 - No proprietary SDK fees — GCC cross-compiler, open Glide API, $299 dev kit
 - Target: small studios and bedroom developers priced out of PS2/Xbox dev kits ($10K–$20K)
 - The dev kit IS the console — plug in a keyboard and a serial cable, and you're developing. No separate hardware needed. That's the revolution.
@@ -43,7 +44,7 @@ The Triton is a fantasy game console that never existed — built by Vertex Tech
 | Q1 2000 | License ColdFire V4e core from Motorola |
 | Q3 2000 | SoC design begins (V4e + GPU + audio on one die) |
 | Oct 2000 | 3Dfx files for bankruptcy |
-| Dec 2000 | Nvidia acquires 3Dfx IP; Vertex negotiates SST-1 license |
+| Dec 2000 | Nvidia acquires 3Dfx IP; Vertex negotiates Banshee (SST-2) license |
 | Q1 2001 | Tape-out custom SoC |
 | Q2 2001 | Engineering samples, dev kits ship to studios |
 | E3 2001 (May) | Public announcement, playable demos on show floor |
@@ -62,6 +63,18 @@ The Triton is a fantasy game console that never existed — built by Vertex Tech
 
 The Triton can't match PS2 or Xbox on raw power, but it's the cheapest to develop for, the easiest to program, and the most open. Its pitch is the same one that made the original PlayStation succeed against the Saturn: "simple hardware that's easy to get triangles out of."
 
+### Design Philosophy — "3D First"
+
+Vertex made deliberate bets about what to include and what to leave out:
+
+- **No FMV / video playback hardware.** Vertex saw FMV as a failed 90s fad — the Sega CD debacle, Night Trap, Sewer Shark, and a generation of bad interactive movies proved that consumers wanted real-time 3D, not pre-rendered video. The market had already spoken. Omitting video decode kept the SoC die smaller and the BOM cheaper.
+
+- **Stereoscopic 3D with shutter glasses.** The Banshee rasterizer already supports stereo buffer rendering. Vertex added a mini-DIN sync output and bundled LCD shutter glasses with a launch title. They were convinced that Nintendo's Virtual Boy was the right idea with terrible execution (monochrome, 32 pixels, neck cramps). A proper stereoscopic 3D experience at 640×480 in full color would be transformative. This was their differentiator. In hindsight, another miscalculation.
+
+- **No overlay / scaler / YUV CSC.** The Banshee design includes a video overlay unit, but Vertex stripped it from the SoC to save die area. Without video playback to support, there's no need for overlay planes or color space conversion hardware. If a game needs to display a full-screen image, it can LFB-blit to the framebuffer. Cutscenes use real-time rendering.
+
+These decisions are narratively consistent with a scrappy startup that puts all its chips on one bet. Vertex truly believed 3D was the only thing that mattered, and that VR was the future. They weren't wrong about 3D — they were just wrong about everything else.
+
 ## CPU
 
 - ColdFire V4e @ 200 MHz
@@ -78,9 +91,11 @@ The Triton can't match PS2 or Xbox on raw power, but it's the cheapest to develo
 See "Updated Memory Map" section under Peripheral Bus for full layout.
 ```
 
-## GPU (Glide-Inspired)
+## GPU (Banshee-Derived, Integrated 2D + 3D)
 
-### Pixel Pipeline
+The Triton GPU is derived from the 3Dfx Voodoo Banshee (SST-2), licensed from Nvidia. Unlike the original Voodoo1 (3D-only, required a separate VGA card), the Banshee integrates 2D acceleration, VGA output, and 3D rendering in a single unified design with one memory controller and one command FIFO. Vertex stripped the VGA compatibility, DAC, and video overlay unit to save die area, keeping the 2D engine, 3D pipeline, and framebuffer controller.
+
+### 3D Pixel Pipeline
 
 ```
 vertex → triangle setup → rasterizer → texel lookup →
@@ -88,10 +103,25 @@ vertex → triangle setup → rasterizer → texel lookup →
   alpha blend → write to framebuffer
 ```
 
+### 2D Engine
+
+The Banshee 2D engine provides hardware-accelerated operations on the framebuffer:
+
+- **BitBLT**: screen-to-screen, host-to-screen, with full ROP support (256 raster operations)
+- **Rectangle fill**: solid color and 8×8 pattern fills
+- **Line draw**: Bresenham line engine with clipping
+- **Color expand**: 1bpp→Nbpp expansion (monochrome font/glyph rendering)
+- **Hardware clipping**: scissor rectangle for all 2D operations
+- **Hardware cursor**: 64×64 2-color sprite overlay
+- **Chroma key**: source color compare for transparency (skip writes where source matches key)
+
+The 2D and 3D engines share VRAM through a single unified memory controller — no arbitration complexity. They submit work through the same command FIFO. Games typically use 2D for menus, HUD overlays, and text rendering, then switch to 3D for gameplay.
+
 ### Specifications
 
 | Component | Specification |
 |---|---|
+| Architecture | Voodoo Banshee (SST-2) derivative |
 | VRAM | 8 MB dedicated (framebuffer + textures) |
 | Resolution | 640×480 (16-bit, 2× FB + Z-buffer) |
 | Color depth | 16-bit (RGB 565) framebuffer, 16-bit Z-buffer |
@@ -101,6 +131,7 @@ vertex → triangle setup → rasterizer → texel lookup →
 | TMU count | 1 (multi-pass for multi-texture) |
 | Fill rate | ~50 Mpixels/sec (Voodoo1-class) |
 | Triangle rate | ~500K triangles/sec |
+| 2D engine | BitBLT, rect fill, line draw, color expand, HW cursor |
 
 ### Texture Formats
 
@@ -113,37 +144,51 @@ vertex → triangle setup → rasterizer → texel lookup →
 - ALPHA_INTENSITY_88 (16-bit, alpha + intensity)
 - RGB_332 (8-bit, low-quality color)
 
-### API Subset (~45 functions from Glide 3.0)
+### Glide 3.0 API
 
-**Init/Shutdown:**
-- `grGlideInit`, `grSstSelect`, `grSstWinOpen`, `grSstWinClose`, `grGlideShutdown`
+Glide 3.0 shipped alongside the Banshee in June 1998. In the open-source Glide
+codebase, Banshee and Voodoo3 share the same `h3` driver — they're the same
+architecture, Voodoo3 just re-adds the second TMU. The full Glide 3.x export
+table is ~98 functions. The Triton implements a practical subset organized into
+three tiers.
 
-**Buffer Operations:**
-- `grBufferClear`, `grBufferSwap`, `grRenderBuffer`, `grClipWindow`
+#### Tier 1 — Implement (~45 functions)
+
+The core rendering pipeline. Every function here does real work.
+
+**Lifecycle:**
+- `grGlideInit`, `grGlideShutdown`
+- `grSstSelect`, `grSstWinOpen`, `grSstWinClose`
+
+**Buffers:**
+- `grBufferClear`, `grBufferSwap`, `grRenderBuffer`
+- `grClipWindow`, `grSstOrigin`
 
 **Drawing:**
 - `grDrawTriangle`, `grDrawLine`, `grDrawPoint`
 - `grDrawVertexArray`, `grDrawVertexArrayContiguous`
 
-**Vertex:**
+**Vertex format:**
 - `grVertexLayout`, `grCoordinateSpace`
 
-**Color:**
+**Color combine:**
 - `grColorCombine`, `grConstantColorValue`, `grColorMask`, `grDitherMode`
 
 **Alpha:**
-- `grAlphaCombine`, `grAlphaBlendFunction`, `grAlphaTestFunction`, `grAlphaTestReferenceValue`
+- `grAlphaCombine`, `grAlphaBlendFunction`
+- `grAlphaTestFunction`, `grAlphaTestReferenceValue`
 
 **Depth:**
-- `grDepthBufferMode`, `grDepthBufferFunction`, `grDepthMask`, `grDepthBiasLevel`, `grDepthRange`
+- `grDepthBufferMode`, `grDepthBufferFunction`, `grDepthMask`, `grDepthBiasLevel`
 
 **Fog:**
 - `grFogMode`, `grFogColorValue`, `grFogTable`
 
 **Texture:**
 - `grTexSource`, `grTexCombine`, `grTexClampMode`, `grTexFilterMode`
-- `grTexMipMapMode`, `grTexDownloadMipMap`
-- `grTexCalcMemRequired`, `grTexMinAddress`, `grTexMaxAddress`
+- `grTexMipMapMode`, `grTexDownloadMipMap`, `grTexDownloadMipMapLevel`
+- `grTexCalcMemRequired`, `grTexTextureMemRequired`
+- `grTexMinAddress`, `grTexMaxAddress`
 
 **Culling:**
 - `grCullMode`
@@ -151,25 +196,89 @@ vertex → triangle setup → rasterizer → texel lookup →
 **Chroma-key:**
 - `grChromakeyMode`, `grChromakeyValue`
 
-**Linear Framebuffer (2D access):**
+**Linear framebuffer:**
 - `grLfbLock`, `grLfbUnlock`, `grLfbWriteRegion`
 
 **Query:**
 - `grGet`, `grGetString`
 
-**Utilities:**
-- `guFogGenerateExp`, `guFogGenerateLinear`, `guGammaCorrectionRGB`
+**Enable/disable:**
+- `grEnable`, `grDisable`
 
-### What Was Cut from Full Glide 3.0
+**Sync:**
+- `grFinish`, `grFlush`
 
-- Multi-TMU (TMU1, TMU2) — single TMU, use multi-pass
-- `*Ext` functions (stencil, surfaces, combine extensions) — Voodoo3/4/5 era
-- Multi-board (SLI, scanline interleave) — single GPU
-- State save/restore (`grGlideGetState`/`grGlideSetState`)
-- LFB readback (`grLfbReadRegion`) — write-only for 2D blitting
-- NCC tables, texture detail control, LOD bias
-- Fragmented texture memory (`grTexMultibase`)
-- Extension discovery (`grGetProcAddress`)
+#### Tier 2 — Stub (~20 functions)
+
+Safe to return success or no-op. Games either check for NULL, use these as
+hints, or call them in non-critical paths.
+
+| Function | Stub behavior |
+|---|---|
+| `grGetProcAddress` | Return NULL — games check before calling extensions |
+| `grSplash` | No-op (3dfx logo splash screen) |
+| `grLoadGammaTable` | No-op (display looks fine without gamma correction) |
+| `grStippleMode`, `grStipplePattern` | No-op (line stipple, almost never used) |
+| `grTexDetailControl` | No-op (LOD detail texturing, rare) |
+| `grTexNCCTable` | No-op (Narrow Channel Compression, uncommon format) |
+| `grTexMultibase`, `grTexMultibaseAddress` | No-op (TMU bank splitting, very rare) |
+| `grDepthRange`, `grViewport` | No-op (only needed with clip-space coordinates) |
+| `grGlideGetState`, `grGlideSetState` | No-op (full state save/restore) |
+| `grGlideGetVertexLayout`, `grGlideSetVertexLayout` | No-op (vertex layout save/restore) |
+| `grSetNumPendingBuffers` | No-op (tuning hint) |
+| `grCheckForRoom` | Return true (FIFO space check) |
+| `grReset` | No-op (stats reset) |
+| `grAADrawTriangle` | Fall through to `grDrawTriangle` (edge AA, rarely used) |
+| `grAlphaControlsITRGBLighting` | No-op (special alpha mode, uncommon) |
+| `grDisableAllEffects` | Reset state to defaults (trivial) |
+| `grErrorSetCallback` | Store pointer (never called back in practice) |
+
+#### Tier 3 — Not implemented
+
+These either require Voodoo3/4/5 hardware, serve no purpose on a console, or
+are host-side utilities that games can replace.
+
+| Category | Functions | Reason |
+|---|---|---|
+| Extensions (V4/V5) | `grStencilFunc/Mask/Op`, `gr*CombineExt`, `grTextureBufferExt` | Voodoo4/5 only — `grGetProcAddress` returns NULL |
+| Multi-TMU | TMU1 state in `grTexCombine`, `grTexSource` | Banshee has 1 TMU — `grGet(GR_NUM_TMU)` returns 1, games multi-pass |
+| Multi-context | `grSelectContext` | Console has one screen |
+| Multi-board | SLI functions | Single GPU |
+| File I/O | `gu3dfLoad`, `gu3dfGetInfo` | .3df texture loader — games do their own loading |
+| Encoding | `guEncodeRLE16` | Host-side utility |
+| LFB config | `grLfbConstantAlpha/Depth`, `grLfbWriteColorSwizzle/Format` | Advanced LFB modes — default RGB565 write is sufficient |
+| LFB readback | `grLfbReadRegion` | Write-only framebuffer access |
+| Texture partial | `grTexDownloadMipMapLevelPartial`, `grTexDownloadTablePartial` | Partial updates — rare, full upload is fine |
+
+#### Utility functions (gu* — pure math, no hardware)
+
+These are trivial helpers (~10-20 lines each) that games call directly.
+Implement them because they're free.
+
+- `guFogGenerateExp`, `guFogGenerateExp2`, `guFogGenerateLinear` — fill a 64-entry fog table
+- `guFogTableIndexToW` — convert fog table index to W depth value
+- `guGammaCorrectionRGB` — convenience gamma wrapper
+
+### Stereoscopic 3D (Shutter Glasses)
+
+The Banshee rasterizer has native stereo 3D support: alternating left-eye/right-eye framebuffers with a sync signal for LCD shutter glasses. Vertex exposes this as a first-party feature:
+
+- **Stereo sync output**: mini-DIN connector on the back of the console
+- **Shutter glasses**: bundled with a launch title (pack-in accessory)
+- **API**: `grSstControl(GR_CONTROL_ACTIVATE)` with stereo buffer mode — games render two views per frame, the GPU alternates them at field rate
+- **Fallback**: games must work without glasses (mono mode default)
+
+Vertex's pitch: "the first affordable stereoscopic 3D gaming platform." They believed Nintendo's Virtual Boy failed because of bad hardware (monochrome, no head tracking, neck pain), not because of a bad concept. In retrospect, this was another miscalculation — consumers in 2001 didn't want glasses any more than they wanted Virtual Boy.
+
+### What Was Cut from Banshee Hardware
+
+Vertex stripped these from the SoC to save die area and reduce cost:
+
+- **VGA compatibility mode and VGA DAC** — console doesn't need legacy PC display modes
+- **Video overlay unit and scaler** — no FMV, no video playback (see Design Philosophy)
+- **AGP interface** — replaced with SoC-internal bus
+- **PCI configuration space** — not a PC add-in card
+- **Second TMU slot** — Banshee already has 1 TMU; Voodoo3 re-added TMU1, but Vertex kept the cheaper single-TMU config
 
 ## Audio
 
