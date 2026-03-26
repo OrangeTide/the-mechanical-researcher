@@ -92,10 +92,10 @@ vertex → triangle setup → rasterizer → texel lookup →
 
 | Component | Specification |
 |---|---|
-| VRAM | 4 MB dedicated (framebuffer + textures) |
-| Resolution | 320×240 (16-bit, 2× FB + Z), 640×480 (16-bit, 2× FB) |
+| VRAM | 8 MB dedicated (framebuffer + textures) |
+| Resolution | 640×480 (16-bit, 2× FB + Z-buffer) |
 | Color depth | 16-bit (RGB 565) framebuffer, 16-bit Z-buffer |
-| Texture memory | ~2 MB (after framebuffer at 320×240) |
+| Texture memory | ~6.2 MB (after double-buffered framebuffer + Z-buffer) |
 | Max texture size | 256×256, with mipmaps |
 | Texture filtering | Point sampled or bilinear |
 | TMU count | 1 (multi-pass for multi-texture) |
@@ -369,14 +369,14 @@ No cartridge slot — the console is disc/HDD-based (like PlayStation or Dreamca
 
 ### System NOR Flash — 4 MB (XIP)
 
-4 MB NOR flash mapped at 0x00E00000–0x00FFFFFF. Execute-in-place (XIP) — the ColdFire can execute code directly from NOR without copying to RAM first. This is how the Mac Classic, many routers, and embedded systems of the era worked.
+4 MB NOR flash mapped at 0x01200000–0x015FFFFF. Execute-in-place (XIP) — the ColdFire can execute code directly from NOR without copying to RAM first. This is how the Mac Classic, many routers, and embedded systems of the era worked.
 
 **Layout:**
 
 ```
-0x00E00000 - 0x00E7FFFF  Recovery loader (512 KB) — write-protected
-0x00E80000 - 0x00F7FFFF  OS / BIOS (3 MB) — updatable
-0x00F80000 - 0x00FFFFFF  Asset partition (512 KB) — FAT16
+0x01200000 - 0x0127FFFF  Recovery loader (512 KB) — write-protected
+0x01280000 - 0x0137FFFF  OS / BIOS (3 MB) — updatable
+0x01380000 - 0x013FFFFF  Asset partition (512 KB) — FAT16
 ```
 
 **Recovery loader** (512 KB, hardware write-protected):
@@ -406,7 +406,7 @@ NOR flash write-protection: the recovery loader region has its WP pin tied high 
 
 ### Boot Sequence
 
-1. ColdFire reset — fetches initial SP and PC from NOR flash vector table at 0x00E00000
+1. ColdFire reset — fetches initial SP and PC from NOR flash vector table at 0x01200000
 2. Boot ROM initializes hardware: RAM test, GPU init, audio silence, SCSI bus reset
 3. Boot system shell from NOR flash — presents menu for:
    - Boot from CD-ROM (load and execute boot sector)
@@ -422,16 +422,16 @@ NOR flash write-protection: the recovery loader region has its WP pin tied high 
 
 ```
 0x00000000 - 0x007FFFFF  Main RAM (8 MB)
-0x00800000 - 0x00BFFFFF  VRAM (4 MB, CPU-accessible via LFB)
-0x00C00000 - 0x00C0FFFF  GPU registers (Glide state machine)
-0x00D00000 - 0x00D003FF  Audio registers (16 channels × 32 bytes + global regs)
-0x00D10000 - 0x00D100FF  NCR 5380 SCSI registers (8 bytes, mirrored)
-0x00D20000 - 0x00D200FF  MMC/SPI registers
-0x00D30000 - 0x00D300FF  Input port registers (2 ports)
-0x00D40000 - 0x00D400FF  Timer / system control registers
-0x00D50000 - 0x00D500FF  UART (debug/link cable)
-0x00D60000 - 0x00D600FF  DMA controller registers (2 channels)
-0x00E00000 - 0x011FFFFF  System NOR Flash (4 MB, XIP — execute in place)
+0x00800000 - 0x00FFFFFF  VRAM (8 MB, CPU-accessible via LFB)
+0x01000000 - 0x0100FFFF  GPU registers (Glide state machine)
+0x01100000 - 0x011003FF  Audio registers (16 channels × 32 bytes + global regs)
+0x01110000 - 0x011100FF  NCR 5380 SCSI registers (8 bytes, mirrored)
+0x01120000 - 0x011200FF  MMC/SPI registers
+0x01130000 - 0x011300FF  Input port registers (2 ports)
+0x01140000 - 0x011400FF  Timer / system control registers
+0x01150000 - 0x011500FF  UART (debug/link cable)
+0x01160000 - 0x011600FF  DMA controller registers (2 channels)
+0x01200000 - 0x015FFFFF  System NOR Flash (4 MB, XIP — execute in place)
 ```
 
 ### Interrupt Assignments
@@ -456,7 +456,7 @@ Gamepad/mouse are polled (no interrupt) — read once per frame in VBlank handle
 identical. The DMA engine sits on the SoC bus and can access any address in the
 memory map — RAM, VRAM, GPU registers, device registers, and NOR flash.
 
-Base address: 0x00D60000. Channel 1 registers are at +0x10.
+Base address: 0x01160000. Channel 1 registers are at +0x10.
 
 #### Registers (Per Channel)
 
@@ -589,9 +589,9 @@ that lets the OS evolve without breaking games.
 The 4 MB NOR flash is split into three regions:
 
 ```
-0x00E00000 - 0x00E7FFFF  Recovery loader (512 KB) — write-protected
-0x00E80000 - 0x00F7FFFF  OS / BIOS (3 MB) — updatable via recovery loader
-0x00F80000 - 0x00FFFFFF  Asset partition (512 KB) — FAT16 filesystem
+0x01200000 - 0x0127FFFF  Recovery loader (512 KB) — write-protected
+0x01280000 - 0x0137FFFF  OS / BIOS (3 MB) — updatable via recovery loader
+0x01380000 - 0x013FFFFF  Asset partition (512 KB) — FAT16 filesystem
 ```
 
 The **recovery loader** (512 KB, write-protected) is the first code that runs
