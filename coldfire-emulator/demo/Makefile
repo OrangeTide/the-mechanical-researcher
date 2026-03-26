@@ -15,6 +15,8 @@ HARNESS     = test_harness
 SMOKE       = smoke_test
 TEST_ELF    = test_program.elf
 QEMU_VALID  = qemu_validate
+INSTR_ELF   = test_instructions.elf
+QEMU_INSTR  = test_instructions_qemu
 
 all: $(HARNESS) $(TEST_ELF)
 
@@ -54,11 +56,26 @@ $(QEMU_VALID): qemu_validate.c
 validate: $(QEMU_VALID)
 	qemu-m68k -cpu cfv4e ./$(QEMU_VALID)
 
+# Cross: build comprehensive instruction test
+$(INSTR_ELF): test_instructions.c link.ld
+	$(M68K_CC) $(M68K_CFLAGS) -O0 $(M68K_LD) -o $@ $<
+
+$(QEMU_INSTR): test_instructions.c
+	$(M68K_CC) $(M68K_CFLAGS) -O0 -fno-builtin -DQEMU_USERMODE -o $@ $<
+
+# Run instruction tests on emulator
+instrtest: $(HARNESS) $(INSTR_ELF)
+	./$(HARNESS) $(INSTR_ELF)
+
+# Run instruction tests on QEMU for comparison
+instrtest-qemu: $(QEMU_INSTR)
+	qemu-m68k -cpu cfv4e ./$(QEMU_INSTR)
+
 # Memory check
 valgrind: $(HARNESS) $(TEST_ELF)
 	valgrind --leak-check=full ./$(HARNESS) $(TEST_ELF)
 
 clean:
-	rm -f $(HARNESS) $(SMOKE) $(TEST_ELF) $(QEMU_VALID)
+	rm -f $(HARNESS) $(SMOKE) $(TEST_ELF) $(QEMU_VALID) $(INSTR_ELF) $(QEMU_INSTR)
 
-.PHONY: all test smoke disasm sections validate valgrind clean
+.PHONY: all test smoke disasm sections validate valgrind instrtest instrtest-qemu clean
