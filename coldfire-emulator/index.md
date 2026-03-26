@@ -11,13 +11,13 @@ When a project needs an embedded CPU — a control system simulator, a retro com
 
 The trade-off is straightforward. A custom bytecode VM can be arbitrarily simple — the Quake 3 VM is 60 opcodes and 2,000 lines of C — but it requires building an entire toolchain from scratch. A real ISA comes with GCC, LLVM, debuggers, and disassemblers out of the box, but it carries decades of design decisions that the emulator must faithfully reproduce. The question is which real architecture minimizes that burden while maximizing what the toolchain can do.
 
-We evaluated fourteen architectures across six dimensions — address space, arithmetic capabilities, implementation complexity, toolchain availability, sandboxing potential, and developer experience — and arrived at Motorola's ColdFire V4e: a simplified derivative of the 68000 family designed for embedded systems, with hardware multiply, divide, and floating-point in a package that compiles to 2,239 lines of C.
+We evaluated fourteen architectures across six dimensions — address space, arithmetic capabilities, implementation complexity, toolchain availability, sandboxing potential, and developer experience — and arrived at Motorola's ColdFire V4e: a simplified derivative of the 68000 family designed for embedded systems, with hardware multiply, divide, and floating-point in a package that compiles to 2,221 lines of C.
 
 This article walks through the selection process, the architecture's instruction encoding, the emulator implementation, and the testing strategy. The complete source code is available as a companion download.
 
 ## Abstract
 
-We compare fourteen CPU architectures for embeddable emulation, evaluating 8-bit through 64-bit designs from the 6809 to Alpha. Five finalists — RISC-V RV32IM, MIPS32, Motorola 68000, PDP-11, and SuperH SH-2 — are analyzed in depth, with GCC cross-compilation tests revealing that ColdFire V4e is the only target where every arithmetic operation (32-bit add, multiply, divide, remainder, and all floating-point operations) compiles to a single hardware instruction. We implement a complete ColdFire V4e emulator in 2,239 lines of C: integer core, FPU, exception handling, and a callback-based memory bus with zero heap allocation. The emulator is validated against GCC 13 cross-compiled bare-metal programs covering recursion, integer arithmetic, bit manipulation, and IEEE-754 floating-point, passing all tests in 1,528 executed instructions.
+We compare fourteen CPU architectures for embeddable emulation, evaluating 8-bit through 64-bit designs from the 6809 to Alpha. Five finalists — RISC-V RV32IM, MIPS32, Motorola 68000, PDP-11, and SuperH SH-2 — are analyzed in depth, with GCC cross-compilation tests revealing that ColdFire V4e is the only target where every arithmetic operation (32-bit add, multiply, divide, remainder, and all floating-point operations) compiles to a single hardware instruction. We implement a complete ColdFire V4e emulator in 2,221 lines of C: integer core, FPU, exception handling, and a callback-based memory bus with zero heap allocation. The emulator is validated against GCC 13 cross-compiled bare-metal programs covering recursion, integer arithmetic, bit manipulation, and IEEE-754 floating-point, passing all tests in 1,528 executed instructions.
 
 ## Choosing an Architecture
 
@@ -186,15 +186,15 @@ V4e is the clear choice. The FPU adds 300–450 LOC but eliminates all floating-
 
 | Component | Estimated | Actual |
 |---|---|---|
-| CPU state + init | ~60 | 68 |
-| Decoder (main switch) | 280–430 | 47 |
-| EA engine | 200–300 | 190 |
-| Integer handlers (groups 0–E) | 900–1,400 | 1,350 |
-| Condition codes | 150–200 | 150 |
-| FPU (group F) | 300–450 | 350 |
-| Exceptions/interrupts | 100–180 | 30 |
-| Memory bus + helpers | — | 54 |
-| **Total** | **2,080–3,120** | **2,239** |
+| CPU state + init | ~60 | 76 |
+| Decoder (main switch) | 280–430 | 62 |
+| EA engine | 200–300 | 194 |
+| Integer handlers (groups 0–E) | 900–1,400 | 1,301 |
+| Condition codes | 150–200 | 119 |
+| FPU (group F) | 300–450 | 323 |
+| Exceptions/interrupts | 100–180 | 31 |
+| Memory bus + helpers | — | 110 |
+| **Total** | **2,080–3,120** | **2,221** |
 
 The actual implementation landed squarely within the estimate, slightly below the midpoint. The decoder came in much smaller than estimated because the two-level switch is just a dispatch table — the real decode logic lives in each group handler.
 
@@ -252,7 +252,7 @@ NXP acquired Freescale in 2015, and ColdFire became a legacy product line — st
 
 The gold standard for 68K emulation is Karl Stenerud's [Musashi](https://github.com/kstenerud/Musashi), used in MAME and numerous retro computing projects. Musashi covers the full 68000/68010/68020/68EC020 instruction set across approximately 6,500 lines of C generated from a code generator that processes instruction tables. It aims for cycle-accurate emulation of the classic 68K family.
 
-Our emulator has a different goal. It implements the ColdFire V4e ISA specifically — the simplified instruction set with its restrictions and additions — in 2,239 lines of handwritten C. It does not aim for cycle accuracy. It provides a callback-based memory bus for embedding, zero heap allocation, and enough fidelity to run GCC-compiled bare-metal programs. Where Musashi emulates vintage hardware for preservation, this emulator is designed for embedding a real ISA into new projects — control system simulators, sandboxed plugin environments, or any application where users need to write C for a target that the host fully controls.
+Our emulator has a different goal. It implements the ColdFire V4e ISA specifically — the simplified instruction set with its restrictions and additions — in 2,221 lines of handwritten C. It does not aim for cycle accuracy. It provides a callback-based memory bus for embedding, zero heap allocation, and enough fidelity to run GCC-compiled bare-metal programs. Where Musashi emulates vintage hardware for preservation, this emulator is designed for embedding a real ISA into new projects — control system simulators, sandboxed plugin environments, or any application where users need to write C for a target that the host fully controls.
 
 ## Instruction Encoding
 
@@ -907,7 +907,7 @@ All five results match between our emulator, the smoke test, and QEMU. The QEMU 
 
 ## Conclusion
 
-The ColdFire V4e emulator is 2,239 lines of C — within the original 2,080–3,120 LOC estimate. It implements the integer core (eight data registers, eight address registers, sixteen opcode groups), an IEEE-754 double-precision FPU mapped directly to host `double` operations, EMAC stubs, and full exception handling. The memory bus uses callbacks for complete isolation between emulator and host. There is no heap allocation.
+The ColdFire V4e emulator is 2,221 lines of C — within the original 2,080–3,120 LOC estimate. It implements the integer core (eight data registers, eight address registers, sixteen opcode groups), an IEEE-754 double-precision FPU mapped directly to host `double` operations, EMAC stubs, and full exception handling. The memory bus uses callbacks for complete isolation between emulator and host. There is no heap allocation.
 
 What the emulator intentionally omits: the EMAC multiply-accumulate unit raises a line-A exception instead of executing (the stub is sufficient for GCC-compiled code, which does not emit EMAC instructions without explicit intrinsics). The MMU, cache control, and debug module are not implemented — `MOVEC` handles control register reads/writes, but the registers themselves are stubs. The ISA_C additions FF1 and BYTEREV are recognized by the decoder but not yet implemented. These omissions reflect the emulator's scope: running GCC-compiled bare-metal C programs, not booting an operating system.
 
