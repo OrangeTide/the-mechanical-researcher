@@ -1312,8 +1312,8 @@ static void exec_group9(cf_cpu *cpu, uint16_t op)
         return;
     }
 
-    /* SUBX Dy,Dx : opmode 10x, ea_mode = 000 */
-    if ((opmode & 0x6) == 0x4 && ea_mode == 0) {
+    /* SUBX Dy,Dx : opmode 1xx, ea_mode = 000 */
+    if ((opmode & 0x4) == 0x4 && ea_mode == 0) {
         uint32_t src = cpu->d[ea_reg];
         uint32_t dst = cpu->d[reg_dx];
         uint32_t x = (cpu->sr & CF_SR_X) ? 1 : 0;
@@ -1570,8 +1570,8 @@ static void exec_groupD(cf_cpu *cpu, uint16_t op)
         return;
     }
 
-    /* ADDX Dy,Dx : opmode 10x, ea_mode = 000 */
-    if ((opmode & 0x6) == 0x4 && ea_mode == 0) {
+    /* ADDX Dy,Dx : opmode 1xx, ea_mode = 000 */
+    if ((opmode & 0x4) == 0x4 && ea_mode == 0) {
         uint32_t src = cpu->d[ea_reg];
         uint32_t dst = cpu->d[reg_dx];
         uint32_t x = (cpu->sr & CF_SR_X) ? 1 : 0;
@@ -2135,10 +2135,9 @@ int cf_step(cf_cpu *cpu)
     switch (group) {
     case 0x0:
         /* Check for BTST/BCHG/BCLR/BSET with register bit number */
-        /* These are: 0000 rrr1 xx eee rrr where xx != 00 for MOVEP */
-        if ((op & 0x0100) && ((op >> 6) & 3) != 0) {
-            /* But MOVEP is 0000 rrr1 xx 001 rrr — not on ColdFire */
-            /* Bit ops with Dn: 0000 rrr1 00/01/10/11 eee rrr */
+        /* These are: 0000 rrr1 xx eee rrr (xx = 00 BTST, 01 BCHG, 10 BCLR, 11 BSET) */
+        if (op & 0x0100) {
+            /* MOVEP (0000 rrr1 xx 001 rrr) not on ColdFire — no conflict */
             exec_bit_reg(cpu, op);
         } else {
             exec_group0(cpu, op);

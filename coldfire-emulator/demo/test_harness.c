@@ -278,22 +278,60 @@ resolve_symbols(const char *path, struct test_case *tests, int ntests)
  * Main
  ****************************************************************/
 
+static int
+load_and_run(const char *elf_path, cf_cpu *cpu)
+{
+    uint32_t entry;
+    int executed;
+
+    memset(mem, 0, MEM_SIZE);
+
+    entry = elf_load(elf_path, elf_write_byte, NULL);
+    if (entry == 0) {
+        fprintf(stderr, "Failed to load ELF: %s\n", elf_path);
+        return -1;
+    }
+    printf("Loaded ELF: entry=0x%08x\n", entry);
+
+    setup_vectors(entry);
+
+    cf_init(cpu, mem_read8, mem_read16, mem_read32,
+            mem_write8, mem_write16, mem_write32, NULL);
+    cf_reset(cpu);
+
+    printf("PC=0x%08x  SP=0x%08x\n", cf_get_pc(cpu), cf_get_a(cpu, 7));
+    printf("Running...\n");
+
+    executed = cf_run(cpu, 10000000);
+    printf("Executed %d instructions (%llu cycles)\n",
+           executed, (unsigned long long)cpu->cycles);
+    printf("Final PC=0x%08x  SR=0x%04x\n",
+           cf_get_pc(cpu), cf_get_sr(cpu));
+
+    return 0;
+}
+
 int
 main(int argc, char **argv)
 {
     cf_cpu cpu;
-    uint32_t entry;
-    int executed, passed, failed, i, resolved;
+    int i, resolved;
     const char *elf_path;
 
-    struct test_case tests[] = {
+    /* Instruction test format: result_pass / result_fail */
+    struct test_case instr_tests[] = {
+        { "pass",  "result_pass",  0, 0 },
+        { "fail",  "result_fail",  0, 0 },
+    };
+
+    /* Original functional tests */
+    struct test_case func_tests[] = {
         { "fibonacci(10)", "result_fib",    0, 55 },
         { "gcd(252, 105)", "result_gcd",    0, 21 },
         { "sum_to(100)",   "result_sum",    0, 5050 },
         { "bit_test(0xAB)","result_bits",   0, 0x0A55 },
         { "sqrt(2)*1000",  "result_sqrt_i", 0, 1414 },
     };
-    int ntests = sizeof(tests) / sizeof(tests[0]);
 
     if (argc < 2) {
         fprintf(stderr, "usage: %s <test_program.elf>\n", argv[0]);
@@ -301,65 +339,66 @@ main(int argc, char **argv)
     }
     elf_path = argv[1];
 
-    /* Clear memory */
-    memset(mem, 0, MEM_SIZE);
+    /* Try instruction test format first */
+    resolved = resolve_symbols(elf_path, instr_tests, 2);
+    if (resolved == 2) {
+        /* Instruction test mode */
+        uint32_t pass_count, fail_count;
 
-    /* Load ELF */
-    entry = elf_load(elf_path, elf_write_byte, NULL);
-    if (entry == 0) {
-        fprintf(stderr, "Failed to load ELF: %s\n", elf_path);
-        return 1;
+        if (load_and_run(elf_path, &cpu) != 0)
+            return 1;
+
+        pass_count = mem_read32(NULL, instr_tests[0].addr);
+        fail_count = mem_read32(NULL, instr_tests[1].addr);
+
+        printf("\n--- Instruction Test Results ---\n");
+        printf("  %u/%u tests passed\n",
+               pass_count, pass_count + fail_count);
+        if (fail_count > 0)
+            printf("  %u FAILED\n", fail_count);
+
+        printf("\n%s\n", fail_count == 0 ? "PASS" : "FAIL");
+
+        return fail_count > 0 ? 1 : 0;
     }
-    printf("Loaded ELF: entry=0x%08x\n", entry);
 
-    /* Resolve result symbol addresses from ELF */
-    resolved = resolve_symbols(elf_path, tests, ntests);
-    printf("Resolved %d/%d result symbols\n", resolved, ntests);
-    for (i = 0; i < ntests; i++) {
-        if (tests[i].addr == 0)
-            fprintf(stderr, "Warning: symbol '%s' not found\n",
-                    tests[i].symbol);
-        else
-            printf("  %s @ 0x%08x\n", tests[i].symbol, tests[i].addr);
+    /* Original functional test mode */
+    {
+        int ntests = sizeof(func_tests) / sizeof(func_tests[0]);
+        int passed = 0, failed = 0;
+
+        resolved = resolve_symbols(elf_path, func_tests, ntests);
+        printf("Resolved %d/%d result symbols\n", resolved, ntests);
+        for (i = 0; i < ntests; i++) {
+            if (func_tests[i].addr == 0)
+                fprintf(stderr, "Warning: symbol '%s' not found\n",
+                        func_tests[i].symbol);
+            else
+                printf("  %s @ 0x%08x\n",
+                       func_tests[i].symbol, func_tests[i].addr);
+        }
+
+        if (load_and_run(elf_path, &cpu) != 0)
+            return 1;
+
+        printf("\n--- Test Results ---\n");
+        for (i = 0; i < ntests; i++) {
+            uint32_t actual = mem_read32(NULL, func_tests[i].addr);
+            int ok = (actual == func_tests[i].expected);
+            printf("  %-20s @ 0x%08x: got %-10u expected %-10u %s\n",
+                   func_tests[i].name, func_tests[i].addr,
+                   actual, func_tests[i].expected,
+                   ok ? "PASS" : "FAIL");
+            if (ok)
+                passed++;
+            else
+                failed++;
+        }
+        printf("\n%d/%d tests passed", passed, ntests);
+        if (failed > 0)
+            printf(", %d FAILED", failed);
+        printf("\n");
+
+        return failed > 0 ? 1 : 0;
     }
-
-    /* Set up vector table */
-    setup_vectors(entry);
-
-    /* Initialize and reset CPU */
-    cf_init(&cpu, mem_read8, mem_read16, mem_read32,
-            mem_write8, mem_write16, mem_write32, NULL);
-    cf_reset(&cpu);
-
-    printf("PC=0x%08x  SP=0x%08x\n", cf_get_pc(&cpu), cf_get_a(&cpu, 7));
-
-    /* Run up to 10 million instructions */
-    printf("Running...\n");
-    executed = cf_run(&cpu, 10000000);
-    printf("Executed %d instructions (%llu cycles)\n",
-           executed, (unsigned long long)cpu.cycles);
-    printf("Final PC=0x%08x  SR=0x%04x\n", cf_get_pc(&cpu), cf_get_sr(&cpu));
-
-    /* Check results */
-    printf("\n--- Test Results ---\n");
-    passed = 0;
-    failed = 0;
-    for (i = 0; i < ntests; i++) {
-        uint32_t actual = mem_read32(NULL, tests[i].addr);
-        int ok = (actual == tests[i].expected);
-        printf("  %-20s @ 0x%08x: got %-10u expected %-10u %s\n",
-               tests[i].name, tests[i].addr,
-               actual, tests[i].expected,
-               ok ? "PASS" : "FAIL");
-        if (ok)
-            passed++;
-        else
-            failed++;
-    }
-    printf("\n%d/%d tests passed", passed, ntests);
-    if (failed > 0)
-        printf(", %d FAILED", failed);
-    printf("\n");
-
-    return failed > 0 ? 1 : 0;
 }
