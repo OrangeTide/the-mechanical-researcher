@@ -3,6 +3,7 @@
 /* Written with AI assistance (Claude, Anthropic) */
 
 #include "coldfire.h"
+#include <limits.h>
 #include <string.h>
 #include <math.h>
 
@@ -282,9 +283,8 @@ typedef struct {
     uint32_t imm;   /* immediate value (for type 3) */
 } ea_loc;
 
-/** Decode an effective address field.
- *  ea_pc is the PC at the start of the EA extension words
- *  (needed for PC-relative modes). */
+/** Decode an effective address field. For PC-relative modes the
+ *  current PC (pointing at the extension word) is used as the base. */
 static ea_loc decode_ea(cf_cpu *cpu, int mode, int reg, int sz)
 {
     ea_loc loc;
@@ -616,11 +616,6 @@ static void exec_group4(cf_cpu *cpu, uint16_t op)
         int sz_bits = (op >> 6) & 3;
         int sz = decode_size(sz_bits);
         if (sz == 0) {
-            /* 0x4AFC = ILLEGAL */
-            if (op == 0x4AFC) {
-                cf_exception(cpu, CF_VEC_ILLEGAL);
-                return;
-            }
             cf_exception(cpu, CF_VEC_ILLEGAL);
             return;
         }
@@ -660,9 +655,13 @@ static void exec_group4(cf_cpu *cpu, uint16_t op)
         int reg = op & 7;
         uint32_t src = cpu->d[reg];
         uint32_t x = (cpu->sr & CF_SR_X) ? 1 : 0;
-        uint32_t res = 0 - src - x;
+        uint64_t diff = (uint64_t)0 - src - x;
+        uint32_t res = (uint32_t)diff;
         cpu->d[reg] = res;
-        set_flags_sub(cpu, src + x, 0, res, SZ_LONG);
+        set_flag(cpu, CF_SR_C, diff >> 32);
+        set_flag(cpu, CF_SR_X, diff >> 32);
+        set_flag(cpu, CF_SR_V, (res & 0x80000000) && (src & 0x80000000));
+        set_flag(cpu, CF_SR_N, res & 0x80000000);
         if (res != 0)
             cpu->sr &= ~CF_SR_Z; /* Z only cleared, never set */
         return;
@@ -723,13 +722,13 @@ static void exec_group4(cf_cpu *cpu, uint16_t op)
         return;
     }
 
-    /* MOVEM register list <-> memory */
-    /* MOVEM.L #list, <ea> : 0100 1000 11 eee rrr */
-    /* MOVEM.L <ea>, #list : 0100 1100 11 eee rrr */
+    /* MOVEM.L register list <-> memory (longword only on ColdFire)
+     * MOVEM.L #list, <ea> : 0100 1000 11 eee rrr
+     * MOVEM.L <ea>, #list : 0100 1100 11 eee rrr
+     * Valid EA modes: (An) and (d16,An) only. */
     if ((op & 0xFB80) == 0x4880) {
         int dir = (op >> 10) & 1; /* 0=reg-to-mem, 1=mem-to-reg */
-        int sz_bit = (op >> 6) & 1; /* 0=word, 1=long */
-        int sz = sz_bit ? SZ_LONG : SZ_WORD;
+        if (((op >> 6) & 1) == 0) goto illegal; /* word size not on CF */
         int mode = (op >> 3) & 7;
         int reg = op & 7;
         uint16_t mask = fetch16(cpu);
@@ -739,58 +738,32 @@ static void exec_group4(cf_cpu *cpu, uint16_t op)
             goto illegal;
         }
 
+        ea_loc loc = decode_ea(cpu, mode, reg, SZ_LONG);
+        uint32_t addr = loc.addr;
+
         if (dir == 0) {
             /* Register to memory */
-            uint32_t addr;
-            if (mode == 4) {
-                /* Predecrement: register mask is reversed */
-                addr = cpu->a[reg];
-                for (int i = 15; i >= 0; i--) {
-                    if (mask & (1 << (15 - i))) {
-                        addr -= size_bytes(sz);
-                        if (i < 8)
-                            bus_write32(cpu, addr, cpu->d[i]);
-                        else
-                            bus_write32(cpu, addr, cpu->a[i - 8]);
-                    }
-                }
-                cpu->a[reg] = addr;
-            } else {
-                ea_loc loc = decode_ea(cpu, mode, reg, sz);
-                addr = loc.addr;
-                for (int i = 0; i < 16; i++) {
-                    if (mask & (1 << i)) {
-                        if (i < 8)
-                            bus_write32(cpu, addr, cpu->d[i]);
-                        else
-                            bus_write32(cpu, addr, cpu->a[i - 8]);
-                        addr += size_bytes(sz);
-                    }
+            for (int i = 0; i < 16; i++) {
+                if (mask & (1 << i)) {
+                    if (i < 8)
+                        bus_write32(cpu, addr, cpu->d[i]);
+                    else
+                        bus_write32(cpu, addr, cpu->a[i - 8]);
+                    addr += 4;
                 }
             }
         } else {
             /* Memory to registers */
-            ea_loc loc = decode_ea(cpu, mode, reg, sz);
-            uint32_t addr = loc.addr;
             for (int i = 0; i < 16; i++) {
                 if (mask & (1 << i)) {
-                    uint32_t val;
-                    if (sz == SZ_WORD) {
-                        val = (uint32_t)(int32_t)(int16_t)
-                              bus_read16(cpu, addr);
-                    } else {
-                        val = bus_read32(cpu, addr);
-                    }
+                    uint32_t val = bus_read32(cpu, addr);
                     if (i < 8)
                         cpu->d[i] = val;
                     else
                         cpu->a[i - 8] = val;
-                    addr += size_bytes(sz);
+                    addr += 4;
                 }
             }
-            /* Postincrement: update An */
-            if (mode == 3)
-                cpu->a[reg] = addr;
         }
         return;
     }
@@ -847,21 +820,16 @@ static void exec_group4(cf_cpu *cpu, uint16_t op)
         cpu->a[7] += 2;
         uint32_t new_pc = bus_read32(cpu, cpu->a[7]);
         cpu->a[7] += 4;
-        /* Check format — skip additional words if needed */
+        /* ColdFire uses format 4 exclusively */
         int format = (fmt >> 12) & 0xF;
-        if (format == 4) {
-            /* 4-word frame, already consumed */
+        if (format != 4) {
+            cf_exception(cpu, CF_VEC_FORMAT_ERROR);
+            return;
         }
         /* Restore SR (may change privilege mode) */
         update_sp(cpu, new_sr);
         cpu->sr = new_sr;
         cpu->pc = new_pc;
-        return;
-    }
-
-    /* HALT : 0100 1010 1100 1000 */
-    if (op == 0x4AC8) {
-        cpu->halted = 1;
         return;
     }
 
@@ -999,6 +967,12 @@ static void exec_group4(cf_cpu *cpu, uint16_t op)
         uint32_t quotient, remainder;
 
         if (is_signed) {
+            /* Guard against INT32_MIN / -1 (undefined behavior in C) */
+            if (dividend == 0x80000000 && (int32_t)divisor == -1) {
+                cpu->sr |= CF_SR_V | CF_SR_N;
+                cpu->sr &= ~CF_SR_Z;
+                return;
+            }
             int32_t q = (int32_t)dividend / (int32_t)divisor;
             int32_t r = (int32_t)dividend % (int32_t)divisor;
             quotient = (uint32_t)q;
@@ -1020,13 +994,16 @@ static void exec_group4(cf_cpu *cpu, uint16_t op)
         return;
     }
 
-    /* MOVEC Rc,Rn / MOVEC Rn,Rc : 0100 1110 0111 101x */
+    /* MOVEC Rn,Rc : 0100 1110 0111 1011 (0x4E7B)
+     * ColdFire control registers are write-only per CFPRM.
+     * 0x4E7A (Rc->Rn) is a 68020+ read encoding not in the ColdFire
+     * spec, but we support it as an emulator convenience. */
     if ((op & 0xFFFE) == 0x4E7A) {
         if (!is_supervisor(cpu)) {
             cf_exception(cpu, CF_VEC_PRIVILEGE);
             return;
         }
-        int dir = op & 1; /* 0 = Rc->Rn, 1 = Rn->Rc */
+        int dir = op & 1; /* 0 = Rc->Rn (emulator ext), 1 = Rn->Rc */
         uint16_t ext = fetch16(cpu);
         int rn = (ext >> 12) & 0xF;
         int is_addr = rn >= 8;
@@ -1036,10 +1013,10 @@ static void exec_group4(cf_cpu *cpu, uint16_t op)
         uint32_t *gpr = is_addr ? &cpu->a[rn_idx] : &cpu->d[rn_idx];
 
         if (dir == 0) {
-            /* Rc -> Rn */
+            /* Rc -> Rn (not in ColdFire spec, emulator extension) */
             switch (rc) {
-            case 0x002: *gpr = cpu->sr & 0xFF; break; /* CACR */
-            case 0x801: *gpr = cpu->vbr; break;
+            case 0x002: *gpr = cpu->cacr; break;   /* CACR */
+            case 0x801: *gpr = cpu->vbr; break;    /* VBR */
             case 0x004: /* ACR0 */ *gpr = 0; break;
             case 0x005: /* ACR1 */ *gpr = 0; break;
             case 0x006: /* ACR2 */ *gpr = 0; break;
@@ -1058,15 +1035,7 @@ static void exec_group4(cf_cpu *cpu, uint16_t op)
         return;
     }
 
-    /* FF1 Dx : 0100 1000 11 00 0 rrr — wait, that's EXTB.L */
-    /* FF1 is actually: 0000 0100 11 000 rrr — NO */
-    /* Actually: FF1 Dx = 0100 1000 11 000 rrr — but EXTB.L is 0100 1001 11 */
-    /* Let me check: EXTB.L = 0x49C0, so 0100 1001 11 000 rrr */
-    /* FF1 = 0x04C0 range... actually in CFPRM it's in group 4 */
-    /* TODO: verify FF1 encoding from CFPRM and add later */
-
-    /* BYTEREV Dx : 0000 0010 11 000 rrr ... actually group 0 */
-    /* These are ISA_C additions, handle later if needed */
+    /* TODO: FF1, BYTEREV (ISA_C) */
 
 illegal:
     cf_exception(cpu, CF_VEC_ILLEGAL);
@@ -1090,13 +1059,7 @@ static void exec_group5(cf_cpu *cpu, uint16_t op)
                           (eval_cc(cpu, cc) ? 0xFF : 0x00);
             return;
         }
-        /* MVS / MVZ : 0101 cccc 11 eee rrr where cc encodes the op */
-        /* MVS.B <ea>,Dx: 0111 cccc 00 eee rrr... no, that's MOVEQ */
-        /* Actually: MVS = 0101 rrr1 11 eee rrr (ISA_B) */
-        /* MVZ = 0101 rrr1 11 eee rrr */
-        /* Let me re-check... */
-        /* Actually Scc only applies to Dn (mode=0) on ColdFire */
-        /* For other modes, this encoding space is used for TPF */
+        /* Scc only valid for Dn on ColdFire */
         goto illegal;
     }
 
@@ -1239,8 +1202,20 @@ static void exec_group8(cf_cpu *cpu, uint16_t op)
         uint32_t dst = cpu->d[reg_dx];
         uint32_t quot, rem;
         if (is_signed) {
-            int32_t q = (int32_t)dst / (int16_t)src;
-            int32_t r = (int32_t)dst % (int16_t)src;
+            int16_t src16 = (int16_t)src;
+            /* Guard against INT32_MIN / -1 (undefined behavior in C) */
+            if ((int32_t)dst == INT32_MIN && src16 == -1) {
+                cpu->sr |= CF_SR_V | CF_SR_N;
+                cpu->sr &= ~CF_SR_Z;
+                return;
+            }
+            int32_t q = (int32_t)dst / src16;
+            int32_t r = (int32_t)dst % src16;
+            /* Overflow if quotient doesn't fit in 16 bits */
+            if (q > 32767 || q < -32768) {
+                cpu->sr |= CF_SR_V;
+                return;
+            }
             quot = (uint32_t)(uint16_t)q;
             rem = (uint32_t)(uint16_t)r;
         } else {
@@ -1317,9 +1292,15 @@ static void exec_group9(cf_cpu *cpu, uint16_t op)
         uint32_t src = cpu->d[ea_reg];
         uint32_t dst = cpu->d[reg_dx];
         uint32_t x = (cpu->sr & CF_SR_X) ? 1 : 0;
-        uint32_t res = dst - src - x;
+        uint64_t diff = (uint64_t)dst - src - x;
+        uint32_t res = (uint32_t)diff;
         cpu->d[reg_dx] = res;
-        set_flags_sub(cpu, src + x, dst, res, SZ_LONG);
+        set_flag(cpu, CF_SR_C, diff >> 32);
+        set_flag(cpu, CF_SR_X, diff >> 32);
+        uint32_t sm = src & 0x80000000, dm = dst & 0x80000000;
+        uint32_t rm = res & 0x80000000;
+        set_flag(cpu, CF_SR_V, (sm != dm) && (rm == sm));
+        set_flag(cpu, CF_SR_N, rm);
         if (res != 0) cpu->sr &= ~CF_SR_Z;
         return;
     }
@@ -1331,9 +1312,7 @@ static void exec_group9(cf_cpu *cpu, uint16_t op)
     int dir = (opmode >> 2) & 1;
 
     if (dir == 0) {
-        /* <ea> -> Dn: Dn - <ea> ... wait, no */
-        /* Actually: SUB <ea>,Dn means Dn = Dn - <ea> */
-        /* opmode 000 = byte, 001 = word, 010 = long */
+        /* SUB <ea>,Dn: Dn = Dn - <ea> */
         uint32_t src = ea_read(cpu, ea_mode, ea_reg, sz);
         uint32_t dst = size_mask(cpu->d[reg_dx], sz);
         uint32_t res = dst - src;
@@ -1347,7 +1326,7 @@ static void exec_group9(cf_cpu *cpu, uint16_t op)
                              (res & 0xFF);
         set_flags_sub(cpu, src, dst, res, sz);
     } else {
-        /* Dn -> <ea>: <ea> = <ea> - Dn */
+        /* SUB Dn,<ea>: <ea> = <ea> - Dn */
         ea_loc loc = decode_ea(cpu, ea_mode, ea_reg, sz);
         uint32_t src = size_mask(cpu->d[reg_dx], sz);
         uint32_t dst = read_ea(cpu, &loc, sz);
@@ -1575,9 +1554,15 @@ static void exec_groupD(cf_cpu *cpu, uint16_t op)
         uint32_t src = cpu->d[ea_reg];
         uint32_t dst = cpu->d[reg_dx];
         uint32_t x = (cpu->sr & CF_SR_X) ? 1 : 0;
-        uint32_t res = dst + src + x;
+        uint64_t sum = (uint64_t)dst + src + x;
+        uint32_t res = (uint32_t)sum;
         cpu->d[reg_dx] = res;
-        set_flags_add(cpu, src + x, dst, res, SZ_LONG);
+        set_flag(cpu, CF_SR_C, sum >> 32);
+        set_flag(cpu, CF_SR_X, sum >> 32);
+        uint32_t sm = src & 0x80000000, dm = dst & 0x80000000;
+        uint32_t rm = res & 0x80000000;
+        set_flag(cpu, CF_SR_V, (sm == dm) && (rm != sm));
+        set_flag(cpu, CF_SR_N, rm);
         if (res != 0) cpu->sr &= ~CF_SR_Z;
         return;
     }
@@ -1760,8 +1745,6 @@ static int eval_fpcc(cf_cpu *cpu, int cc)
     int fn = (fpcc >> 3) & 1;
     int fz = (fpcc >> 2) & 1;
     int fnan = fpcc & 1;
-
-    (void)fn; (void)fz; (void)fnan;
 
     switch (cc & 0xF) {
     case 0x0: return 0;                              /* F */
@@ -2112,13 +2095,6 @@ static void exec_bit_reg(cf_cpu *cpu, uint16_t op)
         }
     }
 }
-
-/****************************************************************
- * MOV3Q: 1010 ddd1 01 eee rrr (ISA_B)
- * Actually, MOV3Q is: 0101 ddd1 01 eee rrr ... let me check
- * MOV3Q is NOT in line-A. It may share with ADDQ/SUBQ space.
- * For ColdFire we'll add it when needed.
- ****************************************************************/
 
 /****************************************************************
  * Main decoder
