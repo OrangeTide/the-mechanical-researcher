@@ -282,11 +282,9 @@ Vertex stripped these from the SoC to save die area and reduce cost:
 
 ## Audio
 
-### Architecture: Hardware Channel Mixer + Optional Wavetable Synth
+### Architecture: 16-Channel Hardware PCM Mixer
 
-16 channels total, configurable as PCM or wavetable synth voices.
-
-### PCM Channels (default: all 16)
+16 PCM channels with hardware mixing, stereo panning, and DMA from main RAM.
 
 Each channel has hardware registers for:
 
@@ -309,28 +307,6 @@ Each channel has hardware registers for:
 - **Pitch control**: frequency register allows arbitrary playback rates from ~172 Hz to ~11.3 MHz sample rate. Pitch = (freq_reg / 256) × 44100.
 - **Interrupt**: fires when any channel reaches end-of-sample or loop point (configurable per-channel)
 
-### Wavetable Synth Mode (optional, replaces PCM channels)
-
-Channels can be switched from PCM mode to wavetable synth mode in groups of 4. When a group is in wavetable mode, those 4 channels become synth voices with:
-
-| Register | Size | Description |
-|---|---|---|
-| `WAVE_TABLE` | 32-bit | Pointer to 256-sample waveform in RAM |
-| `NOTE` | 8-bit | MIDI-style note number (0–127) |
-| `VELOCITY` | 8-bit | Note velocity / volume (0–255) |
-| `ATTACK` | 8-bit | Attack time (0 = instant, 255 = ~2 sec) |
-| `DECAY` | 8-bit | Decay time |
-| `SUSTAIN` | 8-bit | Sustain level (0–255) |
-| `RELEASE` | 8-bit | Release time |
-| `GATE` | 1-bit | Key on/off (triggers ADSR envelope) |
-| `VOLUME_L` | 8-bit | Left volume (post-envelope) |
-| `VOLUME_R` | 8-bit | Right volume (post-envelope) |
-
-- **Waveform**: 256-sample cycle stored in RAM, played back at note frequency. Any waveform — sine, saw, square, sampled instrument single-cycle, etc.
-- **ADSR envelope**: hardware envelope generator per voice, applied to amplitude
-- **Note frequency**: derived from MIDI note number using standard equal temperament. Register provides fractional pitch bend.
-- **Configuration**: channels 0–3, 4–7, 8–11, 12–15 can independently be PCM or wavetable. E.g., channels 0–7 = wavetable for music, channels 8–15 = PCM for sound effects.
-
 ### Audio DMA
 
 Audio channels read sample data directly from main RAM via DMA. The audio hardware fetches ahead into a small internal FIFO (~64 samples per channel). CPU can update sample pointers between buffers for streaming audio.
@@ -343,8 +319,8 @@ Audio channels read sample data directly from main RAM via DMA. The audio hardwa
 ### Real-World Parallels
 
 - PCM mixer is PS1 SPU-class (24ch) but simplified (no hardware reverb/effects)
-- Wavetable mode is similar to Gravis Ultrasound (32ch wavetable) or SNES (8ch BRR wavetable)
 - Channel count (16) is between SNES (8) and Saturn SCSP (32)
+- Homebrew developers can implement software synth (wavetable, FM, etc.) by mixing into a PCM buffer
 
 ## Input Devices
 
@@ -675,10 +651,9 @@ distinguish the source. Each channel has an independent COMPLETE flag.
 - Connecting to SDL or similar for display output
 
 **Part 4: Triton Audio Engine**
-- 16-channel hardware PCM mixer
-- Wavetable synth mode with ADSR envelopes
+- 16-channel hardware PCM mixer with stereo panning
 - ADPCM decompression
-- Audio output via SDL or similar
+- Audio output via SDL
 
 **Part 5+: Triton Storage, Input, System Firmware, Demo Game**
 - NCR 5380 SCSI emulation (8 registers, PIO)

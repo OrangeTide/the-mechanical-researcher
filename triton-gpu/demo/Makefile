@@ -73,14 +73,23 @@ disasm-hello:
 
 # --- Testing -------------------------------------------------------------
 
+test_glide: test_glide.c glide_raster.c glide_raster.h coldfire.h
+	$(CC) $(CFLAGS) -o $@ test_glide.c glide_raster.c $(LDFLAGS)
+
+test: test_glide
+	./test_glide
+
 valgrind: triton-headless
 	valgrind --leak-check=full --error-exitcode=1 ./triton-headless
 
+valgrind-test: test_glide
+	valgrind --leak-check=full --error-exitcode=1 ./test_glide
+
 clean:
-	rm -f triton triton-headless monitor.elf monitor.bin hello.elf hello.bin
+	rm -f triton triton-headless test_glide monitor.elf monitor.bin hello.elf hello.bin
 
 distclean: clean
 	rm -rf sdl3 SDL-release-*
 
 .PHONY: all fetch-sdl3 run run-headless regen disasm-monitor disasm-hello \
-        valgrind clean distclean
+        test valgrind valgrind-test clean distclean

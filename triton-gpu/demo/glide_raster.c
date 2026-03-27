@@ -4,6 +4,7 @@
 
 #include "glide_raster.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -474,20 +475,27 @@ blend_factor(int func, float src_a, float dst_a)
  * Fog
  ************************************************************/
 
-/** Apply w-based fog to an RGB color using the fog table. */
+/** Apply q-based fog to an RGB color using the fog table.
+ *  The fog table is indexed by q (= 1/w = oow), with logarithmic spacing:
+ *  table entry i corresponds to q ≈ 2^(i/4).  See Glide Programming Guide
+ *  §8, guFogTableIndexToW().  */
 static void
-apply_fog(glide_state *gs, float w, float *r, float *g, float *b)
+apply_fog(glide_state *gs, float q, float *r, float *g, float *b)
 {
     if (gs->fog_mode == GR_FOG_DISABLE)
         return;
 
-    /* Map w to a fog table index (0..63) */
-    float wf = (w > 0.0f) ? 1.0f / w : 1.0f;
-    int idx = (int)(wf * 63.0f);
-    if (idx < 0)
-        idx = 0;
-    if (idx > 63)
+    /* Map q (oow) to fog table index via i = 4 * log2(q), clamped 0..63.
+     * q <= 0 means behind the camera — full fog. */
+    int idx;
+    if (q <= 0.0f) {
         idx = 63;
+    } else {
+        float fi = 4.0f * log2f(q);
+        idx = (int)(fi + 0.5f);
+        if (idx < 0) idx = 0;
+        if (idx > 63) idx = 63;
+    }
 
     float fog = (float)gs->fog_table[idx] / 255.0f;
     float fog_r = (float)((gs->fog_color >> 16) & 0xFF);
@@ -683,7 +691,10 @@ draw_triangle(glide_state *gs,
                     int zi = (int)(frag_z * 65535.0f + 0.5f);
                     if (zi < 0) zi = 0;
                     if (zi > 65535) zi = 65535;
-                    uint16_t z16 = (uint16_t)zi + (int16_t)gs->depth_bias;
+                    int z_biased = zi + gs->depth_bias;
+                    if (z_biased < 0) z_biased = 0;
+                    if (z_biased > 65535) z_biased = 65535;
+                    uint16_t z16 = (uint16_t)z_biased;
                     uint16_t stored_z = read_vram_u16(gs->vram, zb_off);
                     if (!depth_compare(gs->depth_func, z16, stored_z))
                         goto next_pixel;
@@ -814,12 +825,22 @@ draw_point(glide_state *gs, const raster_vertex *v)
  * Texture memory management
  ************************************************************/
 
-/** Compute the byte size of one mip level. */
+/** Compute the byte size of one mip level, accounting for aspect ratio. */
 static uint32_t
-tex_level_size(int format, int lod)
+tex_level_size(int format, int lod, int aspect)
 {
-    int dim = 1 << lod; // lod is log2 of dimension
-    int pixels = dim * dim;
+    int base_dim = 1 << lod;
+    int w, h;
+    if (aspect >= 0) {
+        w = base_dim;
+        h = base_dim >> aspect;
+        if (h < 1) h = 1;
+    } else {
+        h = base_dim;
+        w = base_dim >> (-aspect);
+        if (w < 1) w = 1;
+    }
+    int pixels = w * h;
 
     switch (format) {
     case GR_TEXFMT_RGB_565:
@@ -840,11 +861,11 @@ tex_level_size(int format, int lod)
 
 /** Compute total byte size for a mip chain from large_lod down to small_lod. */
 static uint32_t
-tex_mipmap_size(int format, int large_lod, int small_lod)
+tex_mipmap_size(int format, int large_lod, int small_lod, int aspect)
 {
     uint32_t total = 0;
     for (int lod = large_lod; lod >= small_lod; lod--)
-        total += tex_level_size(format, lod);
+        total += tex_level_size(format, lod, aspect);
     return total;
 }
 
@@ -857,7 +878,8 @@ hc_glide_init(glide_state *gs, cf_cpu *cpu)
 {
     (void)cpu;
     gs->initialized = 1;
-    printf("[glide] grGlideInit\n");
+    printf("[glide] Glide 3.10 -- Vertex Technologies, Inc.\n");
+    printf("[glide] Triton GPU (Banshee SST-2 derivative)\n");
     return 0;
 }
 
@@ -902,7 +924,8 @@ hc_sst_win_open(glide_state *gs, cf_cpu *cpu)
     gs->ac_factor = GR_COMBINE_FACTOR_ZERO;
     gs->ac_local = GR_COMBINE_LOCAL_ITERATED;
     gs->ac_other = GR_COMBINE_OTHER_ITERATED;
-    printf("[glide] grSstWinOpen: %dx%d RGB565\n", GR_SCREEN_W, GR_SCREEN_H);
+    printf("[glide] grSstWinOpen: %dx%d RGB565, 8 MB VRAM\n",
+           GR_SCREEN_W, GR_SCREEN_H);
     return 0;
 }
 
@@ -927,9 +950,9 @@ hc_buffer_clear(glide_state *gs, cf_cpu *cpu)
     uint16_t c565 = pack_rgb565(cr, cg, cb);
     uint16_t z16 = (uint16_t)(depth & 0xFFFF);
 
-    /* Clear back buffer */
+    /* Clear current render target */
     for (uint32_t off = 0; off < GR_FB_SIZE; off += 2)
-        write_vram_u16(gs->vram, gs->back_offset + off, c565);
+        write_vram_u16(gs->vram, gs->draw_offset + off, c565);
 
     /* Clear depth buffer if enabled */
     if (gs->depth_mode != GR_DEPTHBUFFER_DISABLE) {
@@ -1202,11 +1225,11 @@ hc_tex_download_mipmap_level(glide_state *gs, cf_cpu *cpu)
 {
     uint32_t dest_offset = cpu->d[1];
     int lod = (int)cpu->d[2];
-    /* aspect = cpu->d[4] — not needed for copy */
+    int aspect = (int32_t)cpu->d[4];
     int format = (int)cpu->d[5];
     uint32_t src_ptr = cpu->a[0];
 
-    uint32_t size = tex_level_size(format, lod);
+    uint32_t size = tex_level_size(format, lod, aspect);
     uint32_t dst = GR_TEX_START + dest_offset;
 
     /* Bounds check */
@@ -1494,7 +1517,8 @@ glide_dispatch(glide_state *gs, cf_cpu *cpu, uint16_t opword)
         int fmt = (int)cpu->d[5];
         int large = (int)cpu->d[2];
         int small = (int)cpu->d[3];
-        cpu->d[0] = tex_mipmap_size(fmt, large, small);
+        int asp = (int32_t)cpu->d[4];
+        cpu->d[0] = tex_mipmap_size(fmt, large, small, asp);
         return 0;
     }
     case GR_HC_TEX_MIN_ADDRESS:
@@ -1524,7 +1548,35 @@ glide_dispatch(glide_state *gs, cf_cpu *cpu, uint16_t opword)
 
     /* Query */
     case GR_HC_GET:         return hc_get(gs, cpu);
-    case GR_HC_GET_STRING:  return 0; // stub
+    case GR_HC_GET_STRING: {
+        /* Write string to a scratch area at top of RAM and return address.
+         * Real Glide returns a pointer to a static buffer. */
+        static const char *str_hardware  = "Vertex Triton GPU (SST-2)";
+        static const char *str_renderer  = "Glide 3.10 for Triton";
+        static const char *str_vendor    = "Vertex Technologies, Inc.";
+        static const char *str_version   = "3.10";
+        static const char *str_extension = "";
+        const char *s = NULL;
+        switch ((int)cpu->d[0]) {
+        case GR_HARDWARE:  s = str_hardware;  break;
+        case GR_RENDERER:  s = str_renderer;  break;
+        case GR_VENDOR:    s = str_vendor;    break;
+        case GR_VERSION:   s = str_version;   break;
+        case GR_EXTENSION: s = str_extension; break;
+        }
+        if (s) {
+            /* Write to scratch area at 0x007FF000 */
+            uint32_t addr = 0x007FF000;
+            size_t len = strlen(s);
+            if (len > 255) len = 255;
+            memcpy(gs->ram + addr, s, len);
+            gs->ram[addr + len] = '\0';
+            cpu->d[0] = addr;
+        } else {
+            cpu->d[0] = 0;
+        }
+        return 0;
+    }
 
     /* Enable/disable — no-ops for now */
     case GR_HC_ENABLE:      return 0;

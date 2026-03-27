@@ -1,12 +1,16 @@
 /*
- * glide3x.h -- Guest-side Glide 3.0 API for the Triton console
+ * glide3x.h -- Glide 3.10 API for the Vertex Triton SDK
  *
- * Types, enums, and inline LINE_A hypercall wrappers.  Include this
- * header in Triton guest programs to call the GPU rasterizer.
+ * Copyright (c) 2001 Vertex Technologies, Inc.
+ * Portions Copyright (c) 1997-1999 3Dfx Interactive, Inc.
+ * All Rights Reserved.
+ *
+ * Triton Glide 3.10 -- SST-2 compatible graphics API.
+ * Types, enums, and inline LINE_A hypercall wrappers.
  *
  * Each Glide function emits a LINE_A opcode (0xA000 | function_id).
- * The host rasterizer intercepts the opcode and reads arguments from
- * the CPU registers: integer args in D0-D7, pointers in A0-A6,
+ * The host GPU intercepts the opcode and reads arguments from the
+ * CPU registers: integer args in D0-D7, pointers in A0-A6,
  * floats in FP0-FP7.
  */
 
