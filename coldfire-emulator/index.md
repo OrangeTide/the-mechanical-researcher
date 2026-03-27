@@ -913,7 +913,7 @@ What the emulator intentionally omits: the EMAC multiply-accumulate unit raises 
 
 The GCC codegen test was the decisive factor in architecture selection. Fourteen candidates were evaluated; five reached the final round; only ColdFire V4e produced clean single-instruction output for every arithmetic operation tested. The SH-4 was the closest competitor but fell short on integer divide (a libgcc call) and carried additional complexity in delay slots, literal pools, and FPSCR bank-switching.
 
-The emulator is designed as a building block. GCC, LLVM, and Free Pascal all produce code for ColdFire targets — the emulator runs whatever these compilers generate. The callback-based memory bus means the host defines what the address space looks like: flat RAM for a simulator, memory-mapped I/O for a virtual control system, or a complete peripheral set for a system emulator. The hypercall mechanism provides a zero-overhead path from guest code to host-native functions, suitable for high-frequency interfaces like graphics APIs or hardware abstraction layers. The result is a 2,246-line library that turns any C program into an embeddable CPU.
+The emulator is designed as a building block. GCC, LLVM, and Free Pascal all produce code for ColdFire targets — the emulator runs whatever these compilers generate. The callback-based memory bus means the host defines what the address space looks like: flat RAM for a simulator, memory-mapped I/O for a virtual control system, or a complete peripheral set for a system emulator. The hypercall mechanism provides a zero-overhead path from guest code to host-native functions, suitable for high-frequency interfaces like graphics APIs or hardware abstraction layers. The result is a 2,221-line library that turns any C program into an embeddable CPU.
 
 ### Sources
 
@@ -924,3 +924,7 @@ The emulator is designed as a building block. GCC, LLVM, and Free Pascal all pro
 - Karl Stenerud, [Musashi](https://github.com/kstenerud/Musashi), 68000/68010/68020/68EC020 emulator used in MAME
 - Rodrigo Copetti, Console architecture analyses: [Sega Mega Drive](https://www.copetti.org/writings/consoles/mega-drive-genesis/), [Sega Saturn](https://www.copetti.org/writings/consoles/sega-saturn/), [Sega Dreamcast](https://www.copetti.org/writings/consoles/dreamcast/)
 - *The M68000 Family Reference Manual* (M68000PM/AD), Motorola, 1992
+
+---
+
+*This is Part 1 of the Triton series.* **Next:** [Part 2: The Triton — System Emulator and Monitor ROM](../triton-system-emulator/)

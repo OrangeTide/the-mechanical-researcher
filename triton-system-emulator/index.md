@@ -420,3 +420,7 @@ Vertex Technologies would not live to see it. But the hardware works.
 - NOR flash background: AMD Am29F032B datasheet, Intel 28F320 datasheet — representative 4 MB NOR flash ICs from the era
 - NCR 5380 (Am5380) datasheet — 8-register SCSI controller used in Macintosh Plus/SE/Classic/II
 - [ELF specification](https://refspecs.linuxfoundation.org/elf/elf.pdf), Tool Interface Standard (TIS) Executable and Linking Format
+
+---
+
+*This is Part 2 of the Triton series.* **Previous:** [Part 1: Building a ColdFire V4e Emulator](../coldfire-emulator/) | **Next:** [Part 3: Triton GPU — Software Rasterizer](../triton-gpu/)

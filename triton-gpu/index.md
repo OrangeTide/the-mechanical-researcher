@@ -564,13 +564,11 @@ cube: 300 frames rendered
 triton: halted after 3372349 instructions
 ```
 
-300 frames, 3.4 million ColdFire instructions, zero memory leaks (verified with valgrind). The monitor ROM boots, loads the ELF, jumps to the entry point. The demo initializes Glide, configures the pipeline, uploads the texture, renders 300 frames of a spinning cube, then shuts down and halts.
+300 frames, 3.4 million ColdFire instructions, zero memory leaks (verified with valgrind). The monitor ROM boots, loads the ELF, jumps to the entry point. The demo initializes Glide, configures the pipeline, uploads the texture, renders 300 frames of a spinning cube, then shuts down and halts. The checkerboard texture is perspective-correct (lines converge toward vanishing points), and each face is tinted by its vertex color — six distinct colors from one texture upload:
 
-Four frames from the rotation sequence — the checkerboard texture is perspective-correct (lines converge toward vanishing points), and each face is tinted by its vertex color:
-
-<img src="images/fr000000.png" alt="Frame 0: back face (green checkerboard) viewed head-on"> <img src="images/fr000049.png" alt="Frame 49: bottom face (cyan) rotated into view with red and yellow edges visible">
-
-<img src="images/fr000149.png" alt="Frame 149: three-quarter view showing red, blue, and magenta faces"> <img src="images/fr000249.png" alt="Frame 249: back face (green) nearly head-on again with blue edge visible">
+<video controls width="640" height="480">
+<source src="videos/cube_demo.mp4" type="video/mp4">
+</video>
 
 ## Conclusion
 
@@ -592,3 +590,7 @@ The hypercall mechanism from Part 1 proves its value here. Each Glide call is a 
 - Juan Piñeda, "A Parallel Algorithm for Polygon Rasterization," *ACM SIGGRAPH Computer Graphics*, Vol. 22, No. 4, August 1988
 - Rodrigo Copetti, [Console architecture analyses](https://www.copetti.org/writings/consoles/)
 - Michael Abrash, *Rasterization on Larrabee*, 2009 (half-space rasterization overview)
+
+---
+
+*This is Part 3 of the Triton series.* **Previous:** [Part 2: The Triton — System Emulator and Monitor ROM](../triton-system-emulator/) | **Next:** [Part 4: Triton Audio — 16-Channel PCM Mixer](../triton-audio/)
