@@ -47,7 +47,9 @@ The Triton is a fantasy game console that never existed — built by Vertex Tech
 | Dec 2000 | Nvidia acquires 3Dfx IP; Vertex negotiates Banshee (SST-2) license |
 | Q1 2001 | Tape-out custom SoC |
 | Q2 2001 | Engineering samples, dev kits ship to studios |
-| E3 2001 (May) | Public announcement, playable demos on show floor |
+| Mar 2001 | Partnership announced with Metricom for Ricochet-based online gaming |
+| E3 2001 (May) | Public announcement, playable demos on show floor. Triton Internet Pack announced. |
+| Aug 2001 | Metricom files for bankruptcy. Ricochet network goes dark. Internet Pack shelved. |
 | Q3 2001 | Volume production |
 | Nov 2001 | Launch — $199, bundles with 4 GB HDD and one controller |
 
@@ -74,6 +76,8 @@ Vertex made deliberate bets about what to include and what to leave out:
 - **No overlay / scaler / YUV CSC.** The Banshee design includes a video overlay unit, but Vertex stripped it from the SoC to save die area. Without video playback to support, there's no need for overlay planes or color space conversion hardware. If a game needs to display a full-screen image, it can LFB-blit to the framebuffer. Cutscenes use real-time rendering.
 
 These decisions are narratively consistent with a scrappy startup that puts all its chips on one bet. Vertex truly believed 3D was the only thing that mattered, and that VR was the future. They weren't wrong about 3D — they were just wrong about everything else.
+
+- **No networking hardware.** The Triton has no Ethernet port, no modem, no USB host controller. Vertex planned to solve online connectivity through a partnership with Metricom's Ricochet wireless network — a city-wide mesh of shoebox-sized radios on lampposts offering 128 kbps wireless internet. The Ricochet modem connects via RS-232 serial (the Triton already has a UART for its dev kit / link cable). No USB stack needed, no Ethernet MAC, no PHY — just a serial port talking PPP to a wireless modem. Vertex announced the "Triton Internet Pack" at E3 2001: a CD-ROM bundle containing a TCP/IP stack, NetFront web browser (licensed from ACCESS Co., the same embedded browser used in the Sega Dreamcast), an email client that stores mail on the GameCard (MMC), and a coupon for 3 months of free Ricochet service. The Internet Pack never shipped. Metricom went bankrupt in August 2001 — four months before the Triton's launch — after spending $500 million and attracting only 51,000 subscribers. The modems were already in the warehouse. The marketing materials were already printed.
 
 ## CPU
 
@@ -627,49 +631,20 @@ distinguish the source. Each channel has an independent COMPLETE flag.
 - **PlayStation 1 DMA**: 6-channel DMA with device modes for GPU, SPU, CD-ROM,
   MDEC — similar device-mode concept but more channels and specialized
 
-## Article Series Plan
+## Article Series Plan (10 Parts)
 
-**Part 1: Building a ColdFire Emulator**
-- Light comparative analysis of real CPU ISAs (the selection process)
-- ColdFire V4e ISA overview — instruction encoding, addressing modes, registers
-- Emulator implementation in C — clean, portable, embeddable, no dependencies
-- Memory bus interface (callback-based read/write, so any project can map its own peripherals)
-- Test harness: cross-compile C programs with `m68k-linux-gnu-gcc -mcpu=5475`, run on emulator
-- Validate against QEMU (`qemu-m68k`) for correctness
-- Standalone article — useful for sandboxing, retro projects, VMs, or as a fantasy console CPU
+**Part 1: Building a ColdFire V4e Emulator** — `coldfire-emulator/` ✓
+**Part 2: System Emulator + Monitor ROM** — `triton-system-emulator/` ✓
+**Part 3: Triton GPU — Software Rasterizer** — `triton-gpu/` ✓
+**Part 4: Triton Audio — 16-Channel PCM Mixer** — `triton-audio/` ✓
+**Part 5: Input Devices** — `triton-input/`
+**Part 6: Storage — CD-ROM and Memory Card** — `triton-storage/`
+**Part 7: System Firmware** — `triton-firmware/`
+**Part 8: System Menu — 3D Environment** — `triton-menu/`
+**Part 9: The Demo Game** — `triton-game/`
+**Part 10: Propaganda — The Reveal** — `triton-propaganda/`
 
-**Part 2: The Triton**
-- Vertex Technologies and the alternate history (Genesis → ColdFire V4e, 3Dfx bankruptcy, commodity console)
-- Full system spec: memory map, GPU (Glide-based), audio, SCSI, MMC, input
-- How the CPU emulator from Part 1 plugs into the Triton's memory bus
-- Boot sequence and system firmware concept
-
-**Part 3: Triton GPU — Software Rasterizer**
-- Implementing the Glide API subset (~45 functions)
-- The pixel pipeline: triangle setup, rasterization, texturing, depth, blending
-- Texture memory management, mipmap support
-- Connecting to SDL or similar for display output
-- Glide calls via LINE_A hypercalls (expedient — host intercepts directly)
-- Note: Part 3 uses direct hypercalls as a stepping stone. The proper Glide
-  binding architecture (NOR flash stubs + linker script) comes in Part 5 when
-  we build the BIOS. Readers see the incremental approach: get it working first,
-  then clean it up to match how real hardware would operate.
-
-**Part 4: Triton Audio Engine**
-- 16-channel hardware PCM mixer with stereo panning
-- ADPCM decompression
-- Audio output via SDL
-
-**Part 5+: Triton System Firmware, Storage, Input, Demo Game**
-- **Glide binding cleanup**: replace direct LINE_A hypercalls with proper
-  architecture — NOR flash stub table + SDK linker script (see "Glide Library
-  Binding" section below). Game source becomes standard Glide code, no
-  hypercall awareness needed.
-- NCR 5380 SCSI emulation (8 registers, PIO)
-- MMC/SPI memory card
-- Input devices (gamepad, mouse, keyboard)
-- System shell / boot firmware
-- A small demo game to tie it all together
+See `todo-triton.md` for detailed task lists per part.
 
 ## System Firmware — OS API Requirements
 
@@ -936,6 +911,86 @@ a dynamic linker. On "real hardware," Vertex would ship the Glide library in
 NOR flash at these same addresses — the linker script is the SDK's way of
 telling games where the library lives.
 
+## Triton Internet Pack (Never Released)
+
+The Triton Internet Pack was announced at E3 2001 as an accessory bundle for
+online gaming and web browsing. It was Vertex's answer to SegaNet and PlayStation
+2's network adapter — but without any new hardware. The Triton's existing UART
+(serial port) was the only interface needed.
+
+### Bundle Contents (Planned)
+
+- **Ricochet wireless modem** — Metricom's 128 kbps city-wide wireless modem,
+  connected via RS-232 serial cable to the Triton's UART/link cable port
+- **Triton Internet CD-ROM** containing:
+  - PPP dial-up stack (serial → Ricochet → internet)
+  - TCP/IP networking (sockets API via TRAP #1)
+  - **NetFront web browser** — licensed from ACCESS Co., Ltd. (Japan). NetFront
+    was the embedded browser used in the Sega Dreamcast (SegaNet browser),
+    PlayStation 2, and later the Amazon Kindle. ACCESS actively licensed NetFront
+    to OEMs in the early 2000s; a February 2002 press release offered free
+    evaluation copies for Pocket PC. Vertex licensed NetFront 3.0 for ColdFire.
+  - **Email client** — POP3/SMTP, stores mail on the GameCard (MMC memory card).
+    "Check your email on the couch. Save it to your memory card."
+  - Basic IRC client for multiplayer game coordination
+- **3 months free Ricochet service** — coupon in the box ($80/month value)
+
+### Why Ricochet
+
+Vertex chose Ricochet over dial-up modems or Ethernet for several reasons:
+
+1. **No hardware changes.** The Triton already has a UART for the dev kit link
+   cable. A serial modem needs nothing else — no USB host controller (OHCI would
+   be period-correct but notoriously difficult to implement bug-free), no Ethernet
+   MAC/PHY, no additional SoC silicon.
+
+2. **Wireless was the pitch.** "Online gaming without a phone line" — in 2001,
+   most homes had one phone line, and using it for the internet meant no calls.
+   Cable and DSL were spreading but not yet universal. Ricochet was always-on
+   wireless, no dial-up busy signals, no tying up the phone.
+
+3. **Metricom needed partners.** Ricochet had coverage in ~10 US cities
+   (Manhattan, San Francisco, Denver, etc.) and was hemorrhaging money trying to
+   reach profitability. A console partnership meant potential subscribers.
+   Metricom offered Vertex favorable bundle pricing.
+
+4. **Speed was adequate.** 128 kbps (real-world 70-180 kbps per Joel Spolsky's
+   review) was comparable to ISDN and sufficient for turn-based or low-bandwidth
+   multiplayer. Not fast enough for FPS gaming, but fine for email, web browsing,
+   and the kind of asynchronous multiplayer Vertex envisioned.
+
+### The Collapse
+
+Metricom filed for bankruptcy on August 8, 2001. The company had spent
+$500 million building its network and accumulated nearly $1 billion in debt,
+with only 51,000 paying subscribers. The poletop radios went dark overnight.
+
+The timing was devastating for Vertex:
+- The Internet Pack was announced at E3 in May 2001, three months before the collapse
+- Ricochet modems were already in Vertex's warehouse, packaged for the bundle
+- Marketing materials featuring the Internet Pack were already at the printer
+- The Triton's only networking story disappeared four months before launch
+
+Vertex had no fallback. Adding Ethernet or USB would require a board revision
+and new SoC masks — impossible on a startup budget with a Christmas ship date.
+The serial port could theoretically work with any Hayes-compatible dial-up modem,
+but "plug in a 56K modem and tie up your phone line" was not the pitch that
+excited anyone in 2001.
+
+The Internet Pack joined stereo 3D glasses on the list of Triton features that
+were technically functional but commercially irrelevant.
+
+### Propaganda Value
+
+The Internet Pack is rich material for the Part 10 propaganda article:
+- **E3 2001 booth**: the Internet Pack demo station, Ricochet modems on display
+- **vertextech.com/internet**: product page with "Coming Holiday 2001" banner
+  (page never updated after Metricom bankruptcy — frozen in time)
+- **Press release**: "Vertex Technologies Partners with Metricom to Bring
+  Wireless Online Gaming to Triton" — dated March 2001, full of optimism
+- **Post-mortem silence**: the Internet Pack quietly disappears from Vertex's
+  website. No announcement, no explanation. The page just goes away.
+
 ## Reference Materials
 
 - Glide 3.0 Reference Manual (Jul 1998): ~/Documents/Fantasy-Console/glide-docs/glide3ref.pdf
@@ -947,3 +1002,7 @@ telling games where the library lives.
 - NCR 5380 datasheet: widely available (8-register SCSI controller)
 - NCR 5380 in Macintosh: Mac Plus, SE, Classic, II all used 5380 for SCSI
 - MMC specification: JEDEC/MMCA standard, SPI mode subset
+- Joel Spolsky, "The Ricochet Wireless Modem, a Review" (Dec 2000): joelonsoftware.com/2000/12/20/the-ricochet-wireless-modem-a-review/
+- Metricom bankruptcy (Aug 2001): $500M spent, 51,000 subscribers, ~$1B debt
+- NetFront browser (ACCESS Co.): en.wikipedia.org/wiki/NetFront — embedded browser used in Dreamcast, PS2, Kindle
+- ACCESS press release (Feb 2002): "ACCESS to Provide Free NetFront v3.0 Evaluation Copy For PocketPC"
