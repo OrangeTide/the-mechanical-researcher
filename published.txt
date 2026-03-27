@@ -4,3 +4,6 @@ build-systems
 coldfire-emulator
 microkernel-architecture
 programmable-display-protocols
+triton-system-emulator
+triton-gpu
+triton-audio
