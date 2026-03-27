@@ -2,7 +2,6 @@ _build/
 notes/pdfs
 coldfire-emulator/demo/smoke_test
 coldfire-emulator/demo/test_harness
-coldfire-emulator/demo/test_program.elf
 coldfire-emulator/demo/qemu_validate
-coldfire-emulator/demo/test_instructions.elf
 coldfire-emulator/demo/test_instructions_qemu
+*.elf
