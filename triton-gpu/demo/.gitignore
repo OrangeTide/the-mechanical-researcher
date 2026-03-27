@@ -1,0 +1,7 @@
+triton
+triton-headless
+*.elf
+*.bin
+*.o
+sdl3/
+SDL-release-*/
