@@ -1,6 +1,6 @@
 # Triton Game System by Vertex
 
-10-part article series. Parts 1-4 complete.
+10-part article series. Parts 1-4 complete (all published, README updated).
 
 ## Part 1: ColdFire V4e Emulator — `coldfire-emulator/`
 
@@ -9,8 +9,8 @@
 - [x] coldfire-emulator/index.md — the article
 - [x] Hypercalls, QEMU validation, Valgrind clean, Musashi comparison
 - [x] demo/README.md — setup guide
-- [ ] Update top-level README.md with link to new topic
-- [ ] Add to published.txt
+- [x] Update top-level README.md with link to new topic
+- [x] Add to published.txt
 
 ## Part 2: System Emulator + Monitor ROM — `triton-system-emulator/`
 
@@ -19,8 +19,8 @@
 - [x] triton-system-emulator/index.md — the article
 - [x] Memory bus, peripheral stubs, NOR flash, SDL3 display/input/audio
 - [x] Monitor ROM: vector table, ELF loader, exception handlers
-- [ ] Update top-level README.md with link to new topic
-- [ ] Add to published.txt
+- [x] Update top-level README.md with link to new topic
+- [x] Add to published.txt
 
 ## Part 3: Triton GPU — `triton-gpu/`
 
@@ -28,8 +28,9 @@
 
 - [x] triton-gpu/index.md — the article
 - [x] ~45 Tier 1 Glide functions, test suite, cube demo
-- [ ] Update top-level README.md with link to new topic
-- [ ] Add to published.txt
+- [x] Embedded video of spinning cube demo
+- [x] Update top-level README.md with link to new topic
+- [x] Add to published.txt
 
 ## Part 4: Triton Audio — `triton-audio/`
 
@@ -37,8 +38,8 @@
 
 - [x] triton-audio/index.md — the article
 - [x] Audio register file, mixer, ADPCM, guest demo
-- [ ] Update top-level README.md with link to new topic
-- [ ] Add to published.txt
+- [x] Update top-level README.md with link to new topic
+- [x] Add to published.txt
 
 ## Part 5: Input Devices — `triton-input/`
 
