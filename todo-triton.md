@@ -41,20 +41,26 @@ Monitor does real ELF parsing on the guest CPU. Reference: existing elf_loader.c
 
 ## Part 3: Triton GPU — Software Rasterizer
 
-- Glide API subset (~45 functions)
-- Pixel pipeline: triangle setup, rasterization, texturing, depth, blending
-- Texture memory management, mipmap support
-- SDL3 framebuffer blit (software-rendered RGB565 → SDL_Texture)
-- RESOLVED: bumped to 8 MB VRAM, 640×480 primary with Z-buffer + double-buffer (~6.2 MB texture space)
-- RESOLVED: SDL3 + software rasterizer. Glide pixel pipeline renders to uint16_t fb[640×480] (RGB565), SDL3 uploads via SDL_UpdateTexture + SDL_RenderTexture. SDL3 also handles audio (callback-based mixer), input (gamepad/keyboard/mouse), and WASM (Emscripten port). Targets: Linux, Windows, WASM; stretch: macOS.
-- Mention: Voodoo 1 FPGA reimplementation (https://hothardware.com/news/3dfx-voodoo1-fpga-project)
+- [x] Glide API subset (~45 Tier 1 functions, ~20 Tier 2 stubs)
+- [x] Pixel pipeline: triangle setup, rasterization, texturing, depth, blending
+- [x] Texture memory management, mipmap support (5 formats, non-square aspect)
+- [x] Color/alpha combine unit matching Glide combine equation
+- [x] Fog (logarithmic table indexing), scissor, cull, alpha test, depth bias
+- [x] SDL3 framebuffer blit (software-rendered RGB565 → SDL_Texture)
+- [x] grGetString with Vertex Technologies branding
+- [x] Host-side test suite (21 tests, 60 assertions, valgrind clean)
+- [x] Article: triton-gpu/index.md
+- [x] Demo: examples/cube.c — textured spinning cube
+- [ ] Update top-level README.md with link to new topic
+- [ ] Add to published.txt
 
 ## Part 4: Triton Audio Engine
 
-- 16-channel hardware PCM mixer
-- Wavetable synth mode with ADSR envelopes
-- ADPCM decompression
+- 16-channel hardware PCM mixer with stereo panning
+- ADPCM decompression (IMA/DVI 4-bit)
 - SDL3 audio output (callback-based mixer)
+- Audio register file at 0x01100000 (16 channels × 32 bytes + global regs)
+- Guest demo program exercising the mixer
 
 ## Part 5+: Storage, Input, System Firmware, Demo Game
 
