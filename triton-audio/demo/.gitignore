@@ -1,0 +1,11 @@
+triton
+triton-headless
+test_glide
+test_audio
+*.elf
+*.bin
+*.o
+*.tga
+*.wav
+sdl3/
+SDL-release-*/

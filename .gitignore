@@ -6,3 +6,7 @@ coldfire-emulator/demo/qemu_validate
 coldfire-emulator/demo/test_instructions_qemu
 *.elf
 triton-gpu/demo/test_glide
+triton-audio/demo/test_glide
+triton-audio/demo/test_audio
+triton-audio/demo/triton-headless
+triton-audio/demo/triton
