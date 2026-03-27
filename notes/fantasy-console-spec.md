@@ -649,13 +649,22 @@ distinguish the source. Each channel has an independent COMPLETE flag.
 - The pixel pipeline: triangle setup, rasterization, texturing, depth, blending
 - Texture memory management, mipmap support
 - Connecting to SDL or similar for display output
+- Glide calls via LINE_A hypercalls (expedient — host intercepts directly)
+- Note: Part 3 uses direct hypercalls as a stepping stone. The proper Glide
+  binding architecture (NOR flash stubs + linker script) comes in Part 5 when
+  we build the BIOS. Readers see the incremental approach: get it working first,
+  then clean it up to match how real hardware would operate.
 
 **Part 4: Triton Audio Engine**
 - 16-channel hardware PCM mixer with stereo panning
 - ADPCM decompression
 - Audio output via SDL
 
-**Part 5+: Triton Storage, Input, System Firmware, Demo Game**
+**Part 5+: Triton System Firmware, Storage, Input, Demo Game**
+- **Glide binding cleanup**: replace direct LINE_A hypercalls with proper
+  architecture — NOR flash stub table + SDK linker script (see "Glide Library
+  Binding" section below). Game source becomes standard Glide code, no
+  hypercall awareness needed.
 - NCR 5380 SCSI emulation (8 registers, PIO)
 - MMC/SPI memory card
 - Input devices (gamepad, mouse, keyboard)
@@ -686,8 +695,9 @@ recovery loader also contains the Part 2 monitor ROM functionality (ELF
 loader for development).
 
 The **OS / BIOS** (3 MB, updatable) contains the full system firmware:
-drivers, system shell, Glide runtime, fonts, audio mixer, 3D menu environment.
-This region can be reflashed by the recovery loader from a CD-ROM image.
+drivers, system shell, Glide stub table (at 0x01280800, see "Glide Library
+Binding"), fonts, audio mixer, 3D menu environment. This region can be
+reflashed by the recovery loader from a CD-ROM image.
 
 The **asset partition** (512 KB) is a tiny FAT16 volume containing
 system-provided resources that games can read: controller graphics, fonts,
@@ -780,6 +790,151 @@ TRAP #3-#15 — available for games / future OS use
 
 The syscall convention mirrors classic 68K OS designs (AmigaOS, Human68k):
 register-based argument passing, return value in D0, error code in D1.
+
+### Glide Library Binding
+
+On real hardware, games would link against a vendor-supplied Glide library that
+writes to Banshee MMIO registers. The Triton emulator uses LINE_A hypercalls
+instead — but the binding architecture is designed so game source code is
+standard Glide 3.0 with no awareness of the underlying mechanism.
+
+#### Architecture
+
+The Glide "library" lives in NOR flash as a table of stub functions at fixed
+addresses in the OS/BIOS region. Each stub occupies a 16-byte slot:
+
+```
+; NOR flash at 0x01280800 — Glide stub table (720 bytes, 45 × 16)
+; Slot 0: grGlideInit
+0x01280800:  A000        ; LINE_A #0x000 — hypercall to host rasterizer
+0x01280802:  4E75        ; RTS
+0x01280804:  ...         ; 12 bytes padding
+
+; Slot 1: grGlideShutdown
+0x01280810:  A001        ; LINE_A #0x001
+0x01280812:  4E75        ; RTS
+0x01280814:  ...
+
+; Slot 8: grDrawTriangle
+0x01280880:  A008        ; LINE_A #0x008
+0x01280882:  4E75        ; RTS
+0x01280884:  ...
+```
+
+The SDK ships a linker script (`glide.ld`) that maps standard Glide function
+names to these NOR flash addresses:
+
+```ld
+/* glide.ld — Triton SDK
+ * Maps Glide 3.0 symbols to NOR flash stub table.
+ * Each function occupies a 16-byte slot starting at 0x01280800.
+ */
+grGlideInit                   = 0x01280800;
+grGlideShutdown               = 0x01280810;
+grSstSelect                   = 0x01280820;
+grSstWinOpen                  = 0x01280830;
+grSstWinClose                 = 0x01280840;
+grBufferClear                 = 0x01280850;
+grBufferSwap                  = 0x01280860;
+grRenderBuffer                = 0x01280870;
+grDrawTriangle                = 0x01280880;
+grDrawLine                    = 0x01280890;
+grDrawPoint                   = 0x012808A0;
+grDrawVertexArray              = 0x012808B0;
+grDrawVertexArrayContiguous    = 0x012808C0;
+grVertexLayout                = 0x012808D0;
+grCoordinateSpace             = 0x012808E0;
+grColorCombine                = 0x012808F0;
+grConstantColorValue          = 0x01280900;
+grColorMask                   = 0x01280910;
+grDitherMode                  = 0x01280920;
+grAlphaCombine                = 0x01280930;
+grAlphaBlendFunction          = 0x01280940;
+grAlphaTestFunction           = 0x01280950;
+grAlphaTestReferenceValue     = 0x01280960;
+grDepthBufferMode             = 0x01280970;
+grDepthBufferFunction         = 0x01280980;
+grDepthMask                   = 0x01280990;
+grDepthBiasLevel              = 0x012809A0;
+grFogMode                     = 0x012809B0;
+grFogColorValue               = 0x012809C0;
+grFogTable                    = 0x012809D0;
+grTexSource                   = 0x012809E0;
+grTexCombine                  = 0x012809F0;
+grTexClampMode                = 0x01280A00;
+grTexFilterMode               = 0x01280A10;
+grTexMipMapMode               = 0x01280A20;
+grTexDownloadMipMap           = 0x01280A30;
+grTexDownloadMipMapLevel      = 0x01280A40;
+grTexCalcMemRequired          = 0x01280A50;
+grTexTextureMemRequired       = 0x01280A60;
+grTexMinAddress               = 0x01280A70;
+grTexMaxAddress               = 0x01280A80;
+grCullMode                    = 0x01280A90;
+grChromakeyMode               = 0x01280AA0;
+grChromakeyValue              = 0x01280AB0;
+grLfbLock                     = 0x01280AC0;
+grLfbUnlock                   = 0x01280AD0;
+grLfbWriteRegion              = 0x01280AE0;
+grGet                         = 0x01280AF0;
+grGetString                   = 0x01280B00;
+grEnable                      = 0x01280B10;
+grDisable                     = 0x01280B20;
+grFinish                      = 0x01280B30;
+grFlush                       = 0x01280B40;
+grSstOrigin                   = 0x01280B50;
+```
+
+#### Usage
+
+Game source code is standard Glide 3.0 — include the normal header, link with
+the SDK linker script:
+
+```c
+#include <glide.h>
+grDrawTriangle(&v0, &v1, &v2);  /* standard Glide call */
+```
+
+```sh
+m68k-linux-gnu-gcc -mcpu=5475 game.c -T glide.ld -o game.elf
+```
+
+The compiler generates `JSR 0x01280880` for `grDrawTriangle` — a direct
+absolute call into NOR flash. The stub executes the LINE_A hypercall and
+returns. No function pointer indirection, no runtime linker, no special macros.
+Game code is portable between the Triton emulator and a hypothetical real
+Banshee implementation.
+
+#### Evolution Across Article Series
+
+- **Part 3** (software rasterizer): Games call LINE_A hypercalls directly.
+  This gets the rasterizer working with minimal infrastructure. The demo
+  program is aware it's running on an emulator.
+- **Part 5+** (system firmware): The NOR flash stub table and `glide.ld` are
+  introduced. Games link against standard Glide symbols. The LINE_A mechanism
+  becomes an implementation detail hidden inside the stubs. Game source code
+  becomes hardware-agnostic.
+
+This mirrors real console development: early dev kits often have direct
+host-communication hacks that get replaced by proper firmware as the system
+matures.
+
+#### Design Rationale
+
+Three approaches were considered:
+
+1. **Function pointer table** (AmigaOS-style): `glide->grDrawTriangle(...)`.
+   Simple, but forces a non-standard calling convention on game code.
+2. **Linker script with NOR flash stubs** (chosen): Standard function calls,
+   linker resolves to fixed ROM addresses. Game code is standard Glide.
+3. **Full ELF shared objects** (`libglide3x.so` with runtime linker): Most
+   realistic, but requires implementing `ld.so` on the guest — too complex
+   for the article series scope.
+
+The linker script approach gives standard game code without the complexity of
+a dynamic linker. On "real hardware," Vertex would ship the Glide library in
+NOR flash at these same addresses — the linker script is the SDK's way of
+telling games where the library lives.
 
 ## Reference Materials
 
