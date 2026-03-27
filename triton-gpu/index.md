@@ -490,7 +490,7 @@ The demo program validates the full rasterizer pipeline: vertex setup, texture u
 
 ### Freestanding Math
 
-The demo runs freestanding on the ColdFire — no libc, no `<math.h>`, no `malloc`. Trigonometry uses a 256-entry sine lookup table in Q15 fixed-point:
+The demo runs freestanding on the ColdFire — no libc, no `<math.h>`, no `malloc`. Trigonometry uses a 256-entry sine lookup table in [Q1.15 fixed-point](https://www.allaboutcircuits.com/technical-articles/fixed-point-representation-the-q-format-and-addition-examples/):
 
 ```c
 static const short sin_table[256] = {
@@ -555,8 +555,9 @@ $ ./triton-headless examples/cube.elf
 triton: loaded 11532 bytes from examples/cube.elf at 0x00001000
 triton: CPU reset, PC=0x01200400 SP=0x00800000
 cube: starting Glide demo
-[glide] grGlideInit
-[glide] grSstWinOpen: 640x480 RGB565
+[glide] Glide 3.10 -- Vertex Technologies, Inc.
+[glide] Triton GPU (Banshee SST-2 derivative)
+[glide] grSstWinOpen: 640x480 RGB565, 8 MB VRAM
 cube: 300 frames rendered
 [glide] grSstWinClose
 [glide] grGlideShutdown

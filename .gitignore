@@ -5,3 +5,4 @@ coldfire-emulator/demo/test_harness
 coldfire-emulator/demo/qemu_validate
 coldfire-emulator/demo/test_instructions_qemu
 *.elf
+triton-gpu/demo/test_glide
