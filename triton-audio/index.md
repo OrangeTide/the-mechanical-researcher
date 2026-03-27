@@ -512,3 +512,7 @@ Vertex Technologies would have called the audio mixer their most trouble-free su
 - *PlayStation SPU Technical Reference*, Sony Computer Entertainment, 1996
 - Rodrigo Copetti, [Console architecture analyses](https://www.copetti.org/writings/consoles/)
 - SDL3 Audio Stream API documentation, libsdl.org
+
+---
+
+*This is Part 4 of the Triton series.* **Previous:** [Part 3: Triton GPU — Software Rasterizer](../triton-gpu/)
