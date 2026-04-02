@@ -10,3 +10,6 @@ triton-audio/demo/test_glide
 triton-audio/demo/test_audio
 triton-audio/demo/triton-headless
 triton-audio/demo/triton
+serialization-formats/demo/demo
+serialization-formats/demo/sensor.h
+serialization-formats/demo/sensor.c

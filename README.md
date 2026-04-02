@@ -16,6 +16,7 @@ A collection of research topics, primarily gathered through agentic AI sessions,
 - [Triton GPU: Software Rasterizer](triton-gpu/)
 - [Triton Audio: 16-Channel PCM Mixer](triton-audio/)
 - [Programmable Display Protocols](programmable-display-protocols/)
+- [Serialization Formats: From Xerox Courier to Cap'n Proto](serialization-formats/)
 - [Virtual Machine Bytecodes](vm-bytecodes/)
 
 ## Build & Deploy
