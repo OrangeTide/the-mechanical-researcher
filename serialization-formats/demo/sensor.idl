@@ -1,0 +1,31 @@
+# Sensor protocol for embedded weather station
+#
+# Messages use tagged fields for forward compatibility.
+# See microser.h for wire format details.
+
+enum SensorType
+    Temperature = 1
+    Humidity = 2
+    Combo = 3
+end
+
+message SensorReading
+    uint8 sensor_id = 1
+    uint32 timestamp = 2
+    case SensorType kind = 3
+        Temperature:
+            int16 temperature = 4
+        Humidity:
+            uint16 humidity = 5
+        Combo:
+            int16 temperature = 4
+            uint16 humidity = 5
+    end
+end
+
+message DeviceInfo
+    uint16 device_id = 1
+    uint8 firmware_major = 2
+    uint8 firmware_minor = 3
+    uint32 uptime_secs = 4
+end
