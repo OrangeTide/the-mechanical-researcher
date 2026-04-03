@@ -68,18 +68,23 @@
 
 ## Part 7: System Firmware — `triton-firmware/`
 
-**Goal:** Real OS in NOR flash replacing the monitor ROM. TRAP #1 syscall API, device drivers, game loading.
+**Goal:** Coherent-Unix-inspired kernel in NOR flash. V7-compatible syscalls, file descriptors,
+VFS with real filesystems, device drivers via cdevsw/bdevsw tables. Single address space, no MMU.
 
-- NOR flash layout: 512 KB recovery (write-protected) + 3 MB OS + 512 KB FAT16 assets
-- TRAP #1 syscall interface (function in D0, args in D1-D4/A0-A1)
-- Device drivers: SCSI CD-ROM, MMC memory card, input, audio
+- NOR flash layout: 512 KB recovery (write-protected) + 3 MB kernel + 512 KB FAT16 assets
+- TRAP #1 syscall dispatch via sysent[] table (V7 numbering: read=3, write=4, open=5, close=6)
+- File descriptor layer: fd table, open/read/write/close/lseek/ioctl, stdin/stdout/stderr on UART
+- VFS: mount points, path resolution, device node lookup
+- Filesystems: ISO 9660 (CD-ROM, read-only), FAT16 (memory card read-write, flash assets)
+- Block I/O buffer cache (LRU, 16-32 buffers)
+- Device drivers (cdevsw/bdevsw): SCSI CD-ROM, MMC memory card, UART, input, audio, framebuffer
+- Heap allocator (kmalloc/kfree), VBlank timer/timeout queue
 - ELF loader (carries forward from monitor ROM)
-- OS API: controller abstraction (button metadata, glyphs from FAT16 asset partition),
-  save data management, system fonts/text rendering, system sounds, region/version info
-- Asset partition patchable by emulator (host substitutes gamepad graphics to match attached controller)
-- Guest demo: a program that uses syscalls to load a file, query controller info, save data
-- Article: OS design philosophy (Human68k-style minimal custom OS), TRAP syscall mechanism,
-  how the asset partition and controller abstraction work
+- Asset partition patchable by emulator (controller graphics substitution)
+- Guest demo: Unix syscalls to open/read files from CD, write/read saves, ioctl for input, render font
+- Article: Coherent Unix history (Mark Williams Company, 77KB kernel, killed by Linux),
+  why Vertex licenses it, porting to ColdFire, kernel architecture walkthrough
+- ~3000-3500 lines of guest ColdFire C, organized as kern/, fs/, dev/, include/
 
 ## Part 8: System Menu — `triton-menu/`
 
