@@ -349,6 +349,20 @@ D-Bus uses a central **message broker** (dbus-daemon, or the faster **dbus-broke
 
 Implementations include the reference **libdbus** (C), **sd-bus** (systemd, simpler API), **GDBus** (GLib/GNOME), **QtDBus** (Qt/KDE), and **zbus** (Rust). D-Bus is used by NetworkManager, PulseAudio, GNOME Shell, KDE, systemd, BlueZ, and essentially every Linux desktop service. Two buses exist: session (per-user) and system (system-wide).
 
+### Shared Memory IPC — Beyond Serialization
+
+When publisher and subscriber share an address space (or a memory-mapped region), serialization becomes optional. Several systems exploit this:
+
+**Iceoryx** (2019, Robert Bosch / Eclipse Foundation) provides true zero-copy pub/sub for automotive and robotics. A central daemon (RouDi) manages shared memory pools; publishers write directly into a slot and subscribers read it in place — no copies, no serialization, no kernel involvement in the hot path. Originally built for AUTOSAR Adaptive sensor pipelines (lidar, camera), it's now a ROS 2 middleware option. C++14.
+
+**Subspace** (2023, Dave Allison / Cruise LLC) takes a similar approach for robotics: a lightweight coroutine-based server brokers channel creation, then all message transfer happens through POSIX shared memory in `/dev/shm/`. Sub-microsecond latency. Messages are payload-agnostic — bring your own serialization. Supports both reliable and unreliable delivery, UDP discovery for cross-machine bridging, and a shadow process for crash recovery. C++17 with native Rust and C bindings.
+
+**Shimmy** (2019, Abranches et al., University of Colorado Boulder) applies shared memory IPC to **inter-container communication** in Kubernetes and edge clouds. Containers on the same host share a SysV shared memory segment via the `hostIPC` namespace option; a per-host Shimmy agent manages topic creation and subscriptions. For containers on different hosts, Shimmy synchronizes shared memory regions over RDMA. In benchmarks against Mosquitto (MQTT) and Kafka, Shimmy showed higher throughput and lower latency for both local and remote pub/sub — the expected result of bypassing the kernel networking stack entirely. The paper proposed a `SharedMemoryChannel` Kubernetes resource type, letting the orchestrator's scheduler co-locate communicating containers to maximize local shared memory use.
+
+**Android system properties** deserve mention as an unusual case. Every Android process maps a read-only shared memory region (`/dev/__properties__/`) containing a trie of key-value system properties. A single writer (the `init` process) updates the trie; readers poll per-property serial numbers to detect changes — a minimal pub/sub without any serialization at all. It's how Android broadcasts boot state, radio status, and debug flags to every process with zero IPC overhead for reads.
+
+These systems occupy a different design point than wire formats: they trade portability and network transparency for raw speed on a single machine. Most still need a conventional serialization format when data crosses a network boundary.
+
 ## JIT-Compiled Serialization
 
 ### Apache Fory (2019/2023)
