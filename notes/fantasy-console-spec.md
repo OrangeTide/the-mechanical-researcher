@@ -464,8 +464,8 @@ No cartridge slot — the console is disc/HDD-based (like PlayStation or Dreamca
 
 ```
 0x01200000 - 0x0127FFFF  Recovery loader (512 KB) — write-protected
-0x01280000 - 0x0137FFFF  OS / BIOS (3 MB) — updatable
-0x01380000 - 0x013FFFFF  Asset partition (512 KB) — FAT16
+0x01280000 - 0x0157FFFF  OS / BIOS (3 MB) — updatable
+0x01580000 - 0x015FFFFF  Asset partition (512 KB) — FAT16
 ```
 
 **Recovery loader** (512 KB, hardware write-protected):
@@ -658,8 +658,8 @@ The 4 MB NOR flash is split into three regions:
 
 ```
 0x01200000 - 0x0127FFFF  Recovery loader (512 KB) — write-protected
-0x01280000 - 0x0137FFFF  OS / BIOS (3 MB) — updatable via recovery loader
-0x01380000 - 0x013FFFFF  Asset partition (512 KB) — FAT16 filesystem
+0x01280000 - 0x0157FFFF  OS / BIOS (3 MB) — updatable via recovery loader
+0x01580000 - 0x015FFFFF  Asset partition (512 KB) — FAT16 filesystem
 ```
 
 The **recovery loader** (512 KB, write-protected) is the first code that runs
