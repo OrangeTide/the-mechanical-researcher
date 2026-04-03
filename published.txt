@@ -8,3 +8,4 @@ triton-system-emulator
 triton-gpu
 triton-audio
 serialization-formats
+vm-bytecodes
