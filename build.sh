@@ -2,8 +2,9 @@
 #
 # build.sh — Static site generator for The Mechanical Researcher
 #
-# Usage: ./build.sh [-u] [output_dir]
+# Usage: ./build.sh [-u] [-a] [output_dir]
 #   -u   Update in-place (skip rm -rf, useful for live preview)
+#   -a   Build all articles, including unpublished
 #
 # Reads research topic directories, converts markdown to HTML via lowdown,
 # and assembles the site using shell-based templates.
@@ -11,10 +12,14 @@
 set -eu
 
 UPDATE_MODE=false
-if [ "${1:-}" = "-u" ]; then
-    UPDATE_MODE=true
-    shift
-fi
+BUILD_ALL=false
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -u) UPDATE_MODE=true; shift ;;
+        -a) BUILD_ALL=true; shift ;;
+        *)  break ;;
+    esac
+done
 
 SITE_DIR="$(cd "$(dirname "$0")" && pwd)"
 OUT_DIR="${1:-$SITE_DIR/_build}"
@@ -110,7 +115,8 @@ else
 fi
 
 is_published() {
-    # Returns 0 (true) if slug is in PUBLISHED_LIST, or if no published.txt exists (all published)
+    # Returns 0 (true) if slug is in PUBLISHED_LIST, -a flag is set, or no published.txt exists
+    [ "$BUILD_ALL" = true ] && return 0
     [ -z "$PUBLISHED_LIST" ] && return 0
     case " $PUBLISHED_LIST " in
         *" $1 "*) return 0 ;;
@@ -133,6 +139,12 @@ for index_md in */index.md; do
 
     topic_dir="$(dirname "$index_md")"
     slug="$topic_dir"
+
+    # Skip unpublished articles entirely
+    if ! is_published "$slug"; then
+        echo "  skipped: $slug (unpublished)"
+        continue
+    fi
 
     title="$(meta title "$index_md")"
     date="$(meta date "$index_md")"
@@ -241,41 +253,39 @@ for index_md in */index.md; do
     }' "$OUT_DIR/$slug/index.html" > "$OUT_DIR/$slug/index.html.tmp"
     mv "$OUT_DIR/$slug/index.html.tmp" "$OUT_DIR/$slug/index.html"
 
-    # Only add published articles to index, packages, and RSS
-    if is_published "$slug"; then
-        # Collect card data for the index page (as JS object literal)
-        # Escape strings for JS
-        js_title="$(printf '%s' "$title" | sed 's/\\/\\\\/g; s/"/\\"/g')"
-        js_abstract="$(printf '%s' "$abstract" | sed 's/\\/\\\\/g; s/"/\\"/g')"
-        js_category="$(printf '%s' "$category" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+    # Collect card data for the index page (as JS object literal)
+    # Escape strings for JS
+    js_title="$(printf '%s' "$title" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+    js_abstract="$(printf '%s' "$abstract" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+    js_category="$(printf '%s' "$category" | sed 's/\\/\\\\/g; s/"/\\"/g')"
 
-        # Prefix with date for sorting (newest first); TAB separates date from JSON
-        js_revised_display="$(printf '%s' "$revised_display" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+    # Prefix with date for sorting (newest first); TAB separates date from JSON
+    js_revised_display="$(printf '%s' "$revised_display" | sed 's/\\/\\\\/g; s/"/\\"/g')"
 
-        CARDS_UNSORTED="${CARDS_UNSORTED}
+    CARDS_UNSORTED="${CARDS_UNSORTED}
 ${date}	{\"title\":\"${js_title}\",\"abstract\":\"${js_abstract}\",\"date\":\"${date}\",\"dateDisplay\":\"${date_display}\",\"revisedDisplay\":\"${js_revised_display}\",\"category\":\"${js_category}\",\"url\":\"${slug}/index.html\"}"
 
-        # ZIP source code directories (demo/) for download
-        if [ -d "$topic_dir/demo" ]; then
-            zip_name="${slug}-source.zip"
-            (cd "$topic_dir" && zip -qr - demo) > "$OUT_DIR/$slug/$zip_name"
-            zip_size="$(wc -c < "$OUT_DIR/$slug/$zip_name")"
-            if [ "$zip_size" -ge 1073741824 ]; then
-                zip_display="$(awk "BEGIN{printf \"%.1f GB\", $zip_size/1073741824}")"
-            elif [ "$zip_size" -ge 1048576 ]; then
-                zip_display="$(awk "BEGIN{printf \"%.1f MB\", $zip_size/1048576}")"
-            else
-                zip_display="$(awk "BEGIN{printf \"%.0f KB\", $zip_size/1024}")"
-            fi
-            PACKAGES_JSON="${PACKAGES_JSON}${PACKAGES_SEP}{\"name\":\"${js_title}\",\"zip\":\"${slug}/${zip_name}\",\"date\":\"${date}\",\"dateDisplay\":\"${date_display}\",\"size\":\"${zip_display}\",\"article\":\"${slug}/index.html\"}"
-            PACKAGES_SEP=","
+    # ZIP source code directories (demo/) for download
+    if [ -d "$topic_dir/demo" ]; then
+        zip_name="${slug}-source.zip"
+        (cd "$topic_dir" && zip -qr - demo) > "$OUT_DIR/$slug/$zip_name"
+        zip_size="$(wc -c < "$OUT_DIR/$slug/$zip_name")"
+        if [ "$zip_size" -ge 1073741824 ]; then
+            zip_display="$(awk "BEGIN{printf \"%.1f GB\", $zip_size/1073741824}")"
+        elif [ "$zip_size" -ge 1048576 ]; then
+            zip_display="$(awk "BEGIN{printf \"%.1f MB\", $zip_size/1048576}")"
+        else
+            zip_display="$(awk "BEGIN{printf \"%.0f KB\", $zip_size/1024}")"
         fi
+        PACKAGES_JSON="${PACKAGES_JSON}${PACKAGES_SEP}{\"name\":\"${js_title}\",\"zip\":\"${slug}/${zip_name}\",\"date\":\"${date}\",\"dateDisplay\":\"${date_display}\",\"size\":\"${zip_display}\",\"article\":\"${slug}/index.html\"}"
+        PACKAGES_SEP=","
+    fi
 
-        # Collect RSS item
-        rss_date="$(date -d "$date" -R 2>/dev/null || echo "$date")"
-        xml_title="$(printf '%s' "$title" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')"
-        xml_abstract="$(printf '%s' "$abstract" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')"
-        RSS_ITEMS="${RSS_ITEMS}
+    # Collect RSS item
+    rss_date="$(date -d "$date" -R 2>/dev/null || echo "$date")"
+    xml_title="$(printf '%s' "$title" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')"
+    xml_abstract="$(printf '%s' "$abstract" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')"
+    RSS_ITEMS="${RSS_ITEMS}
     <item>
       <title>${xml_title}</title>
       <link>${SITE_URL}/${slug}/index.html</link>
@@ -285,10 +295,7 @@ ${date}	{\"title\":\"${js_title}\",\"abstract\":\"${js_abstract}\",\"date\":\"${
       <category>${category}</category>
     </item>"
 
-        echo "  built: $slug"
-    else
-        echo "  built: $slug (unpublished)"
-    fi
+    echo "  built: $slug"
 done
 
 # --------------------------------------------------------------------------
