@@ -18,6 +18,7 @@ A collection of research topics, primarily gathered through agentic AI sessions,
 - [Programmable Display Protocols](programmable-display-protocols/)
 - [Serialization Formats: From Xerox Courier to Cap'n Proto](serialization-formats/)
 - [Virtual Machine Bytecodes](vm-bytecodes/)
+- [Compilers and Languages for 8-Bit CPUs](8bit-compilers/)
 
 ## Build & Deploy
 

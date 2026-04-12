@@ -9,3 +9,4 @@ triton-gpu
 triton-audio
 serialization-formats
 vm-bytecodes
+8bit-compilers

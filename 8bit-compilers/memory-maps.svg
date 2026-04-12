@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 420" font-family="'IBM Plex Mono', monospace">
+  <style>
+    .label { font-size: 11px; fill: #2c2420; font-family: 'IBM Plex Sans', sans-serif; }
+    .addr { font-size: 10px; fill: #6b5b4a; font-family: 'IBM Plex Mono', monospace; }
+    .title { font-size: 13px; fill: #2c2420; font-weight: bold; font-family: 'IBM Plex Sans', sans-serif; }
+    .size { font-size: 9px; fill: #8b7355; font-family: 'IBM Plex Sans Condensed', sans-serif; }
+  </style>
+
+  <!-- 6502 / Commodore 64 Memory Map -->
+  <text x="160" y="20" text-anchor="middle" class="title">MOS 6502 (Commodore 64)</text>
+
+  <!-- Scale: 64KB = 380px height, so 1KB ~ 5.9px -->
+  <!-- $0000-$00FF Zero Page (256B) -->
+  <rect x="80" y="30" width="160" height="5" fill="#c9463d" stroke="#2c2420" stroke-width="0.8" rx="1"/>
+  <text x="245" y="37" class="addr">$0000</text>
+  <text x="48" y="37" text-anchor="end" class="label">Zero Page</text>
+  <text x="160" y="37" text-anchor="middle" class="size" fill="white">256 B</text>
+
+  <!-- $0100-$01FF Stack (256B) -->
+  <rect x="80" y="35" width="160" height="5" fill="#d4763d" stroke="#2c2420" stroke-width="0.8" rx="1"/>
+  <text x="48" y="42" text-anchor="end" class="label">Stack</text>
+
+  <!-- $0200-$07FF System/BASIC (1.5KB) -->
+  <rect x="80" y="40" width="160" height="9" fill="#b8a88a" stroke="#2c2420" stroke-width="0.8" rx="1"/>
+  <text x="48" y="48" text-anchor="end" class="label">System</text>
+  <text x="245" y="48" class="addr">$0800</text>
+
+  <!-- $0800-$9FFF BASIC RAM (38KB) -->
+  <rect x="80" y="49" width="160" height="225" fill="#5b8c5a" stroke="#2c2420" stroke-width="0.8" rx="1"/>
+  <text x="160" y="165" text-anchor="middle" class="label" fill="white" font-weight="bold">User RAM</text>
+  <text x="160" y="180" text-anchor="middle" class="size" fill="white">~38 KB</text>
+  <text x="245" y="57" class="addr">$0800</text>
+
+  <!-- $A000-$BFFF BASIC ROM (8KB) -->
+  <rect x="80" y="274" width="160" height="47" fill="#7a6a5a" stroke="#2c2420" stroke-width="0.8" rx="1"/>
+  <text x="160" y="301" text-anchor="middle" class="label" fill="white">BASIC ROM</text>
+  <text x="160" y="314" text-anchor="middle" class="size" fill="#d4c9b8">8 KB</text>
+  <text x="245" y="282" class="addr">$A000</text>
+
+  <!-- $C000-$CFFF RAM/unused (4KB) -->
+  <rect x="80" y="321" width="160" height="24" fill="#b8a88a" stroke="#2c2420" stroke-width="0.8" rx="1"/>
+  <text x="160" y="336" text-anchor="middle" class="label">RAM/Unused</text>
+  <text x="245" y="330" class="addr">$C000</text>
+
+  <!-- $D000-$DFFF I/O + Char ROM (4KB) -->
+  <rect x="80" y="345" width="160" height="24" fill="#c9863d" stroke="#2c2420" stroke-width="0.8" rx="1"/>
+  <text x="160" y="360" text-anchor="middle" class="label" fill="white">I/O Registers</text>
+  <text x="245" y="354" class="addr">$D000</text>
+
+  <!-- $E000-$FFFF Kernal ROM (8KB) -->
+  <rect x="80" y="369" width="160" height="47" fill="#5a6a8a" stroke="#2c2420" stroke-width="0.8" rx="1"/>
+  <text x="160" y="396" text-anchor="middle" class="label" fill="white">Kernal ROM</text>
+  <text x="160" y="409" text-anchor="middle" class="size" fill="#d4c9b8">8 KB</text>
+  <text x="245" y="378" class="addr">$E000</text>
+  <text x="245" y="418" class="addr">$FFFF</text>
+
+  <!-- Z80 / CP/M Memory Map -->
+  <text x="540" y="20" text-anchor="middle" class="title">Zilog Z80 (CP/M 2.2)</text>
+
+  <!-- $0000-$00FF System area (256B page 0) -->
+  <rect x="460" y="30" width="160" height="8" fill="#b8a88a" stroke="#2c2420" stroke-width="0.8" rx="1"/>
+  <text x="625" y="38" class="addr">$0000</text>
+  <text x="540" y="38" text-anchor="middle" class="size">Page 0 (256 B)</text>
+
+  <!-- $0100-$CFFF TPA (Transient Program Area ~52KB) -->
+  <rect x="460" y="38" width="160" height="326" fill="#5b8c5a" stroke="#2c2420" stroke-width="0.8" rx="1"/>
+  <text x="540" y="200" text-anchor="middle" class="label" fill="white" font-weight="bold">TPA</text>
+  <text x="540" y="215" text-anchor="middle" class="label" fill="white">(User Programs)</text>
+  <text x="540" y="230" text-anchor="middle" class="size" fill="white">~52–57 KB</text>
+  <text x="625" y="46" class="addr">$0100</text>
+
+  <!-- CCP + BDOS (~5.5KB) -->
+  <rect x="460" y="364" width="160" height="24" fill="#7a6a5a" stroke="#2c2420" stroke-width="0.8" rx="1"/>
+  <text x="540" y="380" text-anchor="middle" class="label" fill="white">CCP + BDOS</text>
+  <text x="625" y="373" class="addr">varies</text>
+
+  <!-- BIOS (~1KB) -->
+  <rect x="460" y="388" width="160" height="12" fill="#5a6a8a" stroke="#2c2420" stroke-width="0.8" rx="1"/>
+  <text x="540" y="398" text-anchor="middle" class="label" fill="white">BIOS</text>
+
+  <!-- Top of memory -->
+  <rect x="460" y="400" width="160" height="16" fill="#c9863d" stroke="#2c2420" stroke-width="0.8" rx="1"/>
+  <text x="540" y="412" text-anchor="middle" class="label" fill="white">Stack ↓</text>
+  <text x="625" y="418" class="addr">$FFFF</text>
+</svg>
