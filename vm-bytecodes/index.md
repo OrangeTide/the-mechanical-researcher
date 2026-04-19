@@ -1,6 +1,7 @@
 ---
 title: Virtual Machine Bytecodes
 date: 2026-03-22
+revised: 2026-04-19
 abstract: A comparative survey of virtual machine bytecode architectures — from the JVM's thirty-year dominance to WebAssembly's sandboxed linear memory — evaluating the design trade-offs that determine performance, security, complexity, and portability for anyone choosing or building a bytecode VM.
 category: systems
 ---
@@ -33,6 +34,8 @@ Before diving into individual dimensions, a summary of what each system is and w
 | Lua 5.0+ | 2003 | PUC-Rio | Embeddable scripting | Register, fixed 32-bit |
 | BEAM | 1998 | Ericsson | Concurrent/fault-tolerant | Register, per-process |
 | Quake 3 VM (Q3VM) | 1999 | id Software | Sandboxed game mods | Stack, 32-bit |
+| CPython | 1990 | Guido van Rossum | Python reference interpreter | Stack, fixed 2-byte wordcode (3.6+) |
+| V8 Ignition | 2016 | Google | JavaScript baseline tier | Register + accumulator |
 | WebAssembly | 2017 | W3C (browser vendors) | Sandboxed portable code | Stack, structured control flow |
 
 Five decades of experimentation — and the field has not converged on a single answer.
@@ -96,6 +99,25 @@ Fixed-width encodings (Lua, Q3VM) sacrifice density for decode simplicity. A fix
 Q3VM's encoding is peculiar: the `.qvm` file stores instructions as either 1 byte (no operand) or 5 bytes (1-byte opcode + 4-byte little-endian parameter). There is no 2-byte or 3-byte form. `ADD` is 1 byte; `CONST 42` is 5 bytes. This is simple but wasteful — a constant value of 1 takes the same 5 bytes as a constant value of two billion. During loading, `VM_PrepareInterpreter()` expands the variable-length bytecode into a fixed array of 32-bit words — one word per instruction, with operands stored in a parallel array — so the interpreter loop never parses instruction boundaries at runtime.
 
 But raw bytes-per-instruction is misleading without considering *instructions per operation*. A register machine needs fewer instructions for the same computation because it avoids the push/pop traffic of a stack machine. Dalvik averages 3.2 bytes per instruction but uses 47% fewer instructions than the JVM's 1.9 bytes per instruction for equivalent programs — so total program size is comparable, sometimes even smaller for Dalvik.
+
+### Address Spaces: Byte Offsets vs. Instruction Ordinals
+
+A subtler encoding choice — and one that aged poorly for Q3VM — is what address space branch and call targets live in. Most modern VMs pick one of two answers and apply it uniformly:
+
+- **Byte offsets** (JVM, .NET CIL, Wasm, Dalvik). The program counter is a byte index into the code segment. Branch targets are byte offsets (JVM, Wasm) or relative byte deltas (CPython 3.11+, Lua). The loader does no address translation; the disassembler, the debugger, and the interpreter all agree on what an "address" means. CPython went from variable-width to fixed 2-byte "wordcode" in 3.6 specifically to make `pc++` trivial and dispatch branch-predictor-friendly.
+- **Structured branch depths** (Wasm). Wasm goes a step further: branches name a relative depth into the structured control stack rather than any raw offset. This sidesteps the question entirely but only works because Wasm forbids arbitrary `goto`.
+
+Q3VM picked a third, rarer option: branch and call targets are **instruction ordinals** — the index of the Nth opcode in the program, not its byte offset. `q3asm` emits these ordinals into the `.qvm` file directly. Inside a single run this is self-consistent (PC is also an ordinal), but it forces the loader to expand the variable-length on-disk encoding into a fixed-width array — typically 8 bytes per opcode (opcode word + parameter word), an ~8x memory blowup over the file size, plus rounding up to a power of two and padding the tail with `BREAK` so a stray PC can be masked safely. The expansion exists so the interpreter can do `pc++` and `code[pc]` without ever parsing instruction boundaries at runtime.
+
+The cost is paid in three places:
+
+1. **Memory.** A 10 KB code segment becomes ~80 KB live, plus pow2 padding.
+2. **Tooling coherence.** The on-disk format and any disassembler naturally speak byte offsets; the interpreter speaks ordinals. Anything that straddles both — stack traces, breakpoints, source-line tables — must maintain a parallel map. In practice Q3VM tooling rarely does, so disassembly addresses and runtime PC values do not line up with what `q3asm` emitted.
+3. **Forecloses optimizations.** Threaded dispatch, superinstructions, and JITs all want to see the real byte stream (or their own IR built from it), not a fixed 8-byte intermediate.
+
+The choice is partly an artifact of Q3VM's lineage: it was designed as a backend for LCC, whose IR is instruction-oriented, and `q3asm` followed the path of least resistance. 1999-era Java made similar fixed-width-immediate choices, but Sun used byte offsets for branch targets, sparing the JVM this particular wart. The mainstream picked byte offsets because they compose with everything else — file offsets, memory addresses, debugger line tables, exception tables. Instruction ordinals only make sense inside the interpreter.
+
+The lesson generalizes: pick one address space for code and use it everywhere — file, memory, debugger, interpreter. A format that uses a different address space at runtime than on disk pushes a translation table onto every tool that touches it.
 
 ## Type Systems and Verification
 
@@ -172,6 +194,72 @@ The trade-off is that the program must manage memory manually, and bugs that wou
 ### Explicit Memory (Compiler IR)
 
 LLVM IR exposes raw memory operations: `alloca` for stack slots, `load`/`store` for memory access, `getelementptr` for pointer arithmetic, `fence`/`cmpxchg`/`atomicrmw` for concurrency. There is no GC and no safety net. This is appropriate for a compiler IR — the target language's runtime provides whatever memory management it needs — but it means LLVM IR is not suitable as a sandboxed execution format.
+
+## Garbage Collection Root Identification
+
+Every garbage-collected virtual machine faces the same foundational problem: when the GC runs and must trace reachable objects, which stack slots and registers contain pointers? A wrong answer is catastrophic — the GC may free an object that is still reachable (corruption or crash), or incorrectly retain an object as reachable (memory leak). The solution chosen shapes the entire runtime architecture, and the trade-offs between techniques recur across all GC'd VMs.
+
+### Precise Maps: Stack Maps and GC Info
+
+The safest approach — and the one chosen by production systems — is *precise* GC root identification via compiler-emitted metadata. The compiler knows which locals and temporaries are pointers because it has type information. At every point in the code where a GC could occur (a "GC-safe point"), the compiler emits a metadata table describing the stack layout.
+
+**HotSpot's OopMaps** are the canonical example. The JVM's C++ runtime records, for each GC-safe point in a method, exactly which stack slots and registers hold object pointers. An OopMap is a compact bitfield — one bit per stack slot, 1 = pointer, 0 = non-pointer. When the GC runs and pauses a thread, it consults the OopMap for the current PC to determine which slots to trace. A method may have dozens of OopMaps, one for each loop back-edge and method call site. During a GC pause, tracing a single frame involves a table lookup by PC, then walking the bitfield.
+
+The cost is metadata overhead: a typical method accumulates 10–50 OopMaps depending on branching and call frequency. HotSpot mitigates this by compressing OopMaps — storing deltas from the previous map (usually most bits are unchanged) and using variable-byte encoding. The JVM also uses "stack map frames" in the class file itself (an inheritance from verification), which the C2 optimizing compiler reads to avoid re-scanning the method.
+
+**.NET's GCInfo** follows a similar pattern. The runtime stores GC information per method, encoding which registers and stack locations hold GC references. The encoding is more compact than OopMaps — .NET uses run-length encoding over the metadata, exploiting the fact that most stack slots are non-pointers. When an exception is thrown, .NET's exception unwinding machinery consults GCInfo at each frame to correctly reconstruct the set of roots.
+
+**Wasm has no GC-safe points yet** — the original MVP forbids garbage collection in the core spec. The exception handling proposal adds explicit try/catch, but the post-MVP GC proposal (currently in development) will require similar metadata. Proposals discuss "shadow stacks" (explicit per-function lists of pointer-typed locals) or stack map tables embedded in the module, generated at compile time.
+
+The fundamental insight: precise identification requires the compiler to emit metadata. This is why GC'd VMs must be *GC-aware* at compile time. A naïve interpreter that accepts untrusted bytecode has no way to know which slots are pointers.
+
+### Conservative Scanning: Boehm-Demers-Weiser
+
+Conservative GC avoids the metadata burden entirely: scan all reachable memory (stack, registers, heap) as if every word is a potential pointer. If a word's numeric value falls in the range of any allocated object, treat it as a pointer. This might lead to false retention — a 64-bit integer that *happens* to have the same bit pattern as an object address prevents that object's reclamation — but it is memory-safe (no false collection) and requires no compiler cooperation.
+
+**Early Smalltalk systems** (Smalltalk-80 and variants) relied on conservative scanning. The image file contains objects; the interpreter walks the C call stack and heap looking for values that could be pointers. Smalltalk's object headers contain a size field, so the GC can verify that a candidate pointer points to a valid object boundary.
+
+The **Boehm GC** library, deployed in countless C/C++ programs as the standard conservative GC for unmanaged languages, uses the same strategy: mark phase scans the heap and stack for any 32-bit or 64-bit values that look like pointers; a pointer is "valid" if it falls within a known allocation block and is suitably aligned. On modern 64-bit systems, false retention is uncommon — the probability that a random 64-bit integer happens to lie within an allocated object is small enough that most runs are unaffected.
+
+**V8's early implementation** used conservative scanning for the C++ stack. The engine has roots in the C++ call stack (local variables in C++ code that hold `Handle<Object>` references), and early V8 scanned the entire C++ stack as if it were all pointers. This is correct but can cause false retention of any object whose address happens to appear in C++ code's temporaries or spilled registers. Modern V8 uses explicit GC root tracking (roots are registered with the heap), but older code and some embedders still rely on conservative stack scanning.
+
+The trade-off is precision for simplicity: conservative scanning works without compiler modification, but pays a cost in false retention and unmoving objects (because you cannot update pointers whose locations you do not know with certainty).
+
+### Tagged Values: Self-Describing Data
+
+A third approach eliminates the need for separate metadata by making every value self-describing. Each value carries a type tag — a few bits that identify whether the word is an integer, pointer, float, etc.
+
+**OCaml's runtime** uses immediate tagging. Every value is one 64-bit word (on a 64-bit system). If the low bit is 1, the value is an integer and the remaining 63 bits are the int's magnitude. If the low bit is 0, the value is a pointer to a block on the heap. The GC walks pointers by looking only at words with the tag bit clear. This design is elegant and eliminates the need for metadata — the GC's rules are built into the data representation. The cost is losing one bit of integer range (63-bit integers instead of 64-bit) and the cost of untagging/retagging on arithmetic operations.
+
+**Lua's tagged unions** follow the same principle: each value is a struct containing a type tag (integer, float, string, table, function, etc.) and a union holding the actual value. Pointers are tagged `TSTRING`, `TTABLE`, etc.; the GC sees the tag and knows whether to trace the pointer. Non-pointer values are tagged `TINT` or `TFLOAT` and are left alone.
+
+**V8's SMI (Small Integer) representation** is a middle path: small integers (-2^30 to 2^30-1) are stored with a special bit pattern (low bit = 1); larger integers, floats, and all objects are heap-allocated. The GC uses the tag bit as a first-pass filter: bit 1 set means "this is a small int, not a pointer." For untagged values, V8 must use additional metadata (stack maps), but many hot paths work purely with SMIs and avoid metadata lookups.
+
+Tagged representations are ideal for dynamically typed languages where value types are already tracked at runtime. Statically typed bytecodes (JVM, .NET) could theoretically use tagging but do not — the cost of tagging and untagging every operation outweighs the metadata cost.
+
+### Handles and Indirect References
+
+Some VMs trade direct pointer access for trackable references. The **Java Native Interface (JNI)** does not expose raw pointers to Java objects; instead, it uses local and global handles. A handle is an opaque 64-bit value that the JVM resolves to the actual object pointer. When the GC runs, it updates handle tables but not the handles themselves — the handles remain valid across GC.
+
+The benefits: references remain valid even if the object is moved (the handle is updated, but the handle value is not). The costs: every access through a handle requires a dereference (the handle is a pointer to a pointer), and the handle table must be maintained.
+
+Older **Smalltalk implementations** used a similar indirection: a "stable pointer" or "object ID" that remained valid across GC, with the actual object location tracked in a separate table. This was slower than direct pointers but allowed object relocation without invalidating C code's references.
+
+Modern VMs largely abandoned this approach in favor of precise metadata, because the extra dereference is a hot-path cost that outweighs the flexibility.
+
+### The Implementation in Context
+
+The choice of root identification technique cascades through the VM design:
+
+- **Precise maps (HotSpot, .NET, ART)**: Requires GC-aware compilation. Metadata overhead is modest on modern systems (~10–20 bytes per method). Enables fast, low-latency GC with concurrent collection. Best for long-running server workloads.
+  
+- **Conservative scanning (Boehm, early Smalltalk)**: Works without compiler cooperation. False retention can accumulate on long-running programs. Best for short-lived programs or embedded systems where the compiler cannot be modified.
+
+- **Tagged values (OCaml, Lua)**: Self-describing values require no separate metadata. Works perfectly for dynamically typed languages. Cost is paid in tagging/untagging overhead, not metadata overhead. Best for languages where type tags already exist.
+
+- **Handles (JNI, older Smalltalk)**: Trade direct access for guaranteed reference validity. Indirection cost is high; only justified when C code and objects must coexist. Modern VMs minimize JNI use for this reason.
+
+The HotSpot/LLVM gc.statepoint infrastructure (used by many modern systems) unifies these approaches: the compiler emits maps at safepoints, but the maps are generated using LLVM's GC framework, allowing different backends to choose their own encoding (precise, conservative, hybrid). This is the modern consensus — precision via metadata, delivered by the compiler infrastructure.
 
 ## Compilation Strategies
 
@@ -273,6 +361,101 @@ AOT (Ahead-of-Time) compilation produces native binaries before execution:
 | Lua 5.4 | Switch interpreter | — | — | 0.03–0.1x |
 
 The numbers reveal a clear pattern: multi-tier JIT systems with profile-guided optimization approach native performance; single-tier JITs reach 50–80% of native; optimized interpreters (computed goto) reach 15–20% of native; and plain switch interpreters top out at 3–10% of native for compute-heavy workloads.
+
+## Exception Handling at the Bytecode Level
+
+Exception handling in bytecode VMs appears simple at the language level — "throw" an exception, "catch" it in a handler — but its implementation cascades into the entire execution model. The choice between table-driven unwinding, explicit save-and-restore, and process-level recovery determines whether exceptions have zero cost in the non-throwing path, whether you can safely unwind destructors, and whether the VM trusts the bytecode or the host to manage exceptional control flow.
+
+### Table-Driven Unwinding: The JVM and .NET Model
+
+The most widely deployed exception model is table-driven unwinding. Each method carries an exception table — a list of bytecode ranges and their corresponding handlers. When an exception is thrown (via the `athrow` instruction in the JVM or `throw` in .NET CIL), the runtime walks the call stack, checking each frame's exception table to find a handler for the exception's type.
+
+In the **JVM**, the exception table lives in the `Code` attribute of a method. Each entry specifies:
+- `start_pc`, `end_pc`: bytecode range where the exception applies
+- `handler_pc`: bytecode address of the handler
+- `catch_type`: constant pool index for the exception type
+
+When an exception is thrown, the JVM searches the exception table of the currently executing method. If the current PC falls within a range and the thrown exception matches (or is a subclass of) the `catch_type`, execution transfers to `handler_pc`. The JVM clears the operand stack and pushes the exception object, as required by the JVM spec (section 4.10.1, "Structured Operations and Opcode Constraints"). If no handler matches in the current method, the exception propagates to the caller, repeating the search.
+
+**.NET CIL** implements the same idea through the exception handling table in the method's metadata. The table specifies try blocks, catch handlers, and finally blocks. The runtime unwinds the call stack, consulting the exception table at each frame. A key difference: .NET supports *finally* blocks, which are guaranteed to execute during unwinding (the CLR will execute any finally code before leaving a try block, even if an exception is thrown). This is more complex than the JVM's exception tables, which have no special finally semantics — finally blocks in Java are compiled into bytecode duplicated after both the normal return path and the exception path.
+
+The critical advantage of table-driven unwinding: it is a **zero-cost abstraction on the non-throwing path**. No instructions are executed, no state is maintained, and no registers are clobbered during normal execution. The exception table is only consulted if an exception actually occurs. For code paths that rarely throw (most user code), this is the ideal design.
+
+The limitation: exception tables require the bytecode format to define them, and the loader must validate them. If a handler_pc is out of range or the exception type is invalid, the loader catches this during class/module loading, not during execution.
+
+### Explicit Save-and-Restore: Lua and Early Interpreters
+
+**Lua's `pcall` (protected call)** implements exception handling via explicit save-and-restore. Before calling a protected function, the runtime saves the call stack pointer and exception handler. If an exception occurs inside the pcall, a `longjmp` returns to the saved point, restoring all state. If the function completes normally, the handler is popped.
+
+This approach is simpler to implement than table-driven unwinding — no exception tables, no loader validation — but it has a cost: every protected call must save state (allocate a handler frame, push a `setjmp` context). The instruction footprint is:
+
+```
+enter_pcall label              -- save handler context, jumps to label on error
+function_call ...
+leave_pcall                    -- pop handler context
+...
+label:
+handle_exception ...           -- error path
+```
+
+The cost is paid on every entry to the protected region, not just on throws. For Lua, where most functions are not protected, this is acceptable. For a VM where exceptions are expected to be common (the JVM), it would be unacceptable — the per-call overhead would be substantial.
+
+Lua's mechanism is also less flexible than table-driven unwinding: the handler is a linear execution path (the code at `label`), not a jump table. Multiple catch types (catch `IOException`, catch `RuntimeException`) require explicit type checking in bytecode, not a metadata-driven dispatch. This is why Lua has no built-in exception type system — `pcall` returns `(success, value_or_error)`, leaving error handling to the caller.
+
+### Two-Phase Unwinding: DWARF and the Itanium ABI
+
+The C++ standard library's exception handling, as specified by the Itanium C++ ABI, uses a more sophisticated scheme: **two-phase unwinding**. Phase 1 walks the call stack *without* unwinding, looking for a handler. Phase 2 unwinds and invokes destructors for each exiting scope. This design allows the runtime to detect if an exception will be caught before unwinding anything — important for correctness if a destructor throws an exception.
+
+The mechanism uses **DWARF** (Debugging With Attributed Record Formats), which encodes information about stack frames, register locations, and exception handling state in a compact language-independent format. When an exception is thrown, the unwinder reads DWARF tables to determine:
+1. Which frame is the landing pad (handler)?
+2. How to restore the caller's registers from the current frame?
+3. Which destructors must be called as the frame exits?
+
+The runtime then rewinds the stack, executing destructors in the correct order, and finally transfers control to the handler.
+
+**LLVM's gc.statepoint infrastructure** (used by Java AOT compilers and some research VMs) applies similar two-phase logic: the first phase determines if a GC-safe exception handler exists; the second phase unwinds, running the GC from each frame if needed, and then transfers to the handler.
+
+This is more complex than simple table-driven unwinding, but necessary in C++ to guarantee destructor semantics and correct exception safety. It is overkill for languages like Java that have no destructors.
+
+### WebAssembly's Exception Handling Proposal
+
+The WebAssembly exception handling proposal (currently standardized, but not part of MVP) integrates exceptions as first-class control flow constructs, consistent with Wasm's structured control model. Rather than arbitrary jumps to exception handlers, exceptions use `try`/`catch`/`end` blocks that pair syntactically with the code they protect.
+
+```wasm
+try $label
+  call $risky_function  ;; may throw
+  ...
+catch $exn             ;; catches exception
+  local.get $exn       ;; push exception on stack
+  ... handle it ...
+end
+```
+
+The exception is represented as a tag (a module-level constant) and a payload (values carried by the exception). Like `block` and `loop`, a `try` block can be exited via `throw` or `rethrow` instructions, and the structure ensures that exception handlers are always reachable from the protected code.
+
+The advantage: exception handling is part of the type system. The validator ensures that a `throw` instruction exits the correct number of blocks and that handlers are only reached via explicit exception paths. This prevents "jumping" to a handler from an unprotected context. The disadvantage: Wasm's post-MVP exception proposal required adding new instructions and type rules, increasing the spec and implementation complexity.
+
+### BEAM's Let-It-Crash Model
+
+**Erlang and the BEAM VM** use a fundamentally different exception model: exceptions exist, but the primary recovery mechanism is *process-level* supervision, not exception handling within a process. When a process crashes (an unhandled exception kills the process), a supervisor process (linked to the crashing process) detects the failure and decides whether to restart it, escalate it, or handle it differently. Individual try/catch blocks exist in BEAM bytecode, but they are subordinate to the process supervision hierarchy.
+
+This reflects Erlang's core design principle: "let it crash." Rather than writing defensive code with lots of exception handlers, Erlang encourages programmers to fail fast and let the supervisor handle recovery. The VM supports try/catch via the catch instruction and EXC_HANDLER entries in the code — similar to the JVM model — but the exception is secondary to the process level.
+
+The practical consequence: exceptions within a process follow the JVM-style table-driven model, but *crashing* a process is an entirely different event, handled by linking/monitoring between processes. A monitor can observe crashes asynchronously and take action without being on the call stack.
+
+### The Cost-Benefit Trade-Off
+
+| Method | Throwing Cost | Non-Throwing Cost | Complexity | Supports Destructors? |
+|--------|---------------|-------------------|------------|----------------------|
+| Table-driven (JVM, .NET) | Stack walk + table lookup | Zero | Moderate | No (Java); Yes (.NET, C++) |
+| Explicit save/restore (Lua) | longjmp | Per-call handler setup | Simple | No |
+| Two-phase (DWARF/C++) | Full unwinding + destructor calls | Zero | High | Yes |
+| Structured (Wasm) | Defined by control flow | Zero | High | N/A |
+| Process-level (BEAM) | Process death; restart elsewhere | Zero | Language-dependent | N/A |
+
+The consensus for general-purpose VMs (JVM, .NET): table-driven unwinding is the right choice. The non-throwing path has zero overhead, the throwing path is efficient (a stack walk with a table lookup per frame), and the mechanism is verifiable (the loader validates exception tables). 
+
+For embedded languages (Lua) that expect few exceptions, explicit save-and-restore is acceptable. For systems languages (C++) that must run destructors during unwinding, two-phase unwinding is necessary. Wasm's structured approach guarantees safety but requires careful design to avoid forcing exception handling into the control flow type system. BEAM's process-level model is unique to Erlang's architecture and cannot be adopted directly by other VMs.
 
 ## Sandboxing and Security
 
@@ -440,6 +623,126 @@ The JVM and .NET CIL have the richest multi-language ecosystems. Wasm is catchin
 Dis is the cautionary tale of ecosystem lock-in. It is technically elegant — memory-to-memory three-address, channel concurrency, hybrid GC — and it is effectively dead because Limbo was its only source language and Inferno was its only platform.
 
 Q3VM tells a more nuanced story. The format is tied to a restricted subset of C compiled by LCC, and it originated inside a single game engine. But the bytecode format's simplicity — 60 opcodes, no GC, no type system, auditable in an afternoon — has given it a second life. The standalone jnz/q3vm project extracts the VM from ioquake3 into a single embeddable C file with no game dependencies. Other independent implementations exist — OrangeTide/stackvm implements all 60 opcodes, loads `.qvm` files, and provides a syscall environment in 1,374 lines of C with no code golf tricks. Q3VM demonstrates that a bytecode format can outlive its original application if it is simple enough to reimplement from scratch.
+
+## Cross-Cutting Topics: Tail Calls, Coroutines, and Dynamic Dispatch
+
+This section covers three design questions that cut across multiple bytecode systems and shape how they handle unbounded recursion, suspension and resumption, and method resolution at the bytecode level.
+
+### Tail Calls at the Bytecode Level
+
+A tail call is a function call where the caller does not need to return control to its caller after the callee finishes — the callee can instead return directly to the caller's caller, reusing the stack frame rather than pushing a new one. This is essential for languages like Scheme (where the language spec requires unbounded recursion to be expressible as iteration) and useful for techniques like CPS transformation and trampolined interpreters where the stack would otherwise grow linearly with loop depth.
+
+**Wasm's tail calls** are standardized via the `return_call` and `return_call_indirect` instructions, which replace the current frame with a call to the target function rather than pushing a new frame. [The proposal has progressed through the WebAssembly standardization process and reached Phase 3 implementation](https://github.com/WebAssembly/tail-call), with support in modern runtimes like V8. This enables Wasm modules compiled from Scheme and other languages requiring tail call optimization to run with constant stack depth.
+
+**The JVM's failure to standardize tail calls** is instructive. Tail-call support has been proposed multiple times, with [a draft specification defining a `tailcall` prefix opcode](https://cr.openjdk.org/~jrose/draft/vm-tailcall-jep.html) that could precede any invoke bytecode. The JSR 292 Expert Group concluded that tail calls could be implemented securely and performantly, with formal proofs that JVM-style access checks are compatible with tail call elimination. Yet the feature never shipped. The real obstacle was not technical but architectural: stack frames carry security context — method access checks, caller-sensitive operations, and exception handler tables all depend on the frame chain. The JVM team perceived tail call elimination as breaking the security model, even though the research contradicted this. Instead, Kotlin and Scala emulate tail calls via whole-method trampolines or loops, accepting code size penalties to avoid the language change.
+
+**.NET CIL's `tail.` prefix**, [defined in ECMA-335](https://ecma-international.org/publications-and-standards/standards/ecma-335/), offers a middle ground: a hint instruction that can precede call operations. The runtime is allowed (but not required) to implement the tail call optimization. This creates a portability issue — code written assuming tail call semantics may not run correctly on a conforming but lazy implementation. The safer languages (C#, F#) have compiler-enforced conventions to avoid relying on the optimization.
+
+The design tension is clear: Wasm designed for it from the start with no legacy baggage. The JVM designed against it (for security) and cannot retrofit it without compatibility trauma. CIL compromised with a hint, sacrificing guaranteed semantics for flexibility.
+
+### Coroutines, Generators, and Stack Switching
+
+How should a bytecode VM support suspending execution, saving state, and resuming later? The design space ranges from language-level bytecode support to pure library implementations that cooperate with the runtime.
+
+**Python's generator model** is the simplest: the `YIELD_VALUE` opcode saves the entire execution frame to the heap (frame objects are allocated on the heap in CPython, not the native stack, allowing them to outlive function calls). When `yield` executes, it returns a value to the caller and marks the frame as suspended. On the next `next()` call, the frame is restored from the heap and execution resumes from the saved program counter. This is cheap and transparent — the VM does minimal work, and the bytecode overhead is a single opcode. [CPython's documentation details how frame objects include both the variable-size local array and operand stack](https://github.com/python/cpython/blob/main/InternalDocs/interpreter.md).
+
+**Lua's coroutine model** is more sophisticated: [each coroutine has its own separate Lua stack](https://www.lua.org/pil/9.1.html), completely independent from the main thread stack. The `coroutine.resume()` function switches stacks, and `coroutine.yield()` suspends the current coroutine, saving its position within the Lua stack. The implementation allocates a separate `lua_State` structure for each coroutine, with its own execution stack pointer. Lua coroutines are symmetric (any coroutine can suspend) but not preemptive — they are not lightweight threads, just a way to structure a single-threaded program.
+
+**The Erlang/OTP approach** is different again: each process (Erlang's term for lightweight actor) has its own heap and stack, collected independently with per-process garbage collection. Process switching is preemptive and scheduled by the BEAM VM — one process yielding does not require explicit `yield` calls in the code. This is more powerful than Lua's symmetric coroutines (true concurrency) but requires per-process memory management.
+
+**Wasm's stack switching proposal**, [currently in active development, aims to add typed continuations to Wasm](https://github.com/WebAssembly/stack-switching) — separate stacks per continuation, with explicit suspension/resumption points. Unlike Python or Lua, this is designed to support advanced control flow like async/await, generators, and lightweight threads within the same Wasm instance. The proposal is not yet standardized but is being prototyped in Wasmtime and other implementations.
+
+The design principle: bytecode-level support (Python's YIELD_VALUE) is invasive but free from a runtime overhead perspective. Library-level support (Lua, Erlang) requires more infrastructure but is more flexible — a single language VM can express many concurrency models.
+
+### Calling Conventions and Dynamic Dispatch
+
+How do arguments reach a called function, and how does the VM decide which function to call? This seemingly mechanical question determines the bottleneck in code that makes many polymorphic calls.
+
+**Stack-based argument passing** (JVM, CPython, CIL) pushes arguments onto the operand stack before the call instruction and the callee pops them. **Register-based passing** (Dalvik, Lua) places arguments in designated registers. **Frame-managed passing** (Dis) stores arguments in memory offsets relative to the frame pointer. Each has trade-offs for code density and dispatch overhead — register passing avoids stack churn but requires more explicit bookkeeping.
+
+**Polymorphic inline caches (PICs)**, pioneered in the Self language, are the defining optimization technique for dynamic dispatch. At each call site, the VM maintains a cache mapping the receiver object's type (or shape/hidden class) to the target method. On a cache hit, the call is nearly free — just a memory load and a jump. On a miss, the VM performs a full method lookup and updates the cache. [Self's original 1991 paper by Hölzle, Chambers, and Ungar](https://bibliography.selflanguage.org/pics.html) showed that even with polymorphic message sends, a median speedup of 11% was achievable with per-call-site type caching. This technique became foundational in every high-performance dynamic language engine: V8, BEAM, Lua's JIT (via trace specialization), and the JVM's JIT compilers all implement variants.
+
+**The JVM's `invokedynamic` instruction** ([introduced in JSR 292](https://wiki.openjdk.org/display/HotSpot/Method+handles+and+invokedynamic), shipped in Java 7) takes a different approach. Rather than the VM deciding what to call, `invokedynamic` delegates to user-provided code — a bootstrap method. On the first execution of an `invokedynamic` instruction, the VM invokes the bootstrap method, passing the static call site metadata (method name, expected signature). The bootstrap method returns a `CallSite` object containing a `MethodHandle` — the actual target method. The VM caches this result and subsequent invocations bypass the bootstrap entirely. This was revolutionary because it let dynamic language implementors (JRuby, Nashorn, Jython) write their own dispatch logic without modifying the JVM. It also enabled Java's lambda expressions (`(x) -> x + 1` compiles to an `invokedynamic` call) and `switch` on `String`. JSR 292 is arguably the most consequential JVM addition since Java 1.0 — it shifted the VM from "static multi-dispatch engine" to "programmable dispatch substrate."
+
+**Wasm's typed function tables** offer a lower-level approach. Functions are stored in a table indexed by integer. A `call_indirect` instruction specifies the index and the expected function signature. At runtime, the VM fetches the function at that index and traps if its signature does not match the expected type. Type checking is a single pointer comparison (if signatures are interned) or a structural equality check. This is more expensive than a direct call but prevents the sandbox-breaking issue of calling a function with the wrong signature.
+
+The core tension: static dispatch (direct calls) is fastest but inflexible. PIC-based dynamic dispatch adds minimal cost for monomorphic call sites (one receiver type) but scales gracefully with polymorphism. User-controlled dispatch (invokedynamic) sacrifices some automatic optimizations but puts language implementors in control. Wasm's tables trade dispatch speed for safety.
+
+## Other Notable Bytecode Systems
+
+The thematic comparisons above focus on eleven systems chosen for the breadth of design space they cover, but several more bytecode VMs are widely deployed enough to warrant individual treatment, and two historical systems deserve mention as predecessors.
+
+### CPython
+
+CPython is the reference implementation of Python, and its bytecode is the bytecode most programmers encounter without realizing it — every `.pyc` file in `__pycache__/` is CPython bytecode. It is a stack machine with no type information in the instruction stream, no verifier, and no sandbox. Loading bytecode from an untrusted source can crash or compromise the interpreter.
+
+Since Python 3.6, instructions use a fixed-width 2-byte "wordcode" format: 1 byte for the opcode and 1 byte for an argument. Earlier versions used a variable-length encoding where some instructions had no argument and others had a 2-byte argument; the switch to fixed-width simplified the dispatch loop in `ceval.c` and made `pc += 2` trivially branch-predictable. Arguments larger than 255 are encoded by chaining `EXTENDED_ARG` prefix instructions, each contributing 8 more bits to the next instruction's argument. The interpreter uses computed goto dispatch where supported, falling back to `switch` on MSVC.
+
+The most interesting recent change is PEP 659's specializing adaptive interpreter, shipped in Python 3.11. Hot instructions are *quickened* — replaced in place with specialized variants that assume specific operand types. `BINARY_ADD` becomes `BINARY_ADD_INT` after observing two integer operands; if a later execution sees a non-integer, the instruction *despecializes* back to the generic form. Inline caches storing specialization data are embedded *in the bytecode stream itself* as `CACHE` pseudo-instructions, keeping the hot data in the same cache lines as the executing opcode rather than in a parallel metadata array. The result is a 25–50% speedup over Python 3.10 without a JIT compiler — proof that traditional interpreter techniques still have headroom when applied carefully. CPython 3.13 added an experimental JIT (copy-and-patch style) on top of this, but the adaptive interpreter remains the default execution tier.
+
+CPython's opcode count grows with each release as specialization variants accumulate; recent versions define over 180 distinct opcodes, the majority of which are specialized forms of a much smaller "user-visible" set documented in the `dis` module.
+
+### V8 Ignition
+
+V8 — Chrome's and Node.js's JavaScript engine — interprets bytecode through Ignition before any JIT tier kicks in. Ignition was introduced in 2016, replacing Full-codegen (a non-optimizing baseline JIT) with a true bytecode interpreter. The motivation was memory: storing bytecode for cold functions costs far less than storing baseline-compiled native code, and Ignition's bytecode is the canonical representation that all higher tiers (Sparkplug, Maglev, TurboFan) consume.
+
+Ignition is a register machine with an *implicit accumulator*. Most instructions read or write the accumulator implicitly, eliminating a register operand from the encoding. `Add r2` adds register `r2` to the accumulator and stores the result in the accumulator — a single explicit register operand instead of three. This trick yields code denser than a pure register machine without paying the dispatch cost of a stack machine.
+
+The implementation technique is what makes Ignition unusual. Bytecode handlers are not written in C++; they are written in CodeStubAssembler (CSA), a portable macro-assembler that TurboFan compiles to native code at V8 build time. A single handler specification produces optimized native dispatch routines for every architecture V8 targets (x86-64, ARM64, ARM, MIPS, RISC-V) — combining the portability of writing-once with native-speed handlers. Bytecode flows from Ignition into TurboFan's graph builder directly, so hot functions never need to be re-parsed from JavaScript source when promoted to the optimizing tier.
+
+V8's full execution stack today is four tiers: Ignition (interpreter) → Sparkplug (non-optimizing baseline JIT, added 2021) → Maglev (mid-tier optimizing JIT, added 2023) → TurboFan (top-tier optimizing JIT). Ignition remains the foundation — every function starts there, and the bytecode is the durable representation across tiers.
+
+### eBPF
+
+eBPF (extended Berkeley Packet Filter) is the in-kernel sandbox VM that runs untrusted user-supplied bytecode inside the Linux kernel — and increasingly Windows, via [eBPF for Windows](https://github.com/microsoft/ebpf-for-windows). Introduced in Linux 3.18 (2014) as a generalization of the original BPF packet filter, it now powers XDP packet processing, kprobes and tracepoints for system observability, cgroup-attached network policy, and a growing list of kernel security hooks. The architecture is RISC-like: eleven 64-bit general-purpose registers, a 512-byte stack, fixed-width 64-bit instructions, and a calling convention deliberately aligned with x86-64 so the in-kernel JIT can map eBPF registers directly to native registers.
+
+What sets eBPF apart from every other VM in this survey is its *verifier*. Before any program is allowed to run, the kernel statically analyzes it using abstract interpretation: register types, value ranges (tracked as both intervals and bit-level *tnums*), pointer provenance, and stack contents are propagated along every reachable path. The verifier proves that all memory accesses are in-bounds and type-correct, that control flow terminates (originally by forbidding loops entirely; since Linux 5.3, by accepting bounded loops whose induction variables it can prove monotonic), and that the program does not exceed configured complexity limits (currently up to one million verified instructions). Programs are forbidden from invoking arbitrary syscalls; instead they call a whitelisted set of *helper functions* and access a small set of typed map structures shared with user space. Per-architecture in-kernel JITs (x86-64, ARM64, PowerPC, s390x, MIPS64) translate the verified bytecode to native code, with built-in mitigations for Spectre (Retpolines) and JIT spraying (constant blinding).
+
+This is a categorically different verification posture from the JVM or Wasm. Those systems verify *type safety* — they prove that the program will not corrupt the VM's invariants. eBPF additionally proves *termination and complete memory safety* of arbitrary loaded code, which is what makes it acceptable to load into ring 0 in the first place. The cost is a much smaller language: no recursion, bounded program length, restricted helper API, and a verifier rejection rate that programmers learn to design around. The benefit is the only widely-deployed example of a programmable in-kernel VM.
+
+Sources: [A thorough introduction to eBPF (LWN)](https://lwn.net/Articles/740157/), [the eBPF verifier docs](https://docs.ebpf.io/linux/concepts/verifier/), [BPF Design Q&A in the kernel tree](https://docs.kernel.org/bpf/bpf_design_QA.html).
+
+### OCaml Bytecode
+
+OCaml is the most significant production example of a statically-typed functional language with both a bytecode interpreter and a native code compiler. The bytecode VM, ocamlrun, executes programs compiled by ocamlc; the native compiler ocamlopt produces standalone binaries. Both backends compile from the same *lambda* intermediate representation, so a program's behavior is identical between modes — developers trade compilation speed (bytecode) for runtime performance (native) without changing source code. The bytecode VM descends from Xavier Leroy's 1990 ZINC abstract machine, which adapted Krivine's machine for a strict, ML-style language.
+
+The defining representational choice is *uniform tagged values*. Every OCaml value occupies exactly one machine word. The low bit acts as a type tag: if it is 1, the upper 63 bits are an integer; if it is 0, the word is a pointer to a heap-allocated block. The GC walks pointers by inspecting only the words whose tag bit is clear, eliminating the need for separate stack maps or boxed integers. The cost is a one-bit reduction in integer range (63-bit ints on a 64-bit system) and the overhead of tag/untag operations on arithmetic. The instruction set is around 150 opcodes — small for a typed language — with specialized opcodes for closure creation, pattern matching, and tagged arithmetic that exploit the runtime representation directly.
+
+The bytecode interpreter uses threaded code (computed goto on GCC, switch dispatch elsewhere) and is unusually compact: ocamlrun is a few thousand lines of C, comparable to Lua's interpreter. OCaml's continued use of bytecode in production — most OPAM packages distribute as bytecode, and ocamldebug requires it — demonstrates that a typed FP runtime can ship a serious bytecode tier without sacrificing language semantics. Sources: [Real World OCaml — The Compiler Backend](https://dev.realworldocaml.org/compiler-backend.html), [Leroy's ZINC paper](https://xavierleroy.org/talks/zam-kazam05.pdf).
+
+### Ruby YARV
+
+YARV (Yet Another Ruby VM) is the bytecode interpreter merged into CRuby for the 1.9 release in 2007, replacing the AST-walking interpreter that preceded it and delivering an immediate severalfold speedup on most workloads. It is a stack machine of around 100 opcodes, with the usual mix of arithmetic, local variable access, method calls, and Ruby-specific operations (block invocation, instance variable access, dynamic method dispatch). The dispatch loop uses computed goto where available. YARV's instruction sequences are deeply tied to Ruby semantics — every `send` opcode performs full polymorphic method lookup, hash literal opcodes carry frozen-string flags, and the bytecode preserves enough information to print accurate line-level backtraces.
+
+Ruby's JIT story is unusual. The first attempt, MJIT (Ruby 2.6, 2018), generated *C source code* from hot methods, invoked the system C compiler in a background thread, and dlopen'd the resulting `.so` file. This was easy to implement and produced reasonable code but suffered from slow warmup (multi-second compilation latency) and modest steady-state gains. Shopify's [YJIT](https://github.com/Shopify/yjit), now part of upstream Ruby since 3.1 (2021), took a radically different approach: *Lazy Basic Block Versioning* (LBBV), a technique developed in [Maxime Chevalier-Boisvert's PhD thesis](https://dl.acm.org/doi/10.1145/3486606.3486781). Rather than compiling whole methods, YJIT compiles individual basic blocks lazily, generating a fresh version of each block per observed type combination. This sidesteps the need for static type inference: types are discovered by runtime, and the JIT specializes blocks accordingly, falling back to the interpreter when an unexpected type arrives. Warmup is near-instant, memory overhead is small, and production Rails workloads see 15–30% throughput gains. Ruby 3.4 introduces ZJIT, which layers an SSA IR over YARV bytecode for broader optimizations than LBBV alone supports. Sources: [Shopify Engineering on YJIT](https://shopify.engineering/ruby-yjit-is-production-ready), [Ruby's JIT journey (Codemancers)](https://www.codemancers.com/blog/rubys-jit-journey).
+
+### PHP: Zend Engine and HHVM
+
+The Zend Engine has been PHP's runtime since version 4 (2000). It compiles PHP source to a stack-based bytecode of roughly 200 opcodes and dispatches them through a handler table. For more than a decade PHP had no JIT — a deliberate decision rooted in PHP's request-per-process model (every request started cold, so steady-state JIT gains never materialized) and the difficulty of type-specializing dynamically typed code. The intermediate fix was *opcache*, shipped in PHP 5.5 (2013): compiled bytecode is cached in shared memory across worker processes, eliminating the per-request parse-and-compile cost. Opcache alone roughly doubled real-world throughput.
+
+PHP 8.0 (2020) finally added a JIT, built on [DynASM](https://luajit.org/dynasm.html) — the same dynamic assembler library LuaJIT uses. It ships in two modes: a function JIT that compiles whole functions on first call, and a tracing JIT (the default) that profiles bytecode execution and emits type-specialized native code for hot traces. The win is largest on compute-bound code; for the typical web workload dominated by I/O and database calls, gains are modest, validating the original "no JIT needed" position even as the option becomes available. The [PHP RFC by Stogov and Suraski](https://wiki.php.net/rfc/jit) documents the engineering rationale.
+
+Facebook's [HHVM](https://github.com/facebook/hhvm) explored a parallel design space. After the failed HPHPc experiment (2010–2013, a static PHP-to-C++ AOT compiler that struggled with PHP's dynamism), Facebook pivoted to a JIT-based bytecode VM. The original HHVM JIT compiled *tracelets*: maximal type-specialized linear bytecode sequences extracted by inspecting live VM state at the point of compilation. Tracelets enabled aggressive type assumptions but limited inter-block optimization. Over 2014–2015 Facebook generalized to *region-based compilation*, expanding the unit of compilation from straight-line traces to arbitrary control-flow regions including loop bodies. This unlocked a cumulative ~15% CPU reduction across Facebook's web fleet. HHVM's PHP support was eventually dropped in favor of Hack, but its trajectory — AOT → tracelet JIT → region JIT — is one of the most thoroughly documented evolutions of a production bytecode runtime. Sources: [Redesigning the HHVM JIT (Facebook Engineering)](https://engineering.fb.com/2016/09/22/networking-traffic/redesigning-the-hhvm-jit-compiler-for-better-performance/), [HHVM region JIT blog post](https://hhvm.com/blog/2017/02/17/region-jit.html).
+
+### Honorable Mention: Forth and Threaded Code
+
+Forth, designed by Charles H. Moore in 1968 and described in his [1970 paper](https://www.ultratechnology.com/4th_1970.pdf), predates most of the systems in this survey by a decade and pioneered the dispatch technique that bytecode VMs eventually rediscovered. A Forth program *is* a sequence of addresses — a "thread" — pointing at executable routines. There is no separate interpreter loop; each routine ends by fetching the next address from the thread and jumping to it. This *threaded code* model comes in four variants — direct (raw machine addresses, fastest, machine-specific), indirect (an extra dereference, used by Moore's Nova implementation, enables shared definitions), subroutine (a sequence of native `CALL` instructions, lets the CPU's return stack carry the thread), and token (table indices, fully portable but adds a lookup per word). Empirical comparisons across 2000s-era CPUs show no universal winner; the right variant depends on the host's branch predictor and indirect-jump latency.
+
+Threaded code's influence is broader than Forth itself. Smalltalk-80's bytecode dispatch, PostScript's stack-based execution model, and Open Firmware's portable FCode all descend from it. Modern computed-goto interpreters (CPython 3.11+, Lua, Q3VM) are the same idea reformulated in C: jump directly from one handler to the next without returning through a centralized loop. The terminology has drifted — what bytecode VMs call "direct-threaded dispatch" is what Moore called the entire execution model — but the core insight, that eliminating the dispatch loop is the largest single interpreter optimization available without leaving portable code, is unchanged. Sources: [Threaded Code (Ertl, TU Wien)](https://www.complang.tuwien.ac.at/forth/threaded-code.html), [Threaded Code (Wikipedia)](https://en.wikipedia.org/wiki/Threaded_code).
+
+### Honorable Mention: What Bytecode Replaced — GW-BASIC and Tokenization
+
+Worth noting for context: microcomputer BASIC interpreters of the late 1970s and early 1980s — Microsoft BASIC (1975), GW-BASIC (1983), and their many derivatives — are sometimes lumped in with bytecode VMs, but they are not. They used *tokenization*: source keywords (`PRINT`, `FOR`, `IF`) were replaced at line-entry time with single-byte tokens (`0x91`, `0x82`, `0x8B`) to save memory in 4 KB ROMs. Variable names stayed as ASCII strings, line numbers stayed as ASCII branch targets, and the interpreter parsed each line at runtime — looking up variables in a symbol table, scanning forward to match `FOR`/`NEXT`, searching the line index on every `GOTO`. There is no program counter indexing into a compiled instruction stream; there is a pointer walking partially-parsed source.
+
+Bytecode VMs are precisely what replaced this model. The defining move is doing operand resolution *once*, ahead of execution: variable references become slot indices, branches become offsets or ordinals, and the runtime executes a pre-compiled instruction stream rather than re-parsing source on every iteration. Smalltalk-80 (1980) is the cleaner ancestor of the modern bytecode VM; BASIC tokenization is interesting only as the popular technique that bytecode rendered obsolete.
+
+### Honorable Mention: Wirth's P-machine (P2/P4)
+
+UCSD P-code, covered earlier, is the most famous Pascal bytecode — but it descended from earlier work at ETH Zürich. Niklaus Wirth's original P-machine, described in his 1976 book *Algorithms + Data Structures = Programs*, is a stack machine of striking minimalism: just **eight instructions** (`lit`, `opr`, `lod`, `sto`, `cal`, `int`, `jmp`, `jpc`). The `opr` instruction is parameterized — its argument selects among arithmetic, comparison, and runtime operations — so the eight-instruction count understates the actual semantic surface, but the dispatch loop is tiny.
+
+The Pascal-P series of compilers (P1 in 1973, P2 around 1974, P4 as a successor) were portable bootstrap kits: a Pascal compiler written in Pascal that emitted P-code, distributed with a P-code interpreter in a few thousand lines of Pascal. Anyone implementing a P-code interpreter on their hardware got a working Pascal compiler nearly for free. Kenneth Bowles's UCSD team adapted the P2 compiler around 1974–1975, switched it to a byte-oriented encoding, and built the UCSD P-System around it — the version that shipped on the Apple II, IBM PC, and dozens of other machines.
+
+The P-machine's design influence is everywhere: the JVM's frame-and-operand-stack structure, Smalltalk's bytecode dispatch, and the general assumption that "portable compiled language = stack VM + interpreter in C" all trace back to Wirth's eight-instruction sketch. The lesson — that a tiny instruction set can carry a high-level language, if you accept dispatch overhead — remains the foundational bet of every interpreter in this survey.
 
 ## Design Philosophy
 
