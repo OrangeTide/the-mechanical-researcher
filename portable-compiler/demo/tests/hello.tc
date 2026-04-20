@@ -1,0 +1,16 @@
+char msg[] = "hello, world\n";
+
+strlen(s)
+char *s;
+{
+    int n;
+    n = 0;
+    while (s[n] != 0) n = n + 1;
+    return n;
+}
+
+main()
+{
+    write(1, msg, strlen(msg));
+    return 0;
+}

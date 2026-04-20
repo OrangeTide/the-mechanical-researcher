@@ -10,3 +10,4 @@ triton-gpu
 triton-audio
 serialization-formats
 8bit-compilers
+portable-compiler
