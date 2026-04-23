@@ -12,6 +12,7 @@ A collection of research topics, primarily gathered through agentic AI sessions,
 - [Anatomy of a Microkernel](microkernel-architecture/)
 - [Build Systems](build-systems/)
 - [Building a ColdFire V4e Emulator](coldfire-emulator/)
+- [ColdFire Emulator Part 2: Multi-Language Bare-Metal](coldfire-emulator-part-2/)
 - [The Triton: System Emulator and Monitor ROM](triton-system-emulator/)
 - [Triton GPU: Software Rasterizer](triton-gpu/)
 - [Triton Audio: 16-Channel PCM Mixer](triton-audio/)
