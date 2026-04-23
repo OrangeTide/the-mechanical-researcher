@@ -1,0 +1,4 @@
+*.o
+*.elf
+*.ali
+test_harness
