@@ -20,7 +20,7 @@ for bin in "$ROOT"/build/*; do
     name=$(basename "$bin")
     # skip object files and the start runtime
     case $name in
-        *.o|start*) continue ;;
+        *.o|start*|tinc) continue ;;
     esac
     expect_file="$HERE/$name.expect"
     set +e
