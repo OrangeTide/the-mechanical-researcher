@@ -182,11 +182,10 @@ spill rate is essentially zero on realistic programs — the loop in
 
 TinC compiles a subset of pre-ANSI C. It accepts `int` and `char`,
 pointers and arrays of those, globals, functions with old-style
-parameter declarations, the obvious operators, `if`/`while`/`for`'s
-moral equivalents, and recursion. It rejects `struct`, `typedef`,
-floating point, `#include`, and the preprocessor. The six test
-programs cover `hello`, `fib`, `loop`, `spill`, `memcpy`/`strcpy`,
-and a `bsearch`.
+parameter declarations, the obvious operators, `if`/`else`/`while`, and recursion. It rejects `struct`, `typedef`,
+floating point, `#include`, and the preprocessor. The seven test
+programs cover `hello`, `fib`, `loop`, `spill`, `mod`,
+`memcpy`/`strcpy`, and a `bsearch`.
 
 The source is split into three directories — `ir/` for the portable
 IR library, `backend/` for ColdFire code generation, and `tinc/` for

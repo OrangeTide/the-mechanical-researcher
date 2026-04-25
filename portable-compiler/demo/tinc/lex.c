@@ -273,11 +273,9 @@ lex_one(void)
 		return make(T_PIPE);
 	case '+':
 		p++;
-		if (*p == '+') { p++; return make(T_INC); }
 		return make(T_PLUS);
 	case '-':
 		p++;
-		if (*p == '-') { p++; return make(T_DEC); }
 		return make(T_MINUS);
 	}
 

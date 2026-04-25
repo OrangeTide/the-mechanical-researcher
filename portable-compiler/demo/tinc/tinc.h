@@ -21,7 +21,6 @@ enum tok {
 	T_ANDAND, T_OROR,
 	T_EQ, T_NE, T_LT, T_LE, T_GT, T_GE,
 	T_SHL, T_SHR,
-	T_INC, T_DEC,
 };
 
 struct token {
