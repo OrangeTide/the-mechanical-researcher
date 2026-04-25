@@ -16,8 +16,9 @@ code you can run under `qemu-m68k`.
 - Globals may be scalars, 1D arrays, or char-array string literals.
 - Statements: `if / else`, `while`, `break`, `continue`, `return`,
   expression, compound.
-- Full C operator set with precedence climbing, including `&&` and
-  `||` with short-circuit evaluation.
+- C arithmetic, comparison, logical, and bitwise operators with
+  precedence climbing, including `&&` and `||` with short-circuit
+  evaluation.  No `++`/`--`.
 - Hex literals (`0x2a`) and `\xNN` string escapes are supported; other
   escapes are the usual `\n \t \\ \' \" \0`.
 
@@ -50,6 +51,7 @@ demo/
         bsearch.tc       int[] search - walkthrough subject
         loop.tc          primitive fnmatch - break/continue stress
         spill.tc         nested 6-arg calls force register spilling
+        mod.tc           modulo operator under register pressure
         run-tests.sh     runs each test under qemu-m68k
 ```
 

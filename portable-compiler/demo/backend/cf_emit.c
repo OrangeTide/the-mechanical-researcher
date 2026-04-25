@@ -308,10 +308,11 @@ emit_insn(FILE *out, struct ir_func *fn, struct ir_insn *i)
 			fprintf(out, "\tmove.l %s, %%d1\n", sb);
 			sb = "%d1";
 		}
+		fprintf(out, "\tmove.l %s, -(%%sp)\n", sa);
 		fprintf(out, "\tmove.l %s, %%d0\n", sa);
 		fprintf(out, "\t%s %s, %%d0\n", divop, sb);
 		fprintf(out, "\tmuls.l %s, %%d0\n", sb);
-		fprintf(out, "\tmove.l %s, %s\n", sa, sd);
+		fprintf(out, "\tmove.l (%%sp)+, %s\n", sd);
 		fprintf(out, "\tsub.l %%d0, %s\n", sd);
 		wd(out, fn, i->dst, sd);
 		break;
@@ -417,6 +418,7 @@ static void
 emit_function(FILE *out, struct ir_func *fn)
 {
 	struct ir_insn *i;
+	struct ir_insn *last = NULL;
 
 	narg = 0;
 	label_prefix = ++fn_serial;
@@ -425,11 +427,14 @@ emit_function(FILE *out, struct ir_func *fn)
 		fn->name, fn->name);
 	emit_prologue(out, fn);
 
-	for (i = fn->head; i; i = i->next)
+	for (i = fn->head; i; i = i->next) {
 		emit_insn(out, fn, i);
+		if (i->op != IR_FUNC && i->op != IR_ENDF &&
+		    i->op != IR_LABEL)
+			last = i;
+	}
 
-	if (!fn->tail ||
-	    (fn->tail->op != IR_RET && fn->tail->op != IR_RETV))
+	if (!last || (last->op != IR_RET && last->op != IR_RETV))
 		emit_epilogue(out);
 }
 

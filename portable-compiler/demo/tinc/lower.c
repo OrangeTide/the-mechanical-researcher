@@ -453,15 +453,10 @@ lower_expr(struct node *n)
 
 	case N_INDEX:
 		ad = lower_addr(n);
-		{
-			struct val av = lower_expr(n->a);
-			ins = emit((av.base_type == T_CHAR &&
-				    (av.is_ptr || av.is_array))
-				   ? IR_LB : IR_LW);
-			ins->dst = new_temp();
-			ins->a = ad.temp;
-			return mkval(ins->dst, av.base_type, 0);
-		}
+		ins = emit(ad.base_type == T_CHAR ? IR_LB : IR_LW);
+		ins->dst = new_temp();
+		ins->a = ad.temp;
+		return mkval(ins->dst, ad.base_type, 0);
 
 	case N_UNOP:
 		if (n->op == T_STAR) {
