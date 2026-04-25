@@ -399,6 +399,46 @@ emit_insn(FILE *out, struct ir_func *fn, struct ir_insn *i)
 		break;
 	}
 
+	case IR_MARK: {
+		const char *sd = rd(fn, i->dst, 0);
+		int off = slot_offset(fn, i->slot);
+		fprintf(out, "\tmove.l %%fp, %d(%%fp)\n", off);
+		fprintf(out, "\tlea 0(%%sp), %%a0\n");
+		fprintf(out, "\tmove.l %%a0, %d(%%fp)\n", off + 4);
+		fprintf(out, "\tlea .Lmark%d_%d, %%a0\n",
+			label_prefix, i->label);
+		fprintf(out, "\tmove.l %%a0, %d(%%fp)\n", off + 8);
+		fprintf(out, "\tlea %d(%%fp), %%a0\n", off);
+		fprintf(out, "\tmove.l %%a0, __cont_mark_sp\n");
+		fprintf(out, "\tmoveq #0, %%d0\n");
+		fprintf(out, ".Lmark%d_%d:\n", label_prefix, i->label);
+		if (strcmp(sd, "%d0") != 0)
+			fprintf(out, "\tmove.l %%d0, %s\n", sd);
+		wd(out, fn, i->dst, sd);
+		break;
+	}
+
+	case IR_CAPTURE: {
+		const char *sd = rd(fn, i->dst, 0);
+		fprintf(out, "\tmovem.l %%d2-%%d7, -(%%sp)\n");
+		fprintf(out, "\tjsr __cont_capture\n");
+		fprintf(out, "\tmovem.l (%%sp)+, %%d2-%%d7\n");
+		if (strcmp(sd, "%d0") != 0)
+			fprintf(out, "\tmove.l %%d0, %s\n", sd);
+		wd(out, fn, i->dst, sd);
+		break;
+	}
+
+	case IR_RESUME: {
+		const char *sa = rs(out, fn, i->a, 0);
+		const char *sb = rs(out, fn, i->b, 1);
+		fprintf(out, "\tmove.l %s, -(%%sp)\n", sb);
+		fprintf(out, "\tmove.l %s, -(%%sp)\n", sa);
+		fprintf(out, "\tjsr __cont_resume\n");
+		/* __cont_resume does not return here */
+		break;
+	}
+
 	case IR_FUNC:
 	case IR_ENDF:
 		break;
