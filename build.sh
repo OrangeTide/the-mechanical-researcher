@@ -90,7 +90,9 @@ render_template() {
         _key="$1"
         _val="$2"
         # Use awk for safe substitution (no sed delimiter issues)
-        _input="$(printf '%s' "$_input" | awk -v key="{{${_key}}}" -v val="$_val" '{
+        # Pass val via ENVIRON to avoid awk -v interpreting backslash escapes
+        export _AWK_VAL="$_val"
+        _input="$(printf '%s' "$_input" | awk -v key="{{${_key}}}" 'BEGIN{val=ENVIRON["_AWK_VAL"]} {
             idx = index($0, key)
             while (idx > 0) {
                 $0 = substr($0, 1, idx-1) val substr($0, idx+length(key))
@@ -98,6 +100,7 @@ render_template() {
             }
             print
         }')"
+        unset _AWK_VAL
         shift 2
     done
     printf '%s\n' "$_input"
@@ -198,7 +201,7 @@ for index_md in */index.md; do
                 "CATEGORY" "$category" \
                 "SOURCE_ZIP" "" \
                 "ROOT" "$(printf '%s' "$rel" | sed 's|[^/]||g; s|/|../|g').." \
-            | awk -v body="$suppl_body" '{
+            | _AWK_BODY="$suppl_body" awk 'BEGIN{body=ENVIRON["_AWK_BODY"]} {
                 idx = index($0, "{{BODY}}")
                 if (idx > 0) {
                     print substr($0, 1, idx-1)
@@ -230,7 +233,7 @@ for index_md in */index.md; do
             "CATEGORY" "$category" \
             "SOURCE_ZIP" "$source_zip_html" \
             "ROOT" ".." \
-        | awk -v body="$article_body" '{
+        | _AWK_BODY="$article_body" awk 'BEGIN{body=ENVIRON["_AWK_BODY"]} {
             idx = index($0, "{{BODY}}")
             if (idx > 0) {
                 print substr($0, 1, idx-1)
@@ -243,7 +246,7 @@ for index_md in */index.md; do
 
     # Generate and inject TOC (from the rendered HTML, so heading IDs are available)
     article_toc="$(generate_toc "$OUT_DIR/$slug/index.html")"
-    awk -v toc="$article_toc" '{
+    _AWK_TOC="$article_toc" awk 'BEGIN{toc=ENVIRON["_AWK_TOC"]} {
         idx = index($0, "{{TOC}}")
         if (idx > 0) {
             print substr($0, 1, idx-1) toc substr($0, idx+7)
