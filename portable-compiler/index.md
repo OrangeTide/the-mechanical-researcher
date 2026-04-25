@@ -393,8 +393,10 @@ allocator on top.
 
 The lesson of writing one is that the interesting part is not the
 frontend or the backend; it is the contract in the middle. Once the
-contract is fixed, each side becomes almost mechanical. The IR is
-the compiler.
+contract is fixed, each side becomes almost mechanical.  The IR is
+the compiler.  To test that claim, the demo includes a second front
+end — [TinScheme](demo/scheme/) — that compiles a minimal Scheme
+subset to the same IR with zero changes to the backend.
 
 ## Source
 

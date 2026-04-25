@@ -42,6 +42,14 @@ demo/
         parse.c          recursive-descent parser with precedence climb
         lower.c          AST -> 3AC IR (SSA temps, locals in memory)
         main.c           compiler driver
+    scheme/              TinScheme front end (minimal Scheme subset)
+        scheme.h         front-end header
+        gc.h / gc.c      mark-sweep GC and tagged value representation
+        lex.c            S-expression lexer
+        parse.c          recursive-descent S-expression parser
+        lower.c          S-expression AST -> 3AC IR (tagged arithmetic)
+        print.c          S-expression printer
+        main.c           compiler driver
     runtime/
         start.S          _start, write(2), exit(2) for Linux/m68k
     tests/
@@ -52,6 +60,7 @@ demo/
         loop.tc          primitive fnmatch - break/continue stress
         spill.tc         nested 6-arg calls force register spilling
         mod.tc           modulo operator under register pressure
+        scm_fact.scm     TinScheme factorial (recursive, tagged fixnum)
         run-tests.sh     runs each test under qemu-m68k
 ```
 
@@ -95,8 +104,10 @@ qemu-m68k ./prog ; echo $?
 
 ## Status
 
-All compiler passes are implemented. The code is split into three
+All compiler passes are implemented.  The code is split into three
 layers -- `ir/` (portable IR builder), `backend/` (ColdFire code
 generation), and `tinc/` (front end) -- following a Plan 9-style
 shared-source approach so the IR and backend can be reused by other
-front ends.
+front ends.  TinScheme (`scheme/`) is a second front end that proves
+the split works: it compiles a minimal Scheme subset through the same
+IR and backend with no changes to either.
