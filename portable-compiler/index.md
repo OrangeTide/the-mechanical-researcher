@@ -183,9 +183,9 @@ spill rate is essentially zero on realistic programs — the loop in
 TinC compiles a subset of pre-ANSI C. It accepts `int` and `char`,
 pointers and arrays of those, globals, functions with old-style
 parameter declarations, the obvious operators, `if`/`else`/`while`, and recursion. It rejects `struct`, `typedef`,
-floating point, `#include`, and the preprocessor. The seven test
+floating point, `#include`, and the preprocessor. The test
 programs cover `hello`, `fib`, `loop`, `spill`, `mod`,
-`memcpy`/`strcpy`, and a `bsearch`.
+`memcpy`/`strcpy`, `bsearch`, and `cont` (delimited continuations).
 
 The source is split into three directories — `ir/` for the portable
 IR library, `backend/` for ColdFire code generation, and `tinc/` for
@@ -194,15 +194,15 @@ ends.  The pipeline:
 
 | Stage | File | Lines | Output |
 |---|---|---|---|
-| Lexer | `tinc/lex.c` | 306 | token stream |
+| Lexer | `tinc/lex.c` | 304 | token stream |
 | Parser | `tinc/parse.c` | 574 | AST |
-| Lowering | `tinc/lower.c` | 949 | IR |
+| Lowering | `tinc/lower.c` | 973 | IR |
 | Register alloc | `backend/regalloc_cf.c` | 201 | IR + `temp_reg[]` |
-| ColdFire emit | `backend/cf_emit.c` | 516 | `.s` |
+| ColdFire emit | `backend/cf_emit.c` | 561 | `.s` |
 
 ### The IR
 
-Fifty-one opcodes, grouped by purpose:
+Fifty-four opcodes, grouped by purpose:
 
 - **Data moves.** `IR_LIC` loads an immediate, `IR_LEA` takes the
   address of a global symbol, `IR_ADL` takes the address of a local
@@ -217,6 +217,8 @@ Fifty-one opcodes, grouped by purpose:
 - **Control.** `IR_JMP`, `IR_BZ`, `IR_BNZ`, labels.
 - **Calls.** `IR_ARG` pushes an argument, `IR_CALL` calls by name,
   `IR_CALLI` calls through a temp, `IR_RET`/`IR_RETV` return.
+- **Continuations.** `IR_MARK` sets a delimiter, `IR_CAPTURE` saves
+  the stack segment up to it, `IR_RESUME` restores and jumps back.
 - **Framing.** `IR_FUNC`, `IR_ENDF`, `IR_LABEL`.
 
 The memory model is "SSA within, memory between". Inside a basic
@@ -380,6 +382,84 @@ registers, and here is the algorithm that mediates" — is fully
 present and fully working, on a real ISA, through a real emulator, on
 a real test suite.
 
+## The Compounding Effect: Delimited Continuations
+
+The payoff of a shared IR is not code reuse in the abstract — it is
+that a single backend change compounds across every front end.
+Delimited continuations provide a concrete example.
+
+A delimited continuation captures a slice of the call stack — from the
+current point up to a designated delimiter — packages it into a
+buffer, and later resumes execution from that buffer with a new return
+value. Think of `setjmp`/`longjmp` except the saved context is
+copy-on-capture and one-shot: the stack segment between delimiter and
+capture point is memcpy'd to a bump-allocated arena, and resume
+memcpy's it back. The mechanism supports generators, coroutine-style
+producers, and cooperative multitasking patterns that would otherwise
+require OS threads or manual state machines.
+
+Three new IR opcodes implement it:
+
+- **`IR_MARK`** places a delimiter. It saves the frame pointer, stack
+  pointer, and the address of a re-entry label into a 12-byte slot in
+  the local frame, then publishes that slot's address through a global
+  pointer. On first entry, the mark writes zero to its destination
+  temp; after a capture fires, execution resumes at the re-entry label
+  with the destination set to the captured buffer's address.
+
+- **`IR_CAPTURE`** fires the continuation. Inline code pushes
+  `d2`–`d7` (callee-saves), then calls a runtime helper that reads the
+  mark slot, copies the stack segment between the current SP and the
+  mark's saved SP into a heap buffer, and longjmps to the mark's
+  re-entry label with d0 pointing to the buffer.
+
+- **`IR_RESUME`** restores the continuation. The runtime reads the
+  buffer header, restores FP and SP to their captured values, copies the
+  saved stack data back, and executes `rts` — which pops the return
+  address that was on the stack at capture time, landing at the
+  instruction after `IR_CAPTURE` with the resume value in d0.
+
+The runtime implementation (in `start.S`) is roughly 70 instructions
+of ColdFire assembly: a capture routine, a resume routine, a global
+mark-slot pointer, and a 64 KB arena. The key design choice is that
+`__cont_capture` uses `jmp` (not `rts`) to reach the mark's re-entry
+label, because the mark's saved SP points into the middle of the
+function's frame — there is no return address on top. Resume *can* use
+`rts` because the captured stack segment includes the `jsr
+__cont_capture` return address from the capture site.
+
+With these three opcodes in the backend, TinC gains intrinsics
+`__mark()`, `__capture()`, and `__resume(buf, val)`. A TinC program
+builds delimited continuations with explicit control flow:
+
+```c
+produce()
+{
+    int k;
+    k = __capture();
+    return k + 100;
+}
+main()
+{
+    int buf;
+    buf = __mark();
+    if (buf) return __resume(buf, 42);
+    return produce() - 142;
+}
+```
+
+TinScheme gets `shift`, `reset`, and `resume` as special forms — the
+same three opcodes, wrapped in Scheme syntax with tagged-value
+semantics. See [TinScheme's README](demo/scheme/README.html) for
+details.
+
+The engineering lesson: adding those three opcodes required touching
+one backend file (the emitter), one runtime file, and zero lines of
+the register allocator or IR library. Each front end wired in support
+independently — about 30 lines in TinC's lowering, about 60 in
+TinScheme's. One backend investment, two language features, zero
+coordination.
+
 ## Conclusion
 
 Portable compilers differ mostly in how they answer one question: how
@@ -396,7 +476,10 @@ frontend or the backend; it is the contract in the middle. Once the
 contract is fixed, each side becomes almost mechanical.  The IR is
 the compiler.  To test that claim, the demo includes a second front
 end — [TinScheme](demo/scheme/) — that compiles a minimal Scheme
-subset to the same IR with zero changes to the backend.
+subset to the same IR with zero changes to the backend.  Adding
+delimited continuations to the backend took three opcodes and 70
+instructions of runtime — and both front ends gained the feature
+independently.
 
 ## Source
 

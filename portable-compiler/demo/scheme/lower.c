@@ -559,6 +559,95 @@ lower_call(val_t form)
 }
 
 static int
+lower_reset(val_t args)
+{
+    struct ir_insn *ins;
+    val_t body_expr, handler_expr;
+    int slot, tbuf, tbody, lelse, lend;
+    int tresult;
+
+    if (IS_NIL(args) || IS_NIL(gc_cdr(args)))
+        die("lower: (reset body handler) requires two arguments");
+    body_expr = gc_car(args);
+    handler_expr = gc_car(gc_cdr(args));
+
+    slot = alloc_slot(12);
+    lelse = new_label();
+    lend = new_label();
+    tresult = new_temp();
+
+    ins = emit(IR_MARK);
+    ins->dst = new_temp();
+    ins->slot = slot;
+    ins->label = new_label();
+    tbuf = ins->dst;
+
+    /* if mark returned nonzero (shift fired), branch to handler */
+    ins = emit(IR_BNZ);
+    ins->a = tbuf;
+    ins->label = lelse;
+
+    /* First entry: evaluate body */
+    tbody = lower_expr(body_expr);
+    ins = emit(IR_MOV);
+    ins->dst = tresult;
+    ins->a = tbody;
+    ins = emit(IR_JMP);
+    ins->label = lend;
+
+    /* Else branch: shift fired, call handler with buffer */
+    ins = emit(IR_LABEL);
+    ins->label = lelse;
+
+    {
+        int tf, tcall;
+        tf = lower_expr(handler_expr);
+        ins = emit(IR_ARG);
+        ins->a = tbuf;
+        ins->imm = 0;
+        ins = emit(IR_CALLI);
+        ins->dst = new_temp();
+        ins->a = tf;
+        ins->nargs = 1;
+        tcall = ins->dst;
+        ins = emit(IR_MOV);
+        ins->dst = tresult;
+        ins->a = tcall;
+    }
+
+    ins = emit(IR_LABEL);
+    ins->label = lend;
+    return tresult;
+}
+
+static int
+lower_shift(void)
+{
+    struct ir_insn *ins;
+
+    ins = emit(IR_CAPTURE);
+    ins->dst = new_temp();
+    return ins->dst;
+}
+
+static int
+lower_resume(val_t args)
+{
+    struct ir_insn *ins;
+    int tbuf, tval;
+
+    if (IS_NIL(args) || IS_NIL(gc_cdr(args)))
+        die("lower: (resume buf val) requires two arguments");
+    tbuf = lower_expr(gc_car(args));
+    tval = lower_expr(gc_car(gc_cdr(args)));
+
+    ins = emit(IR_RESUME);
+    ins->a = tbuf;
+    ins->b = tval;
+    return new_temp();
+}
+
+static int
 lower_lambda(val_t args)
 {
 	struct ir_insn *ins;
@@ -672,6 +761,13 @@ lower_expr(val_t expr)
 		if (is_sym(head, "quote"))
 			die("lower: quoted expressions not yet "
 			    "supported in codegen");
+
+		if (is_sym(head, "reset"))
+			return lower_reset(rest);
+		if (is_sym(head, "shift"))
+			return lower_shift();
+		if (is_sym(head, "resume"))
+			return lower_resume(rest);
 
 		return lower_call(expr);
 	}

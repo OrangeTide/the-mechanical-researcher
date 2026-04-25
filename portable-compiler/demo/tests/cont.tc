@@ -1,0 +1,36 @@
+/* cont.tc : delimited continuation test (exit 0 = pass)
+ *
+ * Tests __mark/__capture/__resume intrinsics.
+ * The generator pattern: produce() marks, inner() captures and
+ * returns a value through the mark, main resumes to get the next.
+ */
+
+produce()
+{
+    int k;
+    k = __capture();
+    return k + 100;
+}
+
+main()
+{
+    int buf;
+    int r;
+
+    buf = __mark();
+    if (buf) {
+        /* shift fired: buf holds the continuation buffer,
+         * resume it with value 42 */
+        r = __resume(buf, 42);
+        /* __resume does not return */
+    }
+
+    /* first entry: call produce, which captures */
+    r = produce();
+    /* produce's capture longjmps to our mark, so we never reach here
+     * on the first call -- but after resume, produce() returns
+     * capture_value + 100, and that flows back normally */
+    if (r != 142) return 1;
+
+    return 0;
+}

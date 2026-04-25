@@ -51,7 +51,7 @@ demo/
         print.c          S-expression printer
         main.c           compiler driver
     runtime/
-        start.S          _start, write(2), exit(2) for Linux/m68k
+        start.S          _start, write(2), exit(2), continuation runtime
     tests/
         hello.tc         globals, write, strlen
         fib.tc           recursion, callee-save discipline
@@ -60,7 +60,9 @@ demo/
         loop.tc          primitive fnmatch - break/continue stress
         spill.tc         nested 6-arg calls force register spilling
         mod.tc           modulo operator under register pressure
+        cont.tc          delimited continuations (__mark/__capture/__resume)
         scm_fact.scm     TinScheme factorial (recursive, tagged fixnum)
+        scm_shift.scm    TinScheme delimited continuations (shift/reset)
         run-tests.sh     runs each test under qemu-m68k
 ```
 

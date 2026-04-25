@@ -562,6 +562,35 @@ lower_expr(struct node *n)
 		int nargs = 0;
 		struct node *a;
 
+		if (n->a->kind == N_NAME &&
+		    strcmp(n->a->name, "__mark") == 0) {
+			int slot = alloc_slot(12);
+			ins = emit(IR_MARK);
+			ins->dst = new_temp();
+			ins->slot = slot;
+			ins->label = ir_new_label(cur_fn);
+			return mkval(ins->dst, T_INT, 0);
+		}
+		if (n->a->kind == N_NAME &&
+		    strcmp(n->a->name, "__capture") == 0) {
+			ins = emit(IR_CAPTURE);
+			ins->dst = new_temp();
+			return mkval(ins->dst, T_INT, 0);
+		}
+		if (n->a->kind == N_NAME &&
+		    strcmp(n->a->name, "__resume") == 0) {
+			struct val buf, val;
+			a = n->b;
+			if (!a || !a->next)
+				die("__resume requires 2 args");
+			buf = lower_expr(a);
+			val = lower_expr(a->next);
+			ins = emit(IR_RESUME);
+			ins->a = buf.temp;
+			ins->b = val.temp;
+			return mkval(0, T_INT, 0);
+		}
+
 		for (a = n->b; a; a = a->next) {
 			struct val av = lower_expr(a);
 			if (nargs >= 16)

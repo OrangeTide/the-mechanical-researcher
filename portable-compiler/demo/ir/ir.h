@@ -67,6 +67,8 @@ enum ir_op {
 	IR_RET, IR_RETV,
 
 	IR_FUNC, IR_ENDF, IR_LABEL,
+
+	IR_MARK, IR_CAPTURE, IR_RESUME,
 };
 
 /****************************************************************
