@@ -1,6 +1,7 @@
 ---
 title: Portable Compilers - IR Design and Register Allocation
 date: 2026-04-19
+revised: 2026-04-25
 abstract: How multi-target compilers split the frontend from the backend, and what a toy ColdFire compiler teaches about IR shape and linear-scan register allocation.
 category: compilers
 ---
@@ -187,15 +188,18 @@ floating point, `#include`, and the preprocessor. The six test
 programs cover `hello`, `fib`, `loop`, `spill`, `memcpy`/`strcpy`,
 and a `bsearch`.
 
-The pipeline is four files:
+The source is split into three directories — `ir/` for the portable
+IR library, `backend/` for ColdFire code generation, and `tinc/` for
+the front end — so the IR and backend can be reused by other front
+ends.  The pipeline:
 
 | Stage | File | Lines | Output |
 |---|---|---|---|
-| Lexer | `src/lex.c` | 304 | token stream |
-| Parser | `src/parse.c` | 578 | AST |
-| Lowering | `src/lower.c` | 930 | IR |
-| Register alloc | `src/regalloc.c` | 200 | IR + `temp_reg[]` |
-| ColdFire emit | `src/cf_emit.c` | 501 | `.s` |
+| Lexer | `tinc/lex.c` | 306 | token stream |
+| Parser | `tinc/parse.c` | 574 | AST |
+| Lowering | `tinc/lower.c` | 949 | IR |
+| Register alloc | `backend/regalloc_cf.c` | 201 | IR + `temp_reg[]` |
+| ColdFire emit | `backend/cf_emit.c` | 516 | `.s` |
 
 ### The IR
 
@@ -225,7 +229,7 @@ is defensible for a toy and catastrophic for a real compiler.
 
 ### The Allocator
 
-`src/regalloc.c` is a straight transcription of Poletto-Sarkar. It
+`backend/regalloc_cf.c` is a straight transcription of Poletto-Sarkar. It
 reserves `d0` (return value scratch), `d1` (spill-reload scratch),
 `a0`/`a1` (address scratch for the backend), `a6` (frame pointer),
 and `a7` (stack pointer), leaving `d2..d7` — six callee-save
@@ -251,7 +255,7 @@ a real program it would be the first thing to add.
 
 ### The ColdFire Backend
 
-`src/cf_emit.c` is a per-opcode lowering. Each IR instruction turns
+`backend/cf_emit.c` is a per-opcode lowering. Each IR instruction turns
 into one or a few m68k instructions. The backend materialises
 addresses in `a0`/`a1`, handles the frame with `link.w`/`unlk`, saves
 `d2..d7` at function entry with `movem.l`, and follows the SysV m68k
@@ -359,8 +363,8 @@ real C compiler needs, minus the long tail of float, struct, and
 alignment. Lowering is separated cleanly from code generation.
 Register allocation is a real linear scan, not an ad-hoc heuristic.
 The backend respects a real calling convention. Adding a second target
-would mean writing a second `*_emit.c` and nothing else — the IR does
-not know what it came from or where it's going.
+would mean writing a new emitter and allocator in `backend/` — the IR
+does not know what it came from or where it's going.
 
 **Ducks.** No optimisation. No dataflow. No loop transforms. No
 coalescing. No peephole. No scheduling. Cross-block values are

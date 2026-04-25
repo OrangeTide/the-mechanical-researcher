@@ -27,26 +27,30 @@ See `tests/*.tc` for worked examples.
 
 ```
 demo/
-    Makefile           host + cross build rules
-    src/               the compiler, in ~1500 LOC of C
-        tinc.h         shared header: tokens, AST, IR, function decls
-        util.c         die / xmalloc / xstrdup helpers
-        lex.c          hand-written lexer
-        parse.c        recursive-descent parser with precedence climb
-        lower.c        AST -> 3AC IR (SSA temps, locals in memory)
-        regalloc.c     linear-scan allocator + coalescing
-        cf_emit.c      ColdFire/m68k GAS-syntax back end
-        main.c         driver
+    Makefile             host + cross build rules
+    ir/                  portable IR library
+        ir.h             IR types, opcodes, builder API, shared declarations
+        ir.c             IR construction helpers (ir_emit, ir_new_temp, ...)
+        util.c           die / warn / xmalloc / xstrdup helpers
+    backend/             target-specific code generation
+        regalloc_cf.c    linear-scan register allocator (ColdFire d2..d7)
+        cf_emit.c        ColdFire/m68k GAS-syntax back end
+    tinc/                TinC front end
+        tinc.h           front-end header: tokens, AST, lowering entry point
+        lex.c            hand-written lexer
+        parse.c          recursive-descent parser with precedence climb
+        lower.c          AST -> 3AC IR (SSA temps, locals in memory)
+        main.c           compiler driver
     runtime/
-        start.S        _start, write(2), exit(2) for Linux/m68k
+        start.S          _start, write(2), exit(2) for Linux/m68k
     tests/
-        hello.tc       globals, write, strlen
-        fib.tc         recursion, callee-save discipline
-        memcpy.tc      pointer arithmetic, char loads/stores
-        bsearch.tc     int[] search - walkthrough subject
-        loop.tc        primitive fnmatch - break/continue stress
-        spill.tc       nested 6-arg calls force register spilling
-        run-tests.sh   runs each test under qemu-m68k
+        hello.tc         globals, write, strlen
+        fib.tc           recursion, callee-save discipline
+        memcpy.tc        pointer arithmetic, char loads/stores
+        bsearch.tc       int[] search - walkthrough subject
+        loop.tc          primitive fnmatch - break/continue stress
+        spill.tc         nested 6-arg calls force register spilling
+        run-tests.sh     runs each test under qemu-m68k
 ```
 
 ## Prerequisites
@@ -68,9 +72,9 @@ if your toolchain uses different names.
 ## Build and run
 
 ```sh
-make              # build the tinc compiler -> ./tinc
+make              # build the tinc compiler -> build/tinc
 make check        # compile every tests/*.tc, assemble, link, run under qemu
-make clean        # remove ./tinc and build/
+make clean        # remove build/
 ```
 
 `make check` prints `PASS` / `FAIL` per test. Each test program
@@ -80,7 +84,7 @@ integer); tests without such a file must merely exit 0.
 ## Using `tinc` directly
 
 ```sh
-./tinc -o out.s tests/bsearch.tc
+./build/tinc -o out.s tests/bsearch.tc
 m68k-linux-gnu-as -o out.o out.s
 m68k-linux-gnu-as -o start.o runtime/start.S
 m68k-linux-gnu-ld -o prog start.o out.o
@@ -89,6 +93,8 @@ qemu-m68k ./prog ; echo $?
 
 ## Status
 
-The skeleton lands the interfaces, build system, runtime, and test
-corpus. The compiler passes (lex, parse, lower, regalloc, cf_emit)
-are stubbed; the article walks through filling each one in.
+All compiler passes are implemented. The code is split into three
+layers -- `ir/` (portable IR builder), `backend/` (ColdFire code
+generation), and `tinc/` (front end) -- following a Plan 9-style
+shared-source approach so the IR and backend can be reused by other
+front ends.
