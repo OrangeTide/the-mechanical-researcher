@@ -22,9 +22,10 @@ BE_SRC  := backend/regalloc_cf.c backend/cf_emit.c
 TC_SRC  := tinc/lex.c tinc/parse.c tinc/lower.c tinc/main.c
 SRC     := $(IR_SRC) $(BE_SRC) $(TC_SRC)
 
-TESTS := $(wildcard tests/*.tc)
+TESTS     := $(wildcard tests/*.tc)
+SCM_TESTS := $(wildcard tests/scm_*.scm)
 
-all: build/tinc
+all: build/tinc build/tinscheme
 
 build/tinc: $(SRC) ir/ir.h tinc/tinc.h | build
 	$(CC) $(CFLAGS) -Iir -Itinc -o $@ $(SRC)
@@ -46,10 +47,28 @@ build/%: build/%.o build/start.o
 build:
 	mkdir -p build
 
-check: build/tinc $(TESTS:tests/%.tc=build/%)
+check: build/tinc $(TESTS:tests/%.tc=build/%) $(SCM_TESTS:tests/%.scm=build/%)
 	@sh tests/run-tests.sh "$(QEMU)"
+
+## TinScheme compiler
+SC_SRC := scheme/lex.c scheme/parse.c scheme/print.c scheme/main.c scheme/gc.c \
+          scheme/lower.c $(IR_SRC) $(BE_SRC)
+
+build/tinscheme: $(SC_SRC) scheme/scheme.h scheme/gc.h ir/ir.h | build
+	$(CC) $(CFLAGS) -Ischeme -Iir -o $@ $(SC_SRC)
+
+## TinScheme codegen tests (.scm -> .s via tinscheme)
+build/scm_%.s: tests/scm_%.scm build/tinscheme | build
+	./build/tinscheme -o $@ $<
+
+## TinScheme GC test (host-only)
+build/test_gc: scheme/test_gc.c scheme/gc.c scheme/gc.h | build
+	$(CC) $(CFLAGS) -Ischeme -o $@ scheme/test_gc.c scheme/gc.c
+
+test-gc: build/test_gc
+	./build/test_gc
 
 clean:
 	rm -rf build
 
-.PHONY: all check clean
+.PHONY: all check test-gc test-parse clean
