@@ -109,16 +109,21 @@ drives RTL, once in the target hooks that GIMPLE consults.
 
 ### TCC: No IR At All
 
-Fabrice Bellard's Tiny C Compiler has no IR. The parser emits x86
-machine code directly as it walks the input, using a small value stack
-to track whether the "current expression" lives in a register, on the
-stack, in a global, or as an immediate. A conditional branch turns
-into a forward jump with a patch list; a backward branch resolves when
-the label appears.
+Fabrice Bellard's Tiny C Compiler has no IR. The parser drives
+per-target code generation directly as it walks the input — each
+architecture provides a backend (`i386-gen.c`, `x86_64-gen.c`,
+`arm-gen.c`, etc.) that emits native machine code when the parser
+calls `gen_op()` and friends. A small value stack tracks whether the
+"current expression" lives in a register, on the stack, in a global,
+or as an immediate — the parser pushes operands, calls a gen function,
+and the backend emits instructions immediately. This is not a
+portable IR; it is five separate direct-emission backends behind a
+shared parser. A conditional branch turns into a forward jump with a
+patch list; a backward branch resolves when the label appears.
 
 TCC is fast (it is often used as a JIT) and small (roughly 20 kLOC
 for the core — lexer, preprocessor, and a single-architecture
-backend; all backends and utilities together reach around 55 kLOC,
+backend; all backends and utilities together reach around 64 kLOC,
 but that is no longer an apples-to-apples comparison),
 and it produces mediocre code. The one-pass design is incompatible
 with most optimisations because there is no place to put an
