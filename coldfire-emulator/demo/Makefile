@@ -75,7 +75,28 @@ instrtest-qemu: $(QEMU_INSTR)
 valgrind: $(HARNESS) $(TEST_ELF)
 	valgrind --leak-check=full ./$(HARNESS) $(TEST_ELF)
 
+# Coverage analysis with gcov
+COV_CFLAGS  = -Wall -Wextra -O0 -g --coverage
+COV_HARNESS = test_harness_cov
+COV_SMOKE   = smoke_test_cov
+
+coldfire_cov.o: coldfire.c coldfire.h
+	$(CC) $(COV_CFLAGS) -c -o $@ coldfire.c
+
+$(COV_SMOKE): smoke_test.c coldfire_cov.o coldfire.h
+	$(CC) $(COV_CFLAGS) -o $@ smoke_test.c coldfire_cov.o -lm
+
+$(COV_HARNESS): test_harness.c coldfire_cov.o elf_loader.c coldfire.h elf_loader.h
+	$(CC) $(COV_CFLAGS) -o $@ test_harness.c coldfire_cov.o elf_loader.c -lm
+
+coverage: $(COV_SMOKE) $(COV_HARNESS) $(INSTR_ELF)
+	rm -f *.gcda
+	./$(COV_SMOKE)
+	./$(COV_HARNESS) $(INSTR_ELF)
+	gcov -o coldfire_cov.gcno coldfire.c
+
 clean:
 	rm -f $(HARNESS) $(SMOKE) $(TEST_ELF) $(QEMU_VALID) $(INSTR_ELF) $(QEMU_INSTR)
+	rm -f $(COV_SMOKE) $(COV_HARNESS) *.gcno *.gcda *.gcov
 
-.PHONY: all test smoke disasm sections validate valgrind instrtest instrtest-qemu clean
+.PHONY: all test smoke disasm sections validate valgrind instrtest instrtest-qemu coverage clean

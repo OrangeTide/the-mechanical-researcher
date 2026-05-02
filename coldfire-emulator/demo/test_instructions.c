@@ -1625,6 +1625,285 @@ test_legacy(void)
     GROUP_END();
 }
 
+/* ── ISA_C instructions: FF1, BYTEREV ────────────────────── */
+/* GAS rejects these with -mcpu=5475, so we hand-assemble them. */
+
+static void
+test_isac(void)
+{
+    uint32_t r;
+
+    GROUP_BEGIN("isac (ff1/byterev)");
+
+    /* FF1 D0: find first 1 in 0x80000000 → result 0 */
+    __asm__ volatile(
+        "move.l #0x80000000, %%d0\n\t"
+        ".short 0x04C0\n\t"     /* ff1 d0 */
+        "move.l %%d0, %0"
+        : "=m"(r) : : "d0");
+    CHECK(r == 0);
+
+    /* FF1 D1: find first 1 in 0x00010000 → result 15 */
+    __asm__ volatile(
+        "move.l #0x00010000, %%d1\n\t"
+        ".short 0x04C1\n\t"     /* ff1 d1 */
+        "move.l %%d1, %0"
+        : "=m"(r) : : "d1");
+    CHECK(r == 15);
+
+    /* FF1 D2: find first 1 in 0x00000001 → result 31 */
+    __asm__ volatile(
+        "move.l #0x00000001, %%d2\n\t"
+        ".short 0x04C2\n\t"     /* ff1 d2 */
+        "move.l %%d2, %0"
+        : "=m"(r) : : "d2");
+    CHECK(r == 31);
+
+    /* FF1 D3: find first 1 in 0x00000000 → result 32 */
+    __asm__ volatile(
+        "move.l #0, %%d3\n\t"
+        ".short 0x04C3\n\t"     /* ff1 d3 */
+        "move.l %%d3, %0"
+        : "=m"(r) : : "d3");
+    CHECK(r == 32);
+
+    /* FF1 D7: test different register */
+    __asm__ volatile(
+        "move.l #0x0F000000, %%d7\n\t"
+        ".short 0x04C7\n\t"     /* ff1 d7 */
+        "move.l %%d7, %0"
+        : "=m"(r) : : "d7");
+    CHECK(r == 4);
+
+    /* BYTEREV D0: 0x12345678 → 0x78563412 */
+    __asm__ volatile(
+        "move.l #0x12345678, %%d0\n\t"
+        ".short 0x02C0\n\t"     /* byterev d0 */
+        "move.l %%d0, %0"
+        : "=m"(r) : : "d0");
+    CHECK(r == 0x78563412);
+
+    /* BYTEREV D1: 0x00000001 → 0x01000000 */
+    __asm__ volatile(
+        "move.l #0x00000001, %%d1\n\t"
+        ".short 0x02C1\n\t"     /* byterev d1 */
+        "move.l %%d1, %0"
+        : "=m"(r) : : "d1");
+    CHECK(r == 0x01000000);
+
+    /* BYTEREV D7: 0xFF000000 → 0x000000FF */
+    __asm__ volatile(
+        "move.l #0xFF000000, %%d7\n\t"
+        ".short 0x02C7\n\t"     /* byterev d7 */
+        "move.l %%d7, %0"
+        : "=m"(r) : : "d7");
+    CHECK(r == 0x000000FF);
+
+    /* BYTEREV double: swap and swap back = original */
+    __asm__ volatile(
+        "move.l #0xDEADBEEF, %%d0\n\t"
+        ".short 0x02C0\n\t"     /* byterev d0 */
+        ".short 0x02C0\n\t"     /* byterev d0 */
+        "move.l %%d0, %0"
+        : "=m"(r) : : "d0");
+    CHECK(r == 0xDEADBEEF);
+
+    GROUP_END();
+}
+
+/* ── EMAC instructions: MAC.L, MSAC.L, register moves ───── */
+/* These use hand-assembled opcodes because the assembler
+ * mnemonics for EMAC are difficult to get right with GAS. */
+
+static void
+test_emac(void)
+{
+    uint32_t r;
+
+    GROUP_BEGIN("emac");
+
+    /* MOVE D0 → MACSR: set signed mode (SU=1) */
+    /* Encoding: 1010 100 1 0 0 000 000 = 0xA900 (MACSR, dir=0, Dn=D0) */
+    __asm__ volatile(
+        "move.l #0x40, %%d0\n\t"    /* SU bit = 0x40 */
+        ".short 0xA900\n\t"         /* move d0, macsr */
+        : : : "d0");
+
+    /* MOVE MACSR → D1: read it back */
+    /* Encoding: 1010 100 1 1 0 000 001 = 0xA981 */
+    __asm__ volatile(
+        ".short 0xA981\n\t"         /* move macsr, d1 */
+        "move.l %%d1, %0"
+        : "=m"(r) : : "d1");
+    CHECK(r == 0x40);
+
+    /* MOVE D0 → MASK register */
+    /* Encoding: 1010 110 1 0 0 000 000 = 0xAD00 */
+    __asm__ volatile(
+        "move.l #0xFFFF0000, %%d0\n\t"
+        ".short 0xAD00\n\t"         /* move d0, mask */
+        : : : "d0");
+
+    /* MOVE MASK → D1: read it back */
+    /* Encoding: 1010 110 1 1 0 000 001 = 0xAD81 */
+    __asm__ volatile(
+        ".short 0xAD81\n\t"         /* move mask, d1 */
+        "move.l %%d1, %0"
+        : "=m"(r) : : "d1");
+    CHECK(r == 0xFFFF0000);
+
+    /* Clear MACSR for fresh MAC test */
+    __asm__ volatile(
+        "move.l #0x40, %%d0\n\t"    /* SU=1, signed mode */
+        ".short 0xA900\n\t"         /* move d0, macsr */
+        : : : "d0");
+
+    /* MOVE D0 → ACC0: set accumulator to 0 */
+    /* Encoding: 1010 000 1 0 0 000 000 = 0xA100 */
+    __asm__ volatile(
+        "move.l #0, %%d0\n\t"
+        ".short 0xA100\n\t"         /* move d0, acc0 */
+        : : : "d0");
+
+    /* MAC.L D0, D1, ACC0: 3 * 5 = 15
+     * opword:  1010 000 0 0 0 000 001 = 0xA001 ... no, that's a hypercall.
+     * MAC.L encoding: 1010 Rx(2:0) a ACC[0] Ul Ry(2:0)
+     *   Rx=D0(000), a=0(data), ACC[0]=0, Ul=0, Ry=D1(001)
+     *   → 1010 000 0 0 0 000 001 = 0xA001
+     * But 0xA001 conflicts with hypercall. Use different registers.
+     * MAC.L D2, D3, ACC0:
+     *   Rx=D2(010), a=0, ACC[0]=0, Ul=0, Ry=D3(011)
+     *   → 1010 010 0 0 0 000 011 = 0xA403
+     * Extension: 0000 1 SF(00) sub(0) 000 ACC[1](0) 0000
+     *   → 0000 1 00 0 000 0 0000 = 0x0800 */
+    __asm__ volatile(
+        "move.l #3, %%d2\n\t"
+        "move.l #5, %%d3\n\t"
+        ".short 0xA403\n\t"         /* mac.l d2, d3, acc0 (opword) */
+        ".short 0x0800\n\t"         /* extension: no scale, MAC, acc0 */
+        : : : "d2", "d3");
+
+    /* MOVE ACC0 → D0: read accumulator */
+    /* Encoding: 1010 000 1 1 0 000 000 = 0xA180 */
+    __asm__ volatile(
+        ".short 0xA180\n\t"         /* move acc0, d0 */
+        "move.l %%d0, %0"
+        : "=m"(r) : : "d0");
+    CHECK(r == 15);
+
+    /* MAC.L again: accumulate 3*5 + 4*6 = 15 + 24 = 39 */
+    __asm__ volatile(
+        "move.l #4, %%d2\n\t"
+        "move.l #6, %%d3\n\t"
+        ".short 0xA403\n\t"         /* mac.l d2, d3, acc0 */
+        ".short 0x0800\n\t"         /* extension */
+        : : : "d2", "d3");
+
+    __asm__ volatile(
+        ".short 0xA180\n\t"         /* move acc0, d0 */
+        "move.l %%d0, %0"
+        : "=m"(r) : : "d0");
+    CHECK(r == 39);
+
+    /* MSAC.L D2, D3, ACC0: 39 - 2*10 = 19
+     * Same opword as MAC but extension has sub=1
+     * Extension: 0000 1 00 1 000 0 0000 = 0x0900 */
+    __asm__ volatile(
+        "move.l #2, %%d2\n\t"
+        "move.l #10, %%d3\n\t"
+        ".short 0xA403\n\t"         /* msac.l d2, d3, acc0 (opword) */
+        ".short 0x0900\n\t"         /* extension: no scale, MSAC, acc0 */
+        : : : "d2", "d3");
+
+    __asm__ volatile(
+        ".short 0xA180\n\t"         /* move acc0, d0 */
+        "move.l %%d0, %0"
+        : "=m"(r) : : "d0");
+    CHECK(r == 19);
+
+    /* MAC.L with scale <<1: ACC1 = 0 + (3*4)<<1 = 24
+     * Use ACC1: ACC[0]=1 in opword (bit 7), ACC[1]=0 in ext
+     * opword: 1010 010 0 1 0 000 011 = 0xA483
+     * Extension: 0000 1 01 0 000 0 0000 = 0x0A00 (SF=01 = <<1) */
+    __asm__ volatile(
+        "move.l #0, %%d0\n\t"
+        ".short 0xA300\n\t"         /* move d0, acc1 (1010 001 1 0 0 000 000) */
+        "move.l #3, %%d2\n\t"
+        "move.l #4, %%d3\n\t"
+        ".short 0xA483\n\t"         /* mac.l d2, d3, acc1 */
+        ".short 0x0A00\n\t"         /* extension: scale <<1, MAC, acc1 */
+        : : : "d0", "d2", "d3");
+
+    /* MOVE ACC1 → D0 */
+    /* Encoding: 1010 001 1 1 0 000 000 = 0xA380 */
+    __asm__ volatile(
+        ".short 0xA380\n\t"         /* move acc1, d0 */
+        "move.l %%d0, %0"
+        : "=m"(r) : : "d0");
+    CHECK(r == 24);
+
+    /* MAC.L with scale >>1: ACC2 = 0 + (100*100)>>1 = 5000
+     * ACC2: ACC[0]=0 in opword, ACC[1]=1 in ext
+     * opword: 1010 010 0 0 0 000 011 = 0xA403
+     * Extension: 0000 1 11 0 000 1 0000 = 0x0E10 (SF=11 = >>1, ACC[1]=1) */
+    __asm__ volatile(
+        "move.l #0, %%d0\n\t"
+        ".short 0xA500\n\t"         /* move d0, acc2 (1010 010 1 0 0 000 000) */
+        "move.l #100, %%d2\n\t"
+        "move.l #100, %%d3\n\t"
+        ".short 0xA403\n\t"         /* mac.l d2, d3, acc2 */
+        ".short 0x0E10\n\t"         /* extension: scale >>1, MAC, acc2 */
+        : : : "d0", "d2", "d3");
+
+    /* MOVE ACC2 → D0 */
+    /* Encoding: 1010 010 1 1 0 000 000 = 0xA580 */
+    __asm__ volatile(
+        ".short 0xA580\n\t"         /* move acc2, d0 */
+        "move.l %%d0, %0"
+        : "=m"(r) : : "d0");
+    CHECK(r == 5000);
+
+    /* MACSR N flag: accumulate a negative result */
+    __asm__ volatile(
+        "move.l #0, %%d0\n\t"
+        ".short 0xA100\n\t"         /* move d0, acc0 — clear acc0 */
+        "move.l #0x40, %%d0\n\t"    /* SU=1 */
+        ".short 0xA900\n\t"         /* move d0, macsr */
+        "move.l #-5, %%d2\n\t"
+        "move.l #3, %%d3\n\t"
+        ".short 0xA403\n\t"         /* mac.l d2, d3, acc0 */
+        ".short 0x0800\n\t"         /* extension */
+        : : : "d0", "d2", "d3");
+
+    __asm__ volatile(
+        ".short 0xA981\n\t"         /* move macsr, d1 */
+        "move.l %%d1, %0"
+        : "=m"(r) : : "d1");
+    CHECK(r & 0x08);               /* N flag set */
+    CHECK(!(r & 0x04));            /* Z flag clear */
+
+    /* MACSR Z flag: accumulate to zero */
+    __asm__ volatile(
+        "move.l #0, %%d0\n\t"
+        ".short 0xA100\n\t"         /* clear acc0 */
+        "move.l #0x40, %%d0\n\t"
+        ".short 0xA900\n\t"         /* macsr = SU */
+        "move.l #0, %%d2\n\t"
+        "move.l #99, %%d3\n\t"
+        ".short 0xA403\n\t"         /* mac.l d2, d3, acc0 */
+        ".short 0x0800\n\t"
+        : : : "d0", "d2", "d3");
+
+    __asm__ volatile(
+        ".short 0xA981\n\t"         /* move macsr, d1 */
+        "move.l %%d1, %0"
+        : "=m"(r) : : "d1");
+    CHECK(r & 0x04);               /* Z flag set */
+    CHECK(!(r & 0x08));            /* N flag clear */
+
+    GROUP_END();
+}
+
 /* ── Entry point ──────────────────────────────────────────── */
 
 void _start(void) __attribute__((section(".text.entry")));
@@ -1654,9 +1933,10 @@ _start(void)
     test_fpu();
     test_ccr();
 #ifndef QEMU_USERMODE
-    /* Legacy instructions (ROR, EXG) only work on our emulator,
-     * not QEMU which enforces strict ColdFire ISA */
+    /* These use hand-assembled opcodes that QEMU may not support */
     test_legacy();
+    test_isac();
+    test_emac();
 #endif
 
     result_pass = g_pass;
