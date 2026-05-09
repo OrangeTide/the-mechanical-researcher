@@ -1,0 +1,21 @@
+msc {
+    hscale="1.4", wordwraparcs=on;
+
+    c [label="Client"],
+    s [label="Server"];
+
+    --- [label="QuakeWorld", textcolour="#555"];
+    c -> s [label="connectionless challenge req"];
+    s -> c [label="challenge response"];
+    c -> s [label="connect + challenge token"];
+    s -> c [label="accept (first sequenced pkt)"];
+
+    --- [label="ENet", textcolour="#555"];
+    c -> s [label="CONNECT"];
+    s -> c [label="VERIFY_CONNECT"];
+    c -> s [label="ACK"];
+
+    --- [label="Netchan", textcolour="#555"];
+    c -> s [label="CONNECT_INIT (id + version)"];
+    s -> c [label="CONNECT_ACCEPT (id + version + timeout)"];
+}
