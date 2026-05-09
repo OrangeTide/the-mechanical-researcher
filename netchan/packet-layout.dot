@@ -1,0 +1,17 @@
+digraph packet_layout {
+    rankdir=LR;
+    node [shape=record, fontname="IBM Plex Mono", fontsize=10, style=filled];
+    edge [style=invis];
+
+    label="Netchan Data Packet Layout";
+    labelloc=t;
+    fontname="IBM Plex Sans";
+    fontsize=13;
+
+    hdr [label="{flags\n1B|conn ID\n4B|pkt seq\n2B}", fillcolor="#f5f0e6"];
+    f1 [label="{type\n0x09|chan\n1B|seq\n2B|len\n2B|frag idx\n1B|frag total\n1B|payload\n...}", fillcolor="#e8f0e8"];
+    f2 [label="{type\n0x0A|chan\n1B|ack seq\n2B}", fillcolor="#e6e8f5"];
+    pad [label="{0x00 padding\nto MTU}", fillcolor="#f0f0f0"];
+
+    hdr -> f1 -> f2 -> pad;
+}
