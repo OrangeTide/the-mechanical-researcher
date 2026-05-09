@@ -208,6 +208,8 @@ The frame types:
 
 Channels are the core abstraction. Each connection supports up to 256 channels, opened dynamically with a type, direction, and optional content-type string. Server-allocated channels get even IDs; client-allocated channels get odd IDs, preventing collisions.
 
+Each channel maintains its own sequence counters, reorder buffer, and receive queue. A lost packet affecting channel A doesn't block delivery on channel B, eliminating the head-of-line blocking problem that motivates the entire design. Multiple channels share a UDP packet (fate sharing on the wire), but once received, each channel delivers independently.
+
 Two channel types are implemented:
 
 **Unreliable channels** deliver best-effort datagrams with no sequencing. Fragments are reassembled on arrival, but a lost fragment means a lost message. This is the right mode for position updates, input snapshots, and other data that expires quickly.
@@ -294,6 +296,7 @@ Nine tests exercise the protocol end-to-end using loopback helpers that shuttle 
 | Channels/streams | 1 | Up to 255 | Unlimited | Up to 256 |
 | Fragmentation | No | Yes | Yes | Yes (32 frags) |
 | Flow control | No | Throttle + bandwidth limit | Per-stream + connection | Per-channel window |
+| Head-of-line blocking | Yes (single stream) | Per-channel (independent) | Per-stream (independent) | Per-channel (independent) |
 | Congestion control | No | RTT-based throttle | Pluggable (NewReno/BBR) | No |
 | Encryption | No | No | Mandatory TLS 1.3 | No (layer externally) |
 | Connection migration | No | No | Yes | Yes |
@@ -339,6 +342,62 @@ All figures exclude the 28-byte UDP/IPv4 (or 48-byte UDP/IPv6) header that every
 | Turn-based/strategy | Poor | Good | Viable | Good |
 | MMO (1,000+ connections) | N/A | Possible | Possible | Possible |
 | Web-based game | N/A | N/A | Natural fit | N/A |
+
+## Congestion Control Strategies
+
+TCP's congestion control has evolved through four generations, and game protocols borrow selectively from that history.
+
+### TCP's Evolution
+
+**Reno** (1990) established the loss-based template still used today. The sender grows its congestion window (CWND) linearly until a packet is lost, then halves it. This additive-increase/multiplicative-decrease (AIMD) cycle produces a characteristic sawtooth pattern in throughput. Reno works, but it discovers the network's capacity by exceeding it: every growth phase ends with a lost packet.
+
+**CUBIC** (2006, Linux default since 2.6.19) replaces Reno's linear growth with a cubic function that probes aggressively far from the last loss point and cautiously near it. CUBIC reaches full link utilization faster than Reno but causes more retransmissions in the process, and it dominates competing Reno flows unfairly by consuming buffer capacity that forces Reno to back off.
+
+**Vegas** (1994) took a different approach: measure RTT continuously and slow down when round-trip times increase, before any packet is lost. Vegas produces far fewer retransmissions than loss-based algorithms. The tradeoff is fatal in practice: Vegas is too passive to compete for bandwidth against loss-based senders. A Reno or CUBIC flow sharing a bottleneck will fill the buffer, inflate the RTT, and starve Vegas into a fraction of its fair share.
+
+**BBR** (2016, Google) models the bottleneck bandwidth and minimum RTT directly, pacing packets to match the measured capacity rather than probing until loss. BBR competes effectively against both CUBIC and Reno without relying on packet loss as a signal. It cycles through probing phases (startup, drain, steady-state bandwidth probing) to maintain high utilization without sustained buffer bloat. See Harsha Kapadia's [TCP version performance comparison](https://harshkapadia2.github.io/tcp-version-performance-comparison/) for measured throughput and fairness data across these algorithms.
+
+### How Game Protocols Approach Congestion
+
+Game traffic has a different shape than web or file transfer traffic. A game server sends 20-60 snapshots per second at a roughly constant rate, each snapshot small enough to fit in one or two UDP packets. There is no bulk transfer to ramp up, no slow start phase, and no flow that runs for minutes at full speed. The congestion control problem is less "how fast can I fill this pipe" and more "am I overwhelming this particular client's last-mile link."
+
+**QuakeWorld** ignores congestion entirely. The server sends at a fixed tick rate regardless of network conditions. If the client's connection can't keep up, packets are lost and the client sees glitches. This works because Quake's traffic is small (a few hundred bytes per tick) and was designed for point-to-point play where the game server is the dominant sender.
+
+**ENet** implements a throttle that adjusts per-peer send rates based on RTT variance. The throttle scale (0-32) ramps down when RTT becomes inconsistent, reducing the number of packets sent per interval. Static bandwidth limits (bytes/second) can also be configured per host. This is closer to Vegas than to Reno: it responds to delay rather than loss. ENet avoids the Vegas starvation problem by operating on a dedicated UDP port where it doesn't compete with TCP flows for buffer space.
+
+**QUIC** supports pluggable congestion control. Most implementations ship with NewReno (a minor improvement over Reno that handles multiple losses within a single window better) and optionally BBR. The congestion controller operates per-connection, not per-stream. QUIC's loss detection is more sophisticated than TCP's, using packet number spaces and explicit ACK ranges rather than TCP's cumulative sequence numbers.
+
+**Netchan** has no congestion control. It relies on per-channel flow control (WINDOW_UPDATE frames) to prevent a fast sender from overrunning a slow receiver, but it makes no attempt to detect or respond to network congestion. For a 16-player game server sending small snapshots at a fixed tick rate, this is usually acceptable: the traffic volume is low enough that congestion is rare on any link faster than dial-up.
+
+### Adding Congestion Control to Netchan
+
+Congestion manifests as five observable symptoms, roughly in order of onset: rising latency (packets queue longer at bottleneck routers), increasing jitter (delay becomes unpredictable), packet loss (router buffers overflow), retransmissions (reliable channels resend lost data, adding to the load), and falling throughput (useful data delivered per second drops). An application sitting on top of netchan can already observe the first two through PING/PONG RTT measurements and the last three through ACK gaps and retransmission counts.
+
+Before choosing an algorithm, the goals need to be ranked. The five standard objectives are:
+
+| Goal | Priority for Games |
+|------|-------------------|
+| Low delay (keep queues short) | Critical; 50ms of added latency is visible to players |
+| Stability (avoid oscillations) | High; constant rate changes cause visible stutter |
+| Fast recovery (bounce back after congestion) | High; a brief spike shouldn't ruin the next 5 seconds |
+| Fair sharing (don't starve other flows) | Moderate; game traffic is usually small relative to the link |
+| High throughput (use the link fully) | Low; games send kilobytes per second, not megabytes |
+
+This priority ordering is almost the inverse of TCP's, where throughput comes first and latency is an afterthought. It explains why TCP congestion algorithms are a poor fit for game traffic even when the detection mechanisms are sound.
+
+Congestion control algorithms fall into two broad categories. **Feedback (closed-loop)** algorithms detect and react to symptoms: packet loss (Reno, CUBIC), rising delay (Vegas), or a model of both (BBR). TCP's classic congestion-avoidance algorithm is closed-loop: the sender probes for capacity by increasing its send rate until loss occurs, then backs off. All four TCP algorithms described above are feedback-based. Some networks can also signal congestion directly through Explicit Congestion Notification (ECN), where routers mark packets rather than dropping them, giving the sender an earlier signal than loss. **Prevention (open-loop)** algorithms take structural steps that discourage congestion from forming: admission control (reject new connections when the server is full), traffic shaping (smooth bursty sends into a steady rate), and priority-based scheduling (send important data first when bandwidth is limited).
+
+For netchan, a practical congestion response would combine elements from both categories:
+
+**Detection.** Netchan already measures RTT via PING/PONG at 5-second intervals. Exposing `rtt_ms` and a smoothed RTT minimum through the public API would let the application detect congestion the same way Vegas does: when the current RTT exceeds the baseline minimum by more than a threshold, congestion is likely. Tracking per-channel retransmission counts (already maintained internally as `nc_outgoing.attempts`) would add a loss-based signal for confirmation. Neither requires protocol changes; both are internal state that the API could expose with a getter function.
+
+**Active queue management.** Netchan's send path already packs frames from multiple channels into each outgoing UDP packet. Because the application drives sends on a timer (typically once per tick), there is always a next packet scheduled. The sender can choose what goes into that packet based on channel priority: drop stale unreliable snapshots, defer low-priority reliable messages, and reserve space for critical channels. This is prevention-based congestion control at the application layer, and netchan's channel model supports it naturally. A channel priority field in `netchan_chan_open()` and a "drop oldest unsent" policy for unreliable channels would formalize what most game servers do ad hoc.
+
+**Rate adjustment.** When RTT rises above the baseline, the application can reduce its tick rate for the affected connection (e.g., drop from 60 to 30 snapshots per second), increase delta compression to shrink each snapshot, or close optional channels entirely. This is coarser than TCP's window-based approach but better suited to game traffic, where the send rate is already discrete and the application knows which data matters.
+
+**User-space limitations.** A kernel TCP stack can observe its own socket write queue drain rate and adjust pacing accordingly. User-space UDP has no equivalent: the kernel's socket send buffer is a simple FIFO that the application can fill but cannot introspect. Setting a very small `SO_SNDBUF` and using `poll()` write-ready events could expose back-pressure from the kernel, but this is inefficient in practice and not portable across operating systems. RTT measurement and loss detection at the application layer are more reliable signals than trying to infer kernel buffer state.
+
+The simplest useful addition to netchan would be three things: expose RTT and retransmission statistics through the API, add an optional channel priority field, and document a recommended detection threshold (e.g., current RTT > 1.5x smoothed minimum triggers the application to reduce its send rate). The actual rate adjustment stays in the application, where the game server knows which data can be dropped, compressed, or deferred.
 
 ## When to Use What
 
