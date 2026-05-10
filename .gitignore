@@ -13,3 +13,5 @@ triton-audio/demo/triton
 serialization-formats/demo/demo
 serialization-formats/demo/sensor.h
 serialization-formats/demo/sensor.c
+netchan/demo/netchan_test
+netchan/demo/netchan_example

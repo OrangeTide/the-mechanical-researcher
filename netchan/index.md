@@ -152,7 +152,7 @@ QUIC's unreliable datagram extension (RFC 9221) narrows the gap, but the fundame
 
 ## Netchan
 
-Netchan is a multiplexed UDP channel protocol implemented in 1,398 lines of C (139-line header, 1,398-line implementation) with no external dependencies beyond POSIX sockets. The companion source (`netchan.h`, `netchan.c`, `netchan_test.c`) builds with a single `make` invocation and runs nine protocol-level tests. It doesn't require tens of thousands of lines of code to provide per-channel reliability, flow control, fragmentation, and connection migration.
+Netchan is a multiplexed UDP channel protocol implemented in 1,437 lines of C (160-line header, 1,437-line implementation) with no external dependencies beyond POSIX sockets. The companion source (`netchan.h`, `netchan.c`, `netchan_test.c`) builds with a single `make` invocation and runs ten protocol-level tests. It doesn't require tens of thousands of lines of code to provide per-channel reliability, flow control, fragmentation, connection migration, and congestion detection statistics.
 
 ### Design Goals
 
@@ -262,6 +262,10 @@ int netchan_chan_read(ch, buf, buflen);
 
 /* events */
 int netchan_poll(conn, &ev);
+
+/* statistics — for congestion detection and diagnostics */
+void netchan_conn_stats(conn, &stats);  /* RTT, packet counts */
+void netchan_chan_stats(ch, &stats);     /* msgs sent/acked/recv, retransmissions */
 ```
 
 The `netchan_peek_id()` function extracts the connection ID from a raw packet without full parsing, enabling the application to demultiplex packets across multiple connections using a single socket.
@@ -270,7 +274,7 @@ The library never allocates a socket, never calls `sendto()`, and never uses glo
 
 ### Test Coverage
 
-Nine tests exercise the protocol end-to-end using loopback helpers that shuttle packets between two in-process connections:
+Ten tests exercise the protocol end-to-end using loopback helpers that shuttle packets between two in-process connections:
 
 | Test | Coverage |
 |------|----------|
@@ -283,6 +287,7 @@ Nine tests exercise the protocol end-to-end using loopback helpers that shuttle 
 | Channel close | Graceful channel teardown |
 | Peek ID | Packet demultiplexing utility |
 | Graceful disconnect | Clean shutdown, no leaks |
+| Stats | Connection and channel statistics counters |
 
 ## Comparison
 
@@ -317,10 +322,10 @@ All figures exclude the 28-byte UDP/IPv4 (or 48-byte UDP/IPv6) header that every
 
 | Metric | QuakeWorld | ENet | QUIC (quiche) | Netchan |
 |--------|-----------|------|---------------|---------|
-| Implementation LOC | ~400 | ~5,000 | ~100,000+ | 1,398 |
-| Header LOC | Inline | ~400 | Thousands | 139 |
+| Implementation LOC | ~400 | ~5,000 | ~100,000+ | 1,437 |
+| Header LOC | Inline | ~400 | Thousands | 160 |
 | External dependencies | None | None | TLS library | None |
-| API functions | ~5 | ~50 | ~100+ | 20 |
+| API functions | ~5 | ~50 | ~100+ | 22 |
 | Build complexity | Part of engine | autotools/CMake | Cargo + system TLS | Single `cc` invocation |
 
 ### Reliability Mechanisms
@@ -389,7 +394,7 @@ Congestion control algorithms fall into two broad categories. **Feedback (closed
 
 For netchan, a practical congestion response would combine elements from both categories:
 
-**Detection.** Netchan already measures RTT via PING/PONG at 5-second intervals. Exposing `rtt_ms` and a smoothed RTT minimum through the public API would let the application detect congestion the same way Vegas does: when the current RTT exceeds the baseline minimum by more than a threshold, congestion is likely. Tracking per-channel retransmission counts (already maintained internally as `nc_outgoing.attempts`) would add a loss-based signal for confirmation. Neither requires protocol changes; both are internal state that the API could expose with a getter function.
+**Detection.** Netchan measures RTT via PING/PONG at 5-second intervals. The `netchan_conn_stats()` function exposes the current `rtt_ms` and the smoothed minimum `rtt_min_ms`, letting the application detect congestion the same way Vegas does: when the current RTT exceeds the baseline minimum by more than a threshold, congestion is likely. The `netchan_chan_stats()` function reports per-channel `retransmissions` and `msgs_acked` counts, adding a loss-based signal for confirmation. Neither required protocol changes; both expose internal state through getter functions.
 
 **Active queue management.** Netchan's send path already packs frames from multiple channels into each outgoing UDP packet. Because the application drives sends on a timer (typically once per tick), there is always a next packet scheduled. The sender can choose what goes into that packet based on channel priority: drop stale unreliable snapshots, defer low-priority reliable messages, and reserve space for critical channels. This is prevention-based congestion control at the application layer, and netchan's channel model supports it naturally. A channel priority field in `netchan_chan_open()` and a "drop oldest unsent" policy for unreliable channels would formalize what most game servers do ad hoc.
 
@@ -397,7 +402,7 @@ For netchan, a practical congestion response would combine elements from both ca
 
 **User-space limitations.** A kernel TCP stack can observe its own socket write queue drain rate and adjust pacing accordingly. User-space UDP has no equivalent: the kernel's socket send buffer is a simple FIFO that the application can fill but cannot introspect. Setting a very small `SO_SNDBUF` and using `poll()` write-ready events could expose back-pressure from the kernel, but this is inefficient in practice and not portable across operating systems. RTT measurement and loss detection at the application layer are more reliable signals than trying to infer kernel buffer state.
 
-The simplest useful addition to netchan would be three things: expose RTT and retransmission statistics through the API, add an optional channel priority field, and document a recommended detection threshold (e.g., current RTT > 1.5x smoothed minimum triggers the application to reduce its send rate). The actual rate adjustment stays in the application, where the game server knows which data can be dropped, compressed, or deferred.
+Netchan's stats API already covers the detection side: `netchan_conn_stats()` reports RTT and packet counts, `netchan_chan_stats()` reports per-channel message and retransmission counts. A recommended detection threshold (e.g., current RTT > 1.5x smoothed minimum triggers the application to reduce its send rate) and an optional channel priority field for send-path scheduling are natural next steps. The actual rate adjustment stays in the application, where the game server knows which data can be dropped, compressed, or deferred.
 
 ## When to Use What
 
