@@ -74,6 +74,20 @@ struct netchan_event {
     uint32_t redirect_conn_id;
 };
 
+struct netchan_conn_stats {
+    uint32_t rtt_ms;
+    uint32_t rtt_min_ms;
+    uint32_t pkts_sent;
+    uint32_t pkts_recv;
+};
+
+struct netchan_chan_stats {
+    uint32_t msgs_sent;
+    uint32_t msgs_acked;
+    uint32_t retransmissions;
+    uint32_t msgs_recv;
+};
+
 /****************************************************************
  * Configuration
  ****************************************************************/
@@ -135,5 +149,12 @@ int netchan_chan_read(struct netchan_chan *ch, void *buf, size_t buflen);
  ****************************************************************/
 
 int netchan_poll(struct netchan_conn *c, struct netchan_event *ev);
+
+/****************************************************************
+ * Statistics -- for congestion detection and diagnostics
+ ****************************************************************/
+
+void netchan_conn_stats(struct netchan_conn *c, struct netchan_conn_stats *s);
+void netchan_chan_stats(struct netchan_chan *ch, struct netchan_chan_stats *s);
 
 #endif /* NETCHAN_H */

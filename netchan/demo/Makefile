@@ -10,7 +10,9 @@ CFLAGS += $(if $(PKGS),$(shell pkg-config --cflags $(PKGS)))
 LDLIBS += $(if $(PKGS),$(shell pkg-config --libs $(PKGS)))
 CPPFLAGS += -Iinclude/
 RM ?= rm -f
-all :: netchan_test
-clean :: ; $(RM) netchan_test
+all :: netchan_test netchan_example
+clean :: ; $(RM) netchan_test netchan_example
 netchan_test : netchan_test.c netchan.c netchan.h
 	$(CC) $(CFLAGS) -o $@ netchan_test.c netchan.c
+netchan_example : netchan_example.c netchan.c netchan.h
+	$(CC) $(CFLAGS) -o $@ netchan_example.c netchan.c

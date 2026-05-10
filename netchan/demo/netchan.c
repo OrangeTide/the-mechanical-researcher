@@ -177,6 +177,12 @@ struct netchan_chan {
     uint8_t  need_ack;
     uint16_t ack_seq;
     uint8_t  need_window_update;
+
+    /* stats counters */
+    uint32_t msgs_sent;
+    uint32_t msgs_acked;
+    uint32_t retransmissions;
+    uint32_t msgs_recv;
 };
 
 struct netchan_conn {
@@ -194,6 +200,9 @@ struct netchan_conn {
     uint32_t ping_sent_ms;
     uint32_t ping_opaque;
     uint32_t rtt_ms;
+    uint32_t rtt_min_ms;
+    uint32_t pkts_sent;
+    uint32_t pkts_recv;
     struct netchan_cfg cfg;
 
     struct netchan_chan *channels[NC_MAX_CHANNELS];
@@ -405,6 +414,7 @@ chan_recv_enqueue(struct netchan_chan *ch, const uint8_t *data, size_t len)
     ch->recv_queue[ch->rq_tail].len = len;
     ch->rq_tail = next;
     ch->recv_buffered += len;
+    ch->msgs_recv++;
     return NETCHAN_OK;
 }
 
@@ -568,6 +578,8 @@ process_pong(struct netchan_conn *c, const uint8_t *p, size_t len)
     if (opaque == c->ping_opaque && c->ping_sent_ms) {
         uint32_t now = nc_now_ms();
         c->rtt_ms = now - c->ping_sent_ms;
+        if (c->rtt_min_ms == 0 || c->rtt_ms < c->rtt_min_ms)
+            c->rtt_min_ms = c->rtt_ms;
         c->ping_sent_ms = 0;
     }
     return 5;
@@ -778,6 +790,7 @@ process_ack(struct netchan_conn *c, const uint8_t *p, size_t len)
         int16_t diff = (int16_t)(o->seq - acked_seq);
         if (diff <= 0) {
             ch->bytes_in_flight -= o->len;
+            ch->msgs_acked++;
             free(o->data);
             o->data = NULL;
             o->active = 0;
@@ -1031,6 +1044,7 @@ netchan_feed(struct netchan_conn *c, const void *pkt, size_t len,
     }
 
     c->last_recv_ms = nc_now_ms();
+    c->pkts_recv++;
     return parse_frames(c, p + hdr_size, len - hdr_size);
 }
 
@@ -1046,7 +1060,7 @@ netchan_send_next(struct netchan_conn *c, void *buf, size_t buflen,
         for (int i = 0; i < NC_MAX_CHANNELS; i++) {
             struct netchan_chan *ch = c->channels[i];
             if (!ch || ch->role != 0) continue;
-            if (ch->out_head != ch->out_tail)
+            if (ch->state == 1 && ch->out_head != ch->out_tail)
                 has_data = 1;
             if (ch->need_ack || ch->need_window_update)
                 has_data = 1;
@@ -1175,6 +1189,7 @@ netchan_send_next(struct netchan_conn *c, void *buf, size_t buflen,
     }
 
     c->last_send_ms = nc_now_ms();
+    c->pkts_sent++;
     return pos;
 }
 
@@ -1250,6 +1265,7 @@ netchan_service(struct netchan_conn *c, uint32_t now_ms)
                 o->frag_sent = 0;
                 o->sent_ms = now_ms;
                 o->attempts++;
+                ch->retransmissions++;
             } else {
                 int remain = timeout - elapsed;
                 if (next_ms < 0 || (int)remain < next_ms)
@@ -1356,6 +1372,7 @@ netchan_chan_write(struct netchan_chan *ch, const void *data, size_t len)
     if (ch->type == NETCHAN_RELIABLE)
         ch->bytes_in_flight += len;
 
+    ch->msgs_sent++;
     ch->out_tail = next;
     return (int)len;
 }
@@ -1395,4 +1412,26 @@ netchan_poll(struct netchan_conn *c, struct netchan_event *ev)
         *ev = c->events[c->ev_head];
     c->ev_head = (c->ev_head + 1) % NC_EVENT_QUEUE;
     return 1;
+}
+
+/****************************************************************
+ * Public API -- Statistics
+ ****************************************************************/
+
+void
+netchan_conn_stats(struct netchan_conn *c, struct netchan_conn_stats *s)
+{
+    s->rtt_ms = c->rtt_ms;
+    s->rtt_min_ms = c->rtt_min_ms;
+    s->pkts_sent = c->pkts_sent;
+    s->pkts_recv = c->pkts_recv;
+}
+
+void
+netchan_chan_stats(struct netchan_chan *ch, struct netchan_chan_stats *s)
+{
+    s->msgs_sent = ch->msgs_sent;
+    s->msgs_acked = ch->msgs_acked;
+    s->retransmissions = ch->retransmissions;
+    s->msgs_recv = ch->msgs_recv;
 }

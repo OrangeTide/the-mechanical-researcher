@@ -572,6 +572,81 @@ test_graceful_disconnect(void)
     PASS();
 }
 
+static void
+test_stats(void)
+{
+    TEST(stats);
+
+    struct netchan_conn *client = netchan_open(0);
+    struct netchan_conn *server = netchan_open(1);
+
+    struct sockaddr_in caddr = make_addr(0x7f000001, 10010);
+    struct sockaddr_in saddr = make_addr(0x7f000001, 20010);
+
+    netchan_connect(client, (struct sockaddr *)&saddr, sizeof(saddr));
+    pump(client, server, (struct sockaddr *)&caddr, sizeof(caddr));
+    netchan_accept(server);
+    pump_both(client, server,
+              (struct sockaddr *)&caddr, sizeof(caddr),
+              (struct sockaddr *)&saddr, sizeof(saddr));
+
+    struct netchan_event ev;
+    while (netchan_poll(client, &ev)) {}
+    while (netchan_poll(server, &ev)) {}
+
+    /* conn stats should have non-zero packet counts from handshake */
+    struct netchan_conn_stats cs;
+    netchan_conn_stats(client, &cs);
+    CHECK(cs.pkts_sent > 0, "client pkts_sent should be > 0 after handshake");
+    CHECK(cs.pkts_recv > 0, "client pkts_recv should be > 0 after handshake");
+
+    /* open a reliable channel and send 3 messages */
+    struct netchan_chan *ch = netchan_chan_open(client, NETCHAN_RELIABLE,
+                                               NETCHAN_DIR_SEND, "stats-test");
+    CHECK(ch != NULL, "chan_open failed");
+    pump_both(client, server,
+              (struct sockaddr *)&caddr, sizeof(caddr),
+              (struct sockaddr *)&saddr, sizeof(saddr));
+    while (netchan_poll(server, &ev)) {}
+    while (netchan_poll(client, &ev)) {}
+
+    for (int i = 0; i < 3; i++) {
+        char msg[32];
+        snprintf(msg, sizeof(msg), "msg-%d", i);
+        int wr = netchan_chan_write(ch, msg, strlen(msg));
+        CHECK(wr > 0, "write failed");
+        pump_both(client, server,
+                  (struct sockaddr *)&caddr, sizeof(caddr),
+                  (struct sockaddr *)&saddr, sizeof(saddr));
+    }
+
+    /* drain server events and read data */
+    struct netchan_chan *sch = NULL;
+    while (netchan_poll(server, &ev)) {
+        if (ev.type == NETCHAN_EV_DATA && ev.ch)
+            sch = ev.ch;
+    }
+    CHECK(sch != NULL, "no data on server");
+
+    char buf[256];
+    while (netchan_chan_read(sch, buf, sizeof(buf)) > 0) {}
+
+    /* check channel stats */
+    struct netchan_chan_stats send_stats;
+    netchan_chan_stats(ch, &send_stats);
+    CHECK(send_stats.msgs_sent == 3, "expected 3 msgs_sent");
+    CHECK(send_stats.msgs_acked == 3, "expected 3 msgs_acked");
+    CHECK(send_stats.retransmissions == 0, "unexpected retransmissions");
+
+    struct netchan_chan_stats recv_stats;
+    netchan_chan_stats(sch, &recv_stats);
+    CHECK(recv_stats.msgs_recv == 3, "expected 3 msgs_recv");
+
+    netchan_close(client);
+    netchan_close(server);
+    PASS();
+}
+
 int
 main(void)
 {
@@ -586,6 +661,7 @@ main(void)
     test_channel_close();
     test_peek_id();
     test_graceful_disconnect();
+    test_stats();
 
     printf("\n%d/%d tests passed\n", tests_passed, tests_run);
     return tests_passed == tests_run ? 0 : 1;
