@@ -1,7 +1,7 @@
 ---
 title: Building a ColdFire V4e Emulator
 date: 2026-03-25
-revised: 2026-05-02
+revised: 2026-05-11
 abstract: "From ISA selection through implementation — a standalone ColdFire V4e CPU emulator in C, validated against GCC-compiled bare-metal programs"
 category: systems
 ---
@@ -12,13 +12,13 @@ When a project needs an embedded CPU — a control system simulator, a retro com
 
 The trade-off is straightforward. A custom bytecode VM can be arbitrarily simple — the Quake 3 VM is 60 opcodes and 2,000 lines of C — but it requires building an entire toolchain from scratch. A real ISA comes with GCC, LLVM, debuggers, and disassemblers out of the box, but it carries decades of design decisions that the emulator must faithfully reproduce. The question is which real architecture minimizes that burden while maximizing what the toolchain can do.
 
-We evaluated fourteen architectures across six dimensions — address space, arithmetic capabilities, implementation complexity, toolchain availability, sandboxing potential, and developer experience — and arrived at Motorola's ColdFire V4e: a simplified derivative of the 68000 family designed for embedded systems, with hardware multiply, divide, and floating-point in a package that compiles to 2,372 lines of C.
+We evaluated fourteen architectures across six dimensions — address space, arithmetic capabilities, implementation complexity, toolchain availability, sandboxing potential, and developer experience — and arrived at Motorola's ColdFire V4e: a simplified derivative of the 68000 family designed for embedded systems, with hardware multiply, divide, and floating-point in a package that compiles to 2,545 lines of C.
 
 This article walks through the selection process, the architecture's instruction encoding, the emulator implementation, and the testing strategy. The complete source code is available as a companion download.
 
 ## Abstract
 
-We compare fourteen CPU architectures for embeddable emulation, evaluating 8-bit through 64-bit designs from the 6809 to Alpha. Five finalists — RISC-V RV32IM, MIPS32, Motorola 68000, PDP-11, and SuperH SH-2 — are analyzed in depth, with GCC cross-compilation tests revealing that ColdFire V4e is the only target where every arithmetic operation (32-bit add, multiply, divide, remainder, and all floating-point operations) compiles to a single hardware instruction. We implement a complete ColdFire V4e emulator in 2,372 lines of C: integer core, FPU, EMAC, exception handling, and a callback-based memory bus with zero heap allocation. The emulator is validated against GCC 13 cross-compiled bare-metal programs covering recursion, integer arithmetic, bit manipulation, and IEEE-754 floating-point, passing all tests in 1,528 executed instructions.
+We compare fourteen CPU architectures for embeddable emulation, evaluating 8-bit through 64-bit designs from the 6809 to Alpha. Five finalists — RISC-V RV32IM, MIPS32, Motorola 68000, PDP-11, and SuperH SH-2 — are analyzed in depth, with GCC cross-compilation tests revealing that ColdFire V4e is the only target where every arithmetic operation (32-bit add, multiply, divide, remainder, and all floating-point operations) compiles to a single hardware instruction. We implement a complete ColdFire V4e emulator in 2,545 lines of C: integer core, FPU, EMAC, exception handling, and a callback-based memory bus with zero heap allocation. The emulator is validated against GCC 13 cross-compiled bare-metal programs covering recursion, integer arithmetic, bit manipulation, and IEEE-754 floating-point, passing all tests in 1,528 executed instructions.
 
 ## Choosing an Architecture
 
@@ -187,15 +187,15 @@ V4e is the clear choice. The FPU adds 300–450 LOC but eliminates all floating-
 
 | Component | Estimated | Actual |
 |---|---|---|
-| CPU state + init | ~60 | 76 |
-| Decoder (main switch) | 280–430 | 62 |
-| EA engine | 200–300 | 194 |
-| Integer handlers (groups 0–E) | 900–1,400 | 1,457 |
-| Condition codes | 150–200 | 119 |
-| FPU (group F) | 300–450 | 323 |
-| Exceptions/interrupts | 100–180 | 31 |
-| Memory bus + helpers | — | 110 |
-| **Total** | **2,080–3,120** | **2,372** |
+| CPU state + init | ~60 | 79 |
+| Decoder (main switch) | 280–430 | 55 |
+| EA engine | 200–300 | 190 |
+| Integer handlers (groups 0–E) | 900–1,400 | 1,559 |
+| Condition codes | 150–200 | 115 |
+| FPU (group F) | 300–450 | 363 |
+| Exceptions/interrupts | 100–180 | 97 |
+| Memory bus + helpers | — | 121 |
+| **Total** | **2,080–3,120** | **2,545** |
 
 The actual implementation landed squarely within the estimate, slightly below the midpoint. The decoder came in much smaller than estimated because the two-level switch is just a dispatch table — the real decode logic lives in each group handler.
 
@@ -253,7 +253,7 @@ NXP acquired Freescale in 2015, and ColdFire became a legacy product line — st
 
 The gold standard for 68K emulation is Karl Stenerud's [Musashi](https://github.com/kstenerud/Musashi), used in MAME and numerous retro computing projects. Musashi covers the full 68000/68010/68020/68EC020 instruction set across approximately 6,500 lines of C generated from a code generator that processes instruction tables. It aims for cycle-accurate emulation of the classic 68K family.
 
-Our emulator has a different goal. It implements the ColdFire V4e ISA specifically — the simplified instruction set with its restrictions and additions — in 2,372 lines of handwritten C. It does not aim for cycle accuracy. It provides a callback-based memory bus for embedding, zero heap allocation, and enough fidelity to run GCC-compiled bare-metal programs. Where Musashi emulates vintage hardware for preservation, this emulator is designed for embedding a real ISA into new projects — control system simulators, sandboxed plugin environments, or any application where users need to write C for a target that the host fully controls.
+Our emulator has a different goal. It implements the ColdFire V4e ISA specifically — the simplified instruction set with its restrictions and additions — in 2,545 lines of handwritten C. It does not aim for cycle accuracy. It provides a callback-based memory bus for embedding, zero heap allocation, and enough fidelity to run GCC-compiled bare-metal programs. Where Musashi emulates vintage hardware for preservation, this emulator is designed for embedding a real ISA into new projects — control system simulators, sandboxed plugin environments, or any application where users need to write C for a target that the host fully controls.
 
 ## Instruction Encoding
 
@@ -276,11 +276,11 @@ Many instructions require *extension words* — additional 16-bit or 32-bit valu
 
 | Group | Hex | Instructions | Sub-dispatch |
 |---|---|---|---|
-| 0 | `0x0` | ORI, ANDI, SUBI, ADDI, EORI, CMPI, BTST/BCHG/BCLR/BSET | Bits 11–9 (immediate type) |
+| 0 | `0x0` | ORI, ANDI, SUBI, ADDI, EORI, CMPI, BTST/BCHG/BCLR/BSET, FF1, BYTEREV | Bits 11–9 (immediate type) |
 | 1 | `0x1` | MOVE.B | Dual EA fields (src + dst) |
 | 2 | `0x2` | MOVE.L | Dual EA fields (src + dst) |
 | 3 | `0x3` | MOVE.W | Dual EA fields (src + dst) |
-| 4 | `0x4` | LEA, PEA, CLR, NEG, NOT, EXT, SWAP, MOVEM, TRAP, LINK, UNLK, RTS, RTE, JSR, JMP, TST, MULS.L, DIVS.L, HALT, NOP, FF1 | Bits 11–6 (largest group) |
+| 4 | `0x4` | LEA, PEA, CLR, NEG, NOT, EXT, SWAP, MOVEM, TRAP, LINK, UNLK, RTS, RTE, JSR, JMP, TAS, TST, MULS.L, DIVS.L, HALT, NOP | Bits 11–6 (largest group) |
 | 5 | `0x5` | ADDQ, SUBQ, Scc | Bit 8 (add/sub vs. set) |
 | 6 | `0x6` | Bcc, BRA, BSR | Bits 11–8 (14 conditions + always + subroutine) |
 | 7 | `0x7` | MOVEQ, MVS, MVZ | Bit 8 (0=MOVEQ, 1=MVS/MVZ) |
@@ -377,6 +377,9 @@ typedef struct cf_cpu {
     int      halted;
     uint64_t cycles;        /* instruction counter */
     int      fault;         /* set on bus/address error */
+    uint8_t  fault_status;  /* FS bits for access error frame */
+    int      in_exception;  /* double-fault detection */
+    cf_trace_t trace;       /* diagnostic event ring buffer */
 
     /* Memory bus callbacks */
     cf_read_fn  read8, read16, read32;
@@ -446,7 +449,7 @@ int cf_step(cf_cpu *cpu)
 
 ### The EA Engine
 
-The effective address engine is the emulator's most reusable component — approximately 190 lines that serve almost every instruction. It decodes the 6-bit mode:register field into an `ea_loc` descriptor, then separate `read_ea` and `write_ea` functions access the described location:
+The effective address engine is the emulator's most reusable component — approximately 200 lines that serve almost every instruction. It decodes the 6-bit mode:register field into an `ea_loc` descriptor, then separate `read_ea` and `write_ea` functions access the described location:
 
 ```c
 typedef struct {
@@ -466,14 +469,20 @@ static ea_loc decode_ea(cf_cpu *cpu, int mode, int reg, int sz)
     case 2: /* (An) */
         loc.type = 2;  loc.addr = cpu->a[reg];
         break;
-    case 3: /* (An)+ */
+    case 3: { /* (An)+ */
+        int inc = size_bytes(sz);
+        if (reg == 7 && inc < 2) inc = 2;
         loc.type = 2;  loc.addr = cpu->a[reg];
-        cpu->a[reg] += size_bytes(sz);
+        cpu->a[reg] += inc;
         break;
-    case 4: /* -(An) */
-        cpu->a[reg] -= size_bytes(sz);
+    }
+    case 4: { /* -(An) */
+        int dec = size_bytes(sz);
+        if (reg == 7 && dec < 2) dec = 2;
+        cpu->a[reg] -= dec;
         loc.type = 2;  loc.addr = cpu->a[reg];
         break;
+    }
     case 5: { /* (d16, An) */
         int16_t disp = (int16_t)fetch16(cpu);
         loc.type = 2;  loc.addr = cpu->a[reg] + disp;
@@ -485,7 +494,7 @@ static ea_loc decode_ea(cf_cpu *cpu, int mode, int reg, int sz)
 }
 ```
 
-Post-increment (mode 3) and pre-decrement (mode 4) modify the address register as a side effect of decoding — the adjustment depends on the operand size, so byte operations increment by 1, word by 2, long by 4. This side effect is why EA decode must happen in the right order when an instruction has both source and destination EA fields.
+Post-increment (mode 3) and pre-decrement (mode 4) modify the address register as a side effect of decoding — the adjustment depends on the operand size (byte by 1, word by 2, long by 4), with an exception: A7 (the stack pointer) always adjusts by at least 2, even for byte operations, to maintain word alignment on the stack. This side effect is why EA decode must happen in the right order when an instruction has both source and destination EA fields.
 
 Mode 7 overloads the register field for five additional modes. The PC-relative modes (7/2, 7/3) capture the PC *before* fetching the displacement extension word — this is a common source of off-by-two errors if the implementation fetches the extension word before saving the base PC.
 
@@ -577,17 +586,33 @@ static void exec_move(cf_cpu *cpu, uint16_t op, int sz)
 
 MOVEA (destination mode 1, address register) is handled inline — it sign-extends the source value and does not affect condition codes. This is true for all address register writes on the 68K family: address registers are always 32-bit and never set flags.
 
-#### Group 4: The HALT-Before-TST Gotcha
+#### Group 4: Opcode Ordering in a Pattern-Matching Decoder
 
-Group 4 is the largest group, containing twenty-plus instruction types identified by various bit patterns. The trickiest interaction is between HALT and TST:
+Group 4 is the largest group, containing twenty-plus instruction types identified by various bit patterns. Several encodings overlap, and the decoder must check specific opcodes before broader patterns:
 
 ```c
 static void exec_group4(cf_cpu *cpu, uint16_t op)
 {
-    /* HALT : 0100 1010 1100 1000 — must check before TST */
+    /* HALT : 0100 1010 1100 1000 — must check before TAS and TST */
     if (op == 0x4AC8) {
+        if (!is_supervisor(cpu)) {
+            cf_exception(cpu, CF_VEC_PRIVILEGE);
+            return;
+        }
         cpu->halted = 1;
         return;
+    }
+
+    /* ILLEGAL : 0100 1010 1111 1100 — must check before TAS */
+    if (op == 0x4AFC) {
+        cf_exception(cpu, CF_VEC_ILLEGAL);
+        return;
+    }
+
+    /* TAS <ea> : 0100 1010 11 eee rrr — must check before TST */
+    if ((op & 0xFFC0) == 0x4AC0) {
+        /* read byte, set N/Z flags, write back with bit 7 set */
+        /* ... */
     }
 
     /* TST <ea> : 0100 1010 ss eee rrr */
@@ -600,7 +625,9 @@ static void exec_group4(cf_cpu *cpu, uint16_t op)
 }
 ```
 
-HALT's opcode is `0x4AC8`. TST's pattern is `0x4Axx`. The overlap: HALT matches TST's pattern with size bits = 11 (binary), which is an invalid size encoding. If TST is checked first, HALT is misidentified as TST with an invalid size field and raises an illegal instruction exception instead of halting. The fix is to check for the exact HALT opcode before the broader TST pattern — ordering matters in a pattern-matching decoder.
+Three overlapping patterns require careful ordering. HALT (`0x4AC8`) and ILLEGAL (`0x4AFC`) are exact opcodes that fall within TAS's range (`0x4AC0` mask `0xFFC0`), which in turn falls within TST's range (`0x4A00` mask `0xFF00`). If TAS is checked first, ILLEGAL is misidentified as TAS on register D4. If TST is checked first, all three are misidentified as TST with an invalid size field.
+
+HALT is a privileged instruction: executing it in user mode raises a privilege violation exception instead of halting. This matches the ColdFire specification, where HALT is restricted to supervisor mode along with STOP, RTE, and control register moves.
 
 #### Group 7: MOVEQ vs. MVS/MVZ
 
@@ -740,27 +767,52 @@ Exceptions — traps, illegal instructions, divide-by-zero, privilege violations
 ```c
 void cf_exception(cf_cpu *cpu, int vector)
 {
+    /* Record diagnostic trace event */
+    uint8_t tt = vec_to_trace_type(vector);
+    if (tt != CF_TR_NONE) {
+        uint16_t opword = 0;
+        if (cpu->pc >= 2)
+            opword = (uint16_t)cpu->read16(cpu->bus_ctx, cpu->pc - 2);
+        cf_trace_push(&cpu->trace, tt, cpu->pc, opword, 0, NULL);
+    }
+
+    /* Double fault: exception during exception frame construction */
+    if (cpu->in_exception) {
+        cf_trace_push(&cpu->trace, CF_TR_DOUBLE_FAULT, cpu->pc, 0, 0, NULL);
+        cpu->fault = 1;
+        cpu->halted = 1;
+        cpu->in_exception = 0;
+        return;
+    }
+    cpu->in_exception = 1;
+
     uint32_t old_sr = cpu->sr;
 
-    /* Enter supervisor mode, raise interrupt mask */
+    /* Enter supervisor mode, clear trace */
     cpu->sr |= CF_SR_S;
     cpu->sr &= ~CF_SR_T;
 
-    /* Push exception frame: PC, SR, format word */
+    /* Push exception frame: format word, SR, PC */
     cpu->a[7] -= 4;
     bus_write32(cpu, cpu->a[7], cpu->pc);
     cpu->a[7] -= 2;
     bus_write16(cpu, cpu->a[7], old_sr & 0xFFFF);
     cpu->a[7] -= 2;
     uint16_t fmt = (4 << 12) | ((vector & 0xFF) << 2);
+    if (vector == CF_VEC_ACCESS_ERROR)
+        fmt |= (cpu->fault_status & 0x3) << 10;
     bus_write16(cpu, cpu->a[7], fmt);
 
     /* Fetch handler from vector table */
     cpu->pc = bus_read32(cpu, cpu->vbr + (uint32_t)vector * 4);
+    cpu->halted = 0;
+    cpu->in_exception = 0;
 }
 ```
 
-The exception frame pushed to the supervisor stack contains the saved PC, saved SR, and a ColdFire-format word (format 4, distinct from the 68000's format 0). The test harness uses `TRAP #0` (vector 32) to signal program completion — the trap vector points to a `HALT` instruction, which sets the `halted` flag and stops execution.
+The exception frame pushed to the supervisor stack contains the saved PC, saved SR, and a ColdFire-format word (format 4, distinct from the 68000's format 0). For access error exceptions, the format word's FS field (bits 11–10) encodes the fault status from `cpu->fault_status`, allowing exception handlers to distinguish read/write faults. The test harness uses `TRAP #0` (vector 32) to signal program completion — the trap vector points to a `HALT` instruction, which sets the `halted` flag and stops execution.
+
+Every exception pushes a diagnostic event into the trace ring buffer before frame construction begins. The `vec_to_trace_type` helper maps vector numbers to trace event types, so the host can inspect the exception history after execution completes. If a second exception fires while `in_exception` is set (during the stack frame push), the CPU records a double-fault event and halts, matching real ColdFire behavior where a bus error during exception processing is unrecoverable.
 
 ### Hypercalls
 
@@ -858,11 +910,11 @@ The compiled test program exercises 29 unique instruction mnemonics:
 
 This is not exhaustive coverage of the ColdFire instruction set, but it covers the instructions GCC actually emits for real C programs — which is what matters for a practical emulator.
 
-A separate comprehensive test suite exercises 162 individual checks across all instruction groups — including ISA_C instructions (FF1, BYTEREV), EMAC operations (MAC.L, MSAC.L, register moves), condition code behavior, and hand-assembled legacy instructions (ROR, EXG) that GAS rejects for the V4e target. Code coverage analysis via `gcov` shows 70.96% of the emulator's 1,515 executable lines are exercised by the combined test suite.
+A separate comprehensive test suite exercises 72 individual checks across all instruction groups — including ISA_C instructions (FF1, BYTEREV), EMAC operations (MAC.L, MSAC.L, register moves, MASK), TAS, FMOVEM predecrement, RTE format validation, access error fault status, FMOVE multi-register system control transfers, condition code behavior, and hand-assembled legacy instructions (ROR, EXG) that GAS rejects for the V4e target.
 
-### The Smoke Test
+### The Self-Contained Test
 
-Running the full test requires the m68k cross-compiler toolchain. For environments without cross-tools, the smoke test embeds the compiled binary directly as a C array with disassembly comments:
+Running the full cross-compiled test requires the m68k toolchain. For environments without cross-tools, `test_coldfire.c` embeds the compiled binary directly as a C array with disassembly comments and adds unit-style tests for features that the cross-compiled program does not exercise:
 
 ```c
 static const uint8_t test_image[] = {
@@ -878,11 +930,26 @@ static const uint8_t test_image[] = {
 };
 ```
 
-The array is generated from `objdump` output using a shell script (`bin2c.sh`) that extracts hex bytes and preserves the disassembly as inline comments. This makes the binary self-documenting — any reader can see exactly which instructions are encoded — and the smoke test can be compiled and run with just the host compiler: `gcc smoke_test.c coldfire.c -lm`.
+The embedded binary covers the five original compute tests (fibonacci, GCD, sum, bit manipulation, FPU square root). Beyond that, `test_coldfire.c` injects hand-assembled opcodes into the emulator's memory to test features the cross-compiled program does not reach:
+
+| Category | Tests | What They Exercise |
+|---|---|---|
+| Compute (embedded binary) | 5 | Recursion, REMU.L, loops, shifts, FPU |
+| Hypercall | 2 | LINE_A intercept, unhandled fallthrough |
+| ISA_C: FF1 | 7 | Find-first-one for 0, 1, MSB set, all-ones, single-bit positions |
+| ISA_C: BYTEREV | 2 | Byte order reversal |
+| EMAC | 14 | MAC.L accumulate, signed negative products, <<1/>>1 scaling, 48-bit saturation, register moves (ACC, MACSR, MASK, ACCEXT), MACSR-to-CCR |
+| Trace ring buffer | 5 | Push/peek/count, wraparound, exception auto-recording |
+| Double fault | 3 | Exception during exception frame push, halt and fault flags |
+| Privilege violation | 4 | HALT in user mode, privilege exception generation |
+| Zero divide | 7 | DIVU/DIVS by zero, exception vector, trace recording |
+| Spec compliance | 23 | A7 byte alignment, MASK on EMAC operands, TAS, FMOVEM predecrement, MOVE.B to An rejection, mode 6 extension word validation, RTE format validation, access error FS bits, FMOVE multi-register control, MOVEM EA mode restriction |
+
+The test can be compiled and run with just the host compiler: `gcc test_coldfire.c coldfire.c -lm`.
 
 ### Results
 
-All five tests pass:
+All 72 tests pass:
 
 | Test | Function | Expected | Got | Instructions |
 |---|---|---|---|---|
@@ -893,7 +960,7 @@ All five tests pass:
 | Sqrt(2)×1000 | FPU arithmetic | 1414 | 1414 | — |
 | **Total** | | | | **1,528** |
 
-The emulator executes 1,528 instructions to complete all five tests. The majority are in the fibonacci function, which makes 177 recursive calls to compute fib(10).
+The five compute tests execute 1,528 instructions. The remaining 67 tests inject individual opcodes and verify register state, trace buffer contents, and exception behavior at the single-instruction level.
 
 ### QEMU Validation
 
@@ -912,17 +979,17 @@ QEMU ColdFire V4e validation
 5/5 passed
 ```
 
-All five results match between our emulator, the smoke test, and QEMU. The QEMU validation program uses raw Linux syscalls instead of libc to avoid glibc alignment faults — ColdFire enforces word and long alignment on memory accesses, and the standard m68k glibc contains unaligned access patterns from the 68020 (which relaxed the 68000's alignment requirement).
+All five results match between our emulator, the self-contained test, and QEMU. The QEMU validation program uses raw Linux syscalls instead of libc to avoid glibc alignment faults — ColdFire enforces word and long alignment on memory accesses, and the standard m68k glibc contains unaligned access patterns from the 68020 (which relaxed the 68000's alignment requirement).
 
 ## Conclusion
 
-The ColdFire V4e emulator is 2,372 lines of C — within the original 2,080–3,120 LOC estimate. It implements the integer core (eight data registers, eight address registers, sixteen opcode groups), an IEEE-754 double-precision FPU mapped directly to host `double` operations, the EMAC multiply-accumulate unit (MAC.L, MSAC.L with scale factors, 48-bit accumulators, and saturation), ISA_C additions (FF1 find-first-one, BYTEREV byte swap), and full exception handling. The memory bus uses callbacks for complete isolation between emulator and host. There is no heap allocation.
+The ColdFire V4e emulator is 2,545 lines of C — within the original 2,080–3,120 LOC estimate. It implements the integer core (eight data registers, eight address registers, sixteen opcode groups), an IEEE-754 double-precision FPU mapped directly to host `double` operations, the EMAC multiply-accumulate unit (MAC.L, MSAC.L with scale factors, 48-bit accumulators, and saturation), ISA_C additions (FF1 find-first-one, BYTEREV byte swap), full exception handling with double-fault detection, and a diagnostic trace ring buffer that records exception history. The memory bus uses callbacks for complete isolation between emulator and host. There is no heap allocation.
 
 What the emulator intentionally omits: the MMU, cache control, and debug module are not implemented — `MOVEC` handles control register reads/writes, but the registers themselves are stubs. These omissions reflect the emulator's scope: running GCC-compiled bare-metal C programs, not booting an operating system.
 
 The GCC codegen test was the decisive factor in architecture selection. Fourteen candidates were evaluated; five reached the final round; only ColdFire V4e produced clean single-instruction output for every arithmetic operation tested. The SH-4 was the closest competitor but fell short on integer divide (a libgcc call) and carried additional complexity in delay slots, literal pools, and FPSCR bank-switching.
 
-The emulator is designed as a building block. GCC, LLVM, and Free Pascal all produce code for ColdFire targets — the emulator runs whatever these compilers generate. The callback-based memory bus means the host defines what the address space looks like: flat RAM for a simulator, memory-mapped I/O for a virtual control system, or a complete peripheral set for a system emulator. The hypercall mechanism provides a zero-overhead path from guest code to host-native functions, suitable for high-frequency interfaces like graphics APIs or hardware abstraction layers. The result is a 2,372-line library that turns any C program into an embeddable CPU.
+The emulator is designed as a building block. GCC, LLVM, and Free Pascal all produce code for ColdFire targets — the emulator runs whatever these compilers generate. The callback-based memory bus means the host defines what the address space looks like: flat RAM for a simulator, memory-mapped I/O for a virtual control system, or a complete peripheral set for a system emulator. The hypercall mechanism provides a zero-overhead path from guest code to host-native functions, suitable for high-frequency interfaces like graphics APIs or hardware abstraction layers. The result is a 2,545-line library that turns any C program into an embeddable CPU.
 
 ### Sources
 
