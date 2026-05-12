@@ -12,7 +12,7 @@ M68K_LD     = -T link.ld
 
 # Targets
 HARNESS     = test_harness
-SMOKE       = smoke_test
+SMOKE       = test_coldfire
 TEST_ELF    = test_program.elf
 QEMU_VALID  = qemu_validate
 INSTR_ELF   = test_instructions.elf
@@ -29,8 +29,8 @@ $(TEST_ELF): test_program.c link.ld
 	$(M68K_CC) $(M68K_CFLAGS) $(M68K_LD) -o $@ test_program.c
 
 # Host: build smoke test (no cross-compiler needed)
-$(SMOKE): smoke_test.c coldfire.c coldfire.h
-	$(CC) $(CFLAGS) -o $@ smoke_test.c coldfire.c -lm
+$(SMOKE): test_coldfire.c coldfire.c coldfire.h
+	$(CC) $(CFLAGS) -o $@ test_coldfire.c coldfire.c -lm
 
 # Smoke test — embedded binary, no cross-tools required
 smoke: $(SMOKE)
@@ -78,13 +78,13 @@ valgrind: $(HARNESS) $(TEST_ELF)
 # Coverage analysis with gcov
 COV_CFLAGS  = -Wall -Wextra -O0 -g --coverage
 COV_HARNESS = test_harness_cov
-COV_SMOKE   = smoke_test_cov
+COV_SMOKE   = test_coldfire_cov
 
 coldfire_cov.o: coldfire.c coldfire.h
 	$(CC) $(COV_CFLAGS) -c -o $@ coldfire.c
 
-$(COV_SMOKE): smoke_test.c coldfire_cov.o coldfire.h
-	$(CC) $(COV_CFLAGS) -o $@ smoke_test.c coldfire_cov.o -lm
+$(COV_SMOKE): test_coldfire.c coldfire_cov.o coldfire.h
+	$(CC) $(COV_CFLAGS) -o $@ test_coldfire.c coldfire_cov.o -lm
 
 $(COV_HARNESS): test_harness.c coldfire_cov.o elf_loader.c coldfire.h elf_loader.h
 	$(CC) $(COV_CFLAGS) -o $@ test_harness.c coldfire_cov.o elf_loader.c -lm

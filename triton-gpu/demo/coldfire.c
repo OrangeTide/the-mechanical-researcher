@@ -86,6 +86,20 @@ static inline uint32_t fetch32(cf_cpu *cpu)
 #define SZ_WORD  2
 #define SZ_LONG  4
 
+/* MACSR register bits */
+#define MACSR_PAV3  (1 << 15)
+#define MACSR_PAV2  (1 << 14)
+#define MACSR_PAV1  (1 << 13)
+#define MACSR_PAV0  (1 << 12)
+#define MACSR_OMC   (1 << 7)
+#define MACSR_SU    (1 << 6)
+#define MACSR_FI    (1 << 5)
+#define MACSR_RT    (1 << 4)
+#define MACSR_N     (1 << 3)
+#define MACSR_Z     (1 << 2)
+#define MACSR_V     (1 << 1)
+#define MACSR_EV    (1 << 0)
+
 static inline int size_bytes(int sz)
 {
     return sz; /* SZ_BYTE=1, SZ_WORD=2, SZ_LONG=4 */
@@ -243,8 +257,46 @@ static int eval_cc(cf_cpu *cpu, int cc)
  * Exception processing
  ****************************************************************/
 
+static uint8_t
+vec_to_trace_type(int vector)
+{
+    switch (vector) {
+    case CF_VEC_ACCESS_ERROR:  return CF_TR_ACCESS_ERROR;
+    case CF_VEC_ADDRESS_ERROR: return CF_TR_ADDRESS_ERROR;
+    case CF_VEC_ILLEGAL:       return CF_TR_ILLEGAL;
+    case CF_VEC_ZERO_DIVIDE:   return CF_TR_ZERO_DIVIDE;
+    case CF_VEC_PRIVILEGE:     return CF_TR_PRIVILEGE;
+    case CF_VEC_LINE_A:        return CF_TR_LINE_A;
+    case CF_VEC_LINE_F:        return CF_TR_LINE_F;
+    case CF_VEC_FORMAT_ERROR:  return CF_TR_FORMAT_ERROR;
+    default:
+        if (vector >= 32 && vector < 48)
+            return CF_TR_TRAP;
+        return CF_TR_NONE;
+    }
+}
+
 void cf_exception(cf_cpu *cpu, int vector)
 {
+    uint8_t tt = vec_to_trace_type(vector);
+    if (tt != CF_TR_NONE) {
+        uint16_t opword = 0;
+        if (cpu->pc >= 2)
+            opword = (uint16_t)cpu->read16(cpu->bus_ctx, cpu->pc - 2);
+        cf_trace_push(&cpu->trace, tt, cpu->pc, opword, 0, NULL);
+    }
+
+    /* Double fault: exception during exception processing halts the CPU */
+    if (cpu->in_exception) {
+        cf_trace_push(&cpu->trace, CF_TR_DOUBLE_FAULT, cpu->pc,
+                      0, 0, NULL);
+        cpu->fault = 1;
+        cpu->halted = 1;
+        cpu->in_exception = 0;
+        return;
+    }
+    cpu->in_exception = 1;
+
     /* Save current SR */
     uint32_t old_sr = cpu->sr;
 
@@ -261,14 +313,17 @@ void cf_exception(cf_cpu *cpu, int vector)
     cpu->a[7] -= 2;
     bus_write16(cpu, cpu->a[7], old_sr & 0xFFFF);
     cpu->a[7] -= 2;
-    /* Format word: format=4 (ColdFire), FS=0, vector offset */
+    /* Format word: format=4 (ColdFire), vector offset, FS bits */
     uint16_t fmt = (4 << 12) | ((vector & 0xFF) << 2);
+    if (vector == CF_VEC_ACCESS_ERROR)
+        fmt |= (cpu->fault_status & 0x3) << 10;
     bus_write16(cpu, cpu->a[7], fmt);
 
     /* Fetch handler address from vector table */
     uint32_t handler = bus_read32(cpu, cpu->vbr + (uint32_t)vector * 4);
     cpu->pc = handler;
     cpu->halted = 0;
+    cpu->in_exception = 0;
 }
 
 /****************************************************************
@@ -306,17 +361,23 @@ static ea_loc decode_ea(cf_cpu *cpu, int mode, int reg, int sz)
         loc.addr = cpu->a[reg];
         break;
 
-    case 3: /* (An)+ */
+    case 3: { /* (An)+ */
+        int inc = size_bytes(sz);
+        if (reg == 7 && inc < 2) inc = 2;
         loc.type = 2;
         loc.addr = cpu->a[reg];
-        cpu->a[reg] += size_bytes(sz);
+        cpu->a[reg] += inc;
         break;
+    }
 
-    case 4: /* -(An) */
+    case 4: { /* -(An) */
+        int dec = size_bytes(sz);
+        if (reg == 7 && dec < 2) dec = 2;
         loc.type = 2;
-        cpu->a[reg] -= size_bytes(sz);
+        cpu->a[reg] -= dec;
         loc.addr = cpu->a[reg];
         break;
+    }
 
     case 5: { /* (d16, An) */
         int16_t disp = (int16_t)fetch16(cpu);
@@ -327,15 +388,19 @@ static ea_loc decode_ea(cf_cpu *cpu, int mode, int reg, int sz)
 
     case 6: { /* (d8, An, Xn*SF) */
         uint16_t ext = fetch16(cpu);
+        /* ColdFire: brief format only (bit 8=0), longword index only (bit 11=1) */
+        if ((ext & 0x0100) || !(ext & 0x0800)) {
+            cf_exception(cpu, CF_VEC_ADDRESS_ERROR);
+            cpu->fault = 1;
+            return loc;
+        }
         int xreg = (ext >> 12) & 7;
         int is_addr = (ext >> 15) & 1;
-        /* W/L bit 11: must be 1 (longword) on ColdFire */
         int scale_bits = (ext >> 9) & 3;
         int scale = 1 << scale_bits; /* 1, 2, 4, 8 */
         int8_t disp = (int8_t)(ext & 0xFF);
 
         uint32_t xval = is_addr ? cpu->a[xreg] : cpu->d[xreg];
-        /* ColdFire: index is always longword (W/L=1) */
         loc.type = 2;
         loc.addr = cpu->a[reg] + (int32_t)xval * scale + disp;
         break;
@@ -514,6 +579,34 @@ static void exec_group0(cf_cpu *cpu, uint16_t op)
         return;
     }
 
+    /* FF1 Dx : 0000 0100 1100 0xxx (ISA_C) */
+    if ((op & 0xFFF8) == 0x04C0) {
+        int reg = op & 7;
+        uint32_t val = cpu->d[reg];
+        if (val == 0) {
+            cpu->d[reg] = 32;
+        } else {
+            int n = 0;
+            while (!(val & 0x80000000)) {
+                val <<= 1;
+                n++;
+            }
+            cpu->d[reg] = n;
+        }
+        return;
+    }
+
+    /* BYTEREV Dx : 0000 0010 1100 0xxx (ISA_C) */
+    if ((op & 0xFFF8) == 0x02C0) {
+        int reg = op & 7;
+        uint32_t val = cpu->d[reg];
+        cpu->d[reg] = ((val >> 24) & 0xFF) |
+                      ((val >> 8) & 0xFF00) |
+                      ((val << 8) & 0xFF0000) |
+                      ((val << 24) & 0xFF000000);
+        return;
+    }
+
     /* Immediate operations */
     int imm_op = (op >> 9) & 7;
     int sz_bits = (op >> 6) & 3;
@@ -587,6 +680,11 @@ static void exec_move(cf_cpu *cpu, uint16_t op, int sz)
 
     uint32_t val = ea_read(cpu, src_mode, src_reg, sz);
 
+    if (dst_mode == 1 && sz == SZ_BYTE) {
+        cf_exception(cpu, CF_VEC_ILLEGAL);
+        return;
+    }
+
     if (dst_mode == 1) {
         /* MOVEA: write to address register, no flags change */
         /* Source is sign-extended to 32 bits */
@@ -607,7 +705,28 @@ static void exec_group4(cf_cpu *cpu, uint16_t op)
 {
     /* HALT : 0100 1010 1100 1000 — must check before TST */
     if (op == 0x4AC8) {
+        if (!is_supervisor(cpu)) {
+            cf_exception(cpu, CF_VEC_PRIVILEGE);
+            return;
+        }
         cpu->halted = 1;
+        return;
+    }
+
+    /* ILLEGAL : 0100 1010 1111 1100 */
+    if (op == 0x4AFC) {
+        cf_exception(cpu, CF_VEC_ILLEGAL);
+        return;
+    }
+
+    /* TAS <ea> : 0100 1010 11 eee rrr */
+    if ((op & 0xFFC0) == 0x4AC0) {
+        int mode = (op >> 3) & 7;
+        int reg = op & 7;
+        ea_loc loc = decode_ea(cpu, mode, reg, SZ_BYTE);
+        uint32_t val = read_ea(cpu, &loc, SZ_BYTE);
+        set_flags_move(cpu, val, SZ_BYTE);
+        write_ea(cpu, &loc, SZ_BYTE, val | 0x80);
         return;
     }
 
@@ -725,7 +844,8 @@ static void exec_group4(cf_cpu *cpu, uint16_t op)
     /* MOVEM.L register list <-> memory (longword only on ColdFire)
      * MOVEM.L #list, <ea> : 0100 1000 11 eee rrr
      * MOVEM.L <ea>, #list : 0100 1100 11 eee rrr
-     * Valid EA modes: (An) and (d16,An) only. */
+     * Supports (An), (d16,An), -(An) for store, (An)+ for load.
+     * 68K convention: -(An) uses reversed register mask. */
     if ((op & 0xFB80) == 0x4880) {
         int dir = (op >> 10) & 1; /* 0=reg-to-mem, 1=mem-to-reg */
         if (((op >> 6) & 1) == 0) goto illegal; /* word size not on CF */
@@ -737,6 +857,40 @@ static void exec_group4(cf_cpu *cpu, uint16_t op)
             /* EXT handled above, shouldn't reach here */
             goto illegal;
         }
+
+        if (mode == 4 && dir == 0) {
+            /* -(An) predecrement store: reversed mask, write downward */
+            for (int j = 0; j < 16; j++) {
+                if (!(mask & (1 << j)))
+                    continue;
+                int r = 15 - j;
+                cpu->a[reg] -= 4;
+                if (r < 8)
+                    bus_write32(cpu, cpu->a[reg], cpu->d[r]);
+                else
+                    bus_write32(cpu, cpu->a[reg], cpu->a[r - 8]);
+            }
+            return;
+        }
+
+        if (mode == 3 && dir == 1) {
+            /* (An)+ postincrement load: normal mask, read upward */
+            for (int i = 0; i < 16; i++) {
+                if (!(mask & (1 << i)))
+                    continue;
+                uint32_t val = bus_read32(cpu, cpu->a[reg]);
+                if (i < 8)
+                    cpu->d[i] = val;
+                else
+                    cpu->a[i - 8] = val;
+                cpu->a[reg] += 4;
+            }
+            return;
+        }
+
+        /* ColdFire restricts MOVEM to (An) and (d16,An) */
+        if (mode != 2 && mode != 5)
+            goto illegal;
 
         ea_loc loc = decode_ea(cpu, mode, reg, SZ_LONG);
         uint32_t addr = loc.addr;
@@ -815,17 +969,16 @@ static void exec_group4(cf_cpu *cpu, uint16_t op)
             return;
         }
         uint16_t fmt = bus_read16(cpu, cpu->a[7]);
-        cpu->a[7] += 2;
-        uint32_t new_sr = bus_read16(cpu, cpu->a[7]);
-        cpu->a[7] += 2;
-        uint32_t new_pc = bus_read32(cpu, cpu->a[7]);
-        cpu->a[7] += 4;
-        /* ColdFire uses format 4 exclusively */
         int format = (fmt >> 12) & 0xF;
         if (format != 4) {
             cf_exception(cpu, CF_VEC_FORMAT_ERROR);
             return;
         }
+        cpu->a[7] += 2;
+        uint32_t new_sr = bus_read16(cpu, cpu->a[7]);
+        cpu->a[7] += 2;
+        uint32_t new_pc = bus_read32(cpu, cpu->a[7]);
+        cpu->a[7] += 4;
         /* Restore SR (may change privilege mode) */
         update_sp(cpu, new_sr);
         cpu->sr = new_sr;
@@ -1035,7 +1188,9 @@ static void exec_group4(cf_cpu *cpu, uint16_t op)
         return;
     }
 
-    /* TODO: FF1, BYTEREV (ISA_C) */
+    /* TODO: PULSE (0x4ACC), WDDATA (0xFB..), WDEBUG (0xFBC.)
+     * are privileged debug instructions. User-mode execution should
+     * raise CF_VEC_PRIVILEGE, not CF_VEC_ILLEGAL. */
 
 illegal:
     cf_exception(cpu, CF_VEC_ILLEGAL);
@@ -1368,14 +1523,127 @@ static void exec_groupA(cf_cpu *cpu, uint16_t op)
             write_ea(cpu, &loc, SZ_LONG, (uint32_t)val);
         }
         set_flags_move(cpu, (uint32_t)val, SZ_LONG);
-    } else {
-        /* Hypercall: intercept LINE_A before raising exception */
-        if (cpu->hypercall &&
-            cpu->hypercall(cpu, op, cpu->hypercall_ctx) == 0)
+    } else if (cpu->hypercall &&
+               cpu->hypercall(cpu, op, cpu->hypercall_ctx) == 0) {
+        return;
+    } else if (op & 0x0100) {
+        /* MOVE to/from EMAC registers: 1010 rrr 1 d s 000 nnn
+         *   rrr = 000-011 ACC0-3, 100 MACSR, 101 ACCEXT01,
+         *         110 MASK, 111 ACCEXT23
+         *   d = direction (1=read from EMAC, 0=write to EMAC)
+         *   s = 1 for MACSR→CCR special form
+         *   nnn = data register */
+        int emac_reg = (op >> 9) & 7;
+        int dir = (op >> 7) & 1;
+        int special = (op >> 6) & 1;
+        int rn = op & 7;
+
+        if (special && emac_reg == 4 && dir) {
+            /* MOVE MACSR,CCR — copy N/Z/V to CCR, clear C */
+            cpu->sr = (cpu->sr & ~0x0F) |
+                      (cpu->macsr & (MACSR_N | MACSR_Z | MACSR_V));
             return;
-        /* EMAC instructions use line-A encoding */
-        /* TODO: Implement MAC.L, MSAC.L, MOVE ACC/MACSR/MASK */
-        cf_exception(cpu, CF_VEC_LINE_A);
+        }
+
+        if (dir) {
+            /* Read from EMAC register → Dn */
+            uint32_t val;
+            switch (emac_reg) {
+            case 0: case 1: case 2: case 3:
+                val = (uint32_t)(cpu->acc[emac_reg] & 0xFFFFFFFF);
+                break;
+            case 4: val = cpu->macsr; break;
+            case 5: val = ((uint32_t)cpu->accext[1] << 8) |
+                           (uint32_t)cpu->accext[0]; break;
+            case 6: val = cpu->mask; break;
+            case 7: val = ((uint32_t)cpu->accext[3] << 8) |
+                           (uint32_t)cpu->accext[2]; break;
+            default: val = 0; break;
+            }
+            cpu->d[rn] = val;
+        } else {
+            /* Write Dn → EMAC register */
+            uint32_t val = cpu->d[rn];
+            switch (emac_reg) {
+            case 0: case 1: case 2: case 3:
+                cpu->acc[emac_reg] = (int64_t)(int32_t)val;
+                break;
+            case 4: cpu->macsr = val; break;
+            case 5:
+                cpu->accext[0] = val & 0xFF;
+                cpu->accext[1] = (val >> 8) & 0xFF;
+                break;
+            case 6: cpu->mask = val; break;
+            case 7:
+                cpu->accext[2] = val & 0xFF;
+                cpu->accext[3] = (val >> 8) & 0xFF;
+                break;
+            }
+        }
+    } else {
+        /* MAC.L / MSAC.L: 1010 Rx a A Ul Ry + extension word
+         *   Rx[2:0] = bits 11-9, Rx addr flag = bit 6
+         *   Ry[2:0] = bits 2-0,  Ry addr flag = bit 3
+         *   ACC[0]  = bit 7
+         * Extension word: 0000 1 SF sub 000 ACC[1] 0000
+         *   SF  = bits 10-9 (scale: 00=none, 01=<<1, 11=>>1)
+         *   sub = bit 8 (0=MAC, 1=MSAC) */
+        int rx_num = (op >> 9) & 7;
+        int rx_is_addr = (op >> 6) & 1;
+        int ry_num = op & 7;
+        int ry_is_addr = (op >> 3) & 1;
+        int acc_lo = (op >> 7) & 1;
+        uint16_t ext = fetch16(cpu);
+        int sf = (ext >> 9) & 3;
+        int is_msac = (ext >> 8) & 1;
+        int acc_hi = (ext >> 4) & 1;
+        int acc_idx = (acc_hi << 1) | acc_lo;
+
+        uint32_t rx_val = rx_is_addr ? cpu->a[rx_num] : cpu->d[rx_num];
+        uint32_t ry_val = ry_is_addr ? cpu->a[ry_num] : cpu->d[ry_num];
+        rx_val &= cpu->mask;
+        ry_val &= cpu->mask;
+
+        int64_t product;
+        if (cpu->macsr & MACSR_SU)
+            product = (int64_t)(int32_t)rx_val * (int64_t)(int32_t)ry_val;
+        else
+            product = (int64_t)(uint64_t)rx_val * (uint64_t)ry_val;
+
+        if (sf == 1)
+            product <<= 1;
+        else if (sf == 3)
+            product >>= 1;
+
+        int64_t result;
+        if (is_msac)
+            result = cpu->acc[acc_idx] - product;
+        else
+            result = cpu->acc[acc_idx] + product;
+
+        /* 48-bit saturation if OMC set */
+        if (cpu->macsr & MACSR_OMC) {
+            int64_t max48 = ((int64_t)1 << 47) - 1;
+            int64_t min48 = -((int64_t)1 << 47);
+            if (result > max48) {
+                result = max48;
+                cpu->macsr |= MACSR_V;
+                cpu->macsr |= (MACSR_PAV0 << acc_idx);
+            } else if (result < min48) {
+                result = min48;
+                cpu->macsr |= MACSR_V;
+                cpu->macsr |= (MACSR_PAV0 << acc_idx);
+            }
+        }
+
+        cpu->acc[acc_idx] = result;
+
+        /* Update MACSR N/Z from result */
+        cpu->macsr &= ~(MACSR_N | MACSR_Z);
+        if (result == 0)
+            cpu->macsr |= MACSR_Z;
+        if (result < 0)
+            cpu->macsr |= MACSR_N;
     }
 }
 
@@ -1988,38 +2256,92 @@ static void exec_groupF(cf_cpu *cpu, uint16_t op)
         break;
     }
 
-    case 4: { /* FMOVE to system control register */
+    case 4: { /* FMOVE to system control register(s) */
         int ea_mode = (op >> 3) & 7;
         int ea_reg = op & 7;
         int regsel = (ext >> 10) & 7;
-        uint32_t val = ea_read(cpu, ea_mode, ea_reg, SZ_LONG);
-
-        if (regsel & 4) cpu->fpcr = val;
-        if (regsel & 2) cpu->fpsr = val;
-        if (regsel & 1) cpu->fpiar = val;
-        break;
-    }
-
-    case 5: { /* FMOVE from system control register */
-        int ea_mode = (op >> 3) & 7;
-        int ea_reg = op & 7;
-        int regsel = (ext >> 10) & 7;
-        uint32_t val = 0;
-
-        if (regsel & 4) val = cpu->fpcr;
-        else if (regsel & 2) val = cpu->fpsr;
-        else if (regsel & 1) val = cpu->fpiar;
-
         ea_loc loc = decode_ea(cpu, ea_mode, ea_reg, SZ_LONG);
-        write_ea(cpu, &loc, SZ_LONG, val);
+        uint32_t addr = loc.addr;
+
+        if (regsel & 4) {
+            cpu->fpcr = (loc.type == 2) ?
+                bus_read32(cpu, addr) : read_ea(cpu, &loc, SZ_LONG);
+            if (loc.type == 2) addr += 4;
+        }
+        if (regsel & 2) {
+            cpu->fpsr = (loc.type == 2) ?
+                bus_read32(cpu, addr) : read_ea(cpu, &loc, SZ_LONG);
+            if (loc.type == 2) addr += 4;
+        }
+        if (regsel & 1) {
+            cpu->fpiar = (loc.type == 2) ?
+                bus_read32(cpu, addr) : read_ea(cpu, &loc, SZ_LONG);
+        }
         break;
     }
 
-    case 6: /* FMOVEM: memory → FP registers (dr=0) */
-    case 7: { /* FMOVEM: FP registers → memory (dr=1) */
+    case 5: { /* FMOVE from system control register(s) */
+        int ea_mode = (op >> 3) & 7;
+        int ea_reg = op & 7;
+        int regsel = (ext >> 10) & 7;
+        ea_loc loc = decode_ea(cpu, ea_mode, ea_reg, SZ_LONG);
+        uint32_t addr = loc.addr;
+
+        if (regsel & 4) {
+            if (loc.type == 2) {
+                bus_write32(cpu, addr, cpu->fpcr);
+                addr += 4;
+            } else {
+                write_ea(cpu, &loc, SZ_LONG, cpu->fpcr);
+            }
+        }
+        if (regsel & 2) {
+            if (loc.type == 2) {
+                bus_write32(cpu, addr, cpu->fpsr);
+                addr += 4;
+            } else {
+                write_ea(cpu, &loc, SZ_LONG, cpu->fpsr);
+            }
+        }
+        if (regsel & 1) {
+            if (loc.type == 2) {
+                bus_write32(cpu, addr, cpu->fpiar);
+            } else {
+                write_ea(cpu, &loc, SZ_LONG, cpu->fpiar);
+            }
+        }
+        break;
+    }
+
+    case 6: /* FMOVEM: memory to FP registers */
+    case 7: { /* FMOVEM: FP registers to memory */
         int ea_mode = (op >> 3) & 7;
         int ea_reg = op & 7;
         int regmask = ext & 0xFF;
+
+        if (opclass == 7 && ea_mode == 4) {
+            /* -(An) predecrement store: decrement by 8 per register */
+            for (int i = 0; i < 8; i++) {
+                if (regmask & (1 << (7 - i))) {
+                    cpu->a[ea_reg] -= 8;
+                    uint64_t bits;
+                    memcpy(&bits, &cpu->fp[i], sizeof(double));
+                    bus_write32(cpu, cpu->a[ea_reg],
+                                (uint32_t)(bits >> 32));
+                    bus_write32(cpu, cpu->a[ea_reg] + 4,
+                                (uint32_t)bits);
+                }
+            }
+            break;
+        }
+
+        /* Validate EA mode: load=(An),(d16,An),(d8,An,Xi);
+         * store=(An),(d16,An),(d8,An,Xi) (-(An) handled above) */
+        if (ea_mode != 2 && ea_mode != 5 && ea_mode != 6) {
+            cf_exception(cpu, CF_VEC_LINE_F);
+            break;
+        }
+
         ea_loc loc = decode_ea(cpu, ea_mode, ea_reg, SZ_LONG);
         uint32_t addr = loc.addr;
 
@@ -2102,7 +2424,7 @@ static void exec_bit_reg(cf_cpu *cpu, uint16_t op)
 
 int cf_step(cf_cpu *cpu)
 {
-    if (cpu->halted)
+    if (cpu->halted || cpu->fault)
         return -1;
 
     uint16_t op = fetch16(cpu);
@@ -2138,7 +2460,7 @@ int cf_step(cf_cpu *cpu)
     }
 
     cpu->cycles++;
-    return cpu->halted ? -1 : 0;
+    return (cpu->halted || cpu->fault) ? -1 : 0;
 }
 
 int cf_run(cf_cpu *cpu, int count)
@@ -2161,6 +2483,7 @@ void cf_init(cf_cpu *cpu,
              void *bus_ctx)
 {
     memset(cpu, 0, sizeof(*cpu));
+    cf_trace_init(&cpu->trace);
     cpu->read8 = r8;
     cpu->read16 = r16;
     cpu->read32 = r32;
@@ -2180,6 +2503,7 @@ void cf_reset(cf_cpu *cpu)
     cpu->pc = bus_read32(cpu, cpu->vbr + 4);
     cpu->halted = 0;
     cpu->fault = 0;
+    cpu->in_exception = 0;
     cpu->cycles = 0;
 
     /* Clear FPU */
@@ -2193,7 +2517,7 @@ void cf_reset(cf_cpu *cpu)
     for (int i = 0; i < 4; i++)
         cpu->acc[i] = 0;
     cpu->macsr = 0;
-    cpu->mask = 0;
+    cpu->mask = 0xFFFFFFFF;
 }
 
 uint32_t cf_get_d(cf_cpu *cpu, int n) { return cpu->d[n & 7]; }
