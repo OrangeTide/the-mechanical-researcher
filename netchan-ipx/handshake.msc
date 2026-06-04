@@ -1,0 +1,16 @@
+msc {
+  hscale = "1.6", wordwraparcs = "true";
+
+  C [label="Client"], S [label="Server (host)"];
+
+  C => S [label="SYN  (broadcast node, conn_id 0, carries client id)"];
+  S => C [label="SYN-ACK  (conn_id = client id, carries server id)"];
+  C => S [label="ACK  (conn_id = server id)"];
+  --- [label="connected; client locks onto server's unicast address"];
+  S => C [label="WELCOME  (assigned player index)   [reliable ch 0]"];
+  S => C [label="MAP chunk x N  ->  MAPEND   [reliable ch 0]"];
+  |||;
+  C => S [label="INPUT  (8-dir + fire), each tick   [unreliable ch 1]"];
+  S => C [label="STATE  (players, creatures, shots), 8 Hz   [unreliable ch 1]"];
+  C => S [label="CHAT  (a typed line)   [reliable ch 0]"];
+}

@@ -1,0 +1,18 @@
+# build artifacts
+COUT.TXT
+CVIEW.TXT
+*.err
+*.exe
+*.gcda
+*.gcno
+MOUT.TXT
+ncdemo
+*.o
+O1.TXT
+O2.TXT
+*.obj
+OUT.TXT
+SOUT.TXT
+SVIEW.TXT
+test_netchan
+thor
