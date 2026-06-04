@@ -98,14 +98,19 @@
     };
   }
 
-  // 5:3 aspect ratio (width:height)
-  var CARD_RATIO = 5 / 3;
+  // Card aspect ratio (width:height). Landscape 5:3 on wide screens; on narrow
+  // (portrait phone) screens a width-constrained 5:3 card is too short for the
+  // article text, so use a portrait 3:5 ratio there. Threshold matches the
+  // max-width:600px CSS breakpoint.
+  function cardRatio() {
+    return getViewport().w < 600 ? 3 / 5 : 5 / 3;
+  }
 
   // Card size when on the desk (small)
   function deskCardRect() {
     var vp = getViewport();
     var h = Math.min(180, vp.h * 0.25);
-    var w = h * CARD_RATIO;
+    var w = h * cardRatio();
     var stack = stackEl.getBoundingClientRect();
     return {
       width: w,
@@ -122,12 +127,13 @@
     var barH = 40; // bottom bar
     var maxH = vp.h - pad * 2 - barH;
     var maxW = vp.w - pad * 2;
-    // Fit 3:5 card within available space
+    // Fit card within available space
+    var ratio = cardRatio();
     var h = maxH;
-    var w = h * CARD_RATIO;
+    var w = h * ratio;
     if (w > maxW) {
       w = maxW;
-      h = w / CARD_RATIO;
+      h = w / ratio;
     }
     return {
       width: w,
