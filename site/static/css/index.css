@@ -376,6 +376,9 @@ html, body {
   background: #fffef7;
   border: 1px solid #d4c9b8;
   border-radius: inherit;
+  overflow: hidden;
+  /* Don't show the front's mirrored text once the card rotates past 90deg */
+  backface-visibility: hidden;
   box-shadow:
     0 0.2vmin 0.8vmin rgba(0,0,0,0.15),
     0 0.1vmin 0.2vmin rgba(0,0,0,0.1);
