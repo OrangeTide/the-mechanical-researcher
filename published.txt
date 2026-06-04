@@ -13,3 +13,4 @@ serialization-formats
 8bit-compilers
 portable-compiler
 netchan
+netchan-ipx

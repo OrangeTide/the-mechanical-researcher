@@ -21,6 +21,7 @@ A collection of research topics, primarily gathered through agentic AI sessions,
 - [Virtual Machine Bytecodes](vm-bytecodes/)
 - [Compilers and Languages for 8-Bit CPUs](8bit-compilers/)
 - [Reliable UDP for Games: QuakeWorld, ENet, QUIC, and Netchan Compared](netchan/)
+- [Netchan on IPX: Reliable Channels for a 16-bit DOS Game](netchan-ipx/)
 
 ## Build & Deploy
 

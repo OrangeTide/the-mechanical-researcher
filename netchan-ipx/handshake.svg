@@ -1,0 +1,93 @@
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+ "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1"
+ width="960px" height="280px"
+ viewBox="0 0 960 280"
+ xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges"
+ stroke-width="1" text-rendering="geometricPrecision">
+<polygon fill="white" points="223,7 255,7 255,16 223,16"/>
+<text x="240" y="16" textLength="31" font-family="Helvetica" font-size="12" fill="black" text-anchor="middle">
+
+Client
+</text>
+<polygon fill="white" points="684,7 754,7 754,16 684,16"/>
+<text x="720" y="16" textLength="69" font-family="Helvetica" font-size="12" fill="black" text-anchor="middle">
+
+Server (host)
+</text>
+<line x1="240" y1="22" x2="240" y2="50" stroke="black"/>
+<line x1="720" y1="22" x2="720" y2="50" stroke="black"/>
+<line x1="240" y1="33" x2="720" y2="33" stroke="black"/>
+<polygon fill="black" points="720,33 710,39 710,27"/>
+<polygon fill="white" points="345,23 614,23 614,32 345,32"/>
+<text x="346" y="32" textLength="267" font-family="Helvetica" font-size="12" fill="black">
+SYN  (broadcast node, conn_id 0, carries client id)
+</text>
+<line x1="240" y1="50" x2="240" y2="78" stroke="black"/>
+<line x1="720" y1="50" x2="720" y2="78" stroke="black"/>
+<line x1="720" y1="61" x2="240" y2="61" stroke="black"/>
+<polygon fill="black" points="240,61 250,67 250,55"/>
+<polygon fill="white" points="350,51 608,51 608,60 350,60"/>
+<text x="351" y="60" textLength="256" font-family="Helvetica" font-size="12" fill="black">
+SYN-ACK  (conn_id = client id, carries server id)
+</text>
+<line x1="240" y1="78" x2="240" y2="106" stroke="black"/>
+<line x1="720" y1="78" x2="720" y2="106" stroke="black"/>
+<line x1="240" y1="89" x2="720" y2="89" stroke="black"/>
+<polygon fill="black" points="720,89 710,95 710,83"/>
+<polygon fill="white" points="408,79 551,79 551,88 408,88"/>
+<text x="409" y="88" textLength="141" font-family="Helvetica" font-size="12" fill="black">
+ACK  (conn_id = server id)
+</text>
+<line x1="240" y1="106" x2="240" y2="123" stroke="black"/>
+<line x1="720" y1="106" x2="720" y2="123" stroke="black"/>
+<line x1="120" y1="111" x2="840" y2="111" stroke="black" stroke-dasharray="2,2"/>
+<polygon fill="white" points="338,107 620,107 620,116 338,116"/>
+<text x="339" y="116" textLength="280" font-family="Helvetica" font-size="12" fill="black">
+connected; client locks onto server's unicast address
+</text>
+<line x1="240" y1="123" x2="240" y2="151" stroke="black"/>
+<line x1="720" y1="123" x2="720" y2="151" stroke="black"/>
+<line x1="720" y1="134" x2="240" y2="134" stroke="black"/>
+<polygon fill="black" points="240,134 250,140 250,128"/>
+<polygon fill="white" points="341,124 617,124 617,133 341,133"/>
+<text x="342" y="133" textLength="274" font-family="Helvetica" font-size="12" fill="black">
+WELCOME  (assigned player index)   [reliable ch 0]
+</text>
+<line x1="240" y1="151" x2="240" y2="179" stroke="black"/>
+<line x1="720" y1="151" x2="720" y2="179" stroke="black"/>
+<line x1="720" y1="162" x2="240" y2="162" stroke="black"/>
+<polygon fill="black" points="240,162 250,168 250,156"/>
+<polygon fill="white" points="358,152 600,152 600,161 358,161"/>
+<text x="359" y="161" textLength="240" font-family="Helvetica" font-size="12" fill="black">
+MAP chunk x N  -&gt;  MAPEND   [reliable ch 0]
+</text>
+<line x1="240" y1="179" x2="240" y2="196" stroke="black"/>
+<line x1="720" y1="179" x2="720" y2="196" stroke="black"/>
+<line x1="240" y1="196" x2="240" y2="224" stroke="black"/>
+<line x1="720" y1="196" x2="720" y2="224" stroke="black"/>
+<line x1="240" y1="207" x2="720" y2="207" stroke="black"/>
+<polygon fill="black" points="720,207 710,213 710,201"/>
+<polygon fill="white" points="351,197 607,197 607,206 351,206"/>
+<text x="352" y="206" textLength="254" font-family="Helvetica" font-size="12" fill="black">
+INPUT  (8-dir + fire), each tick   [unreliable ch 1]
+</text>
+<line x1="240" y1="224" x2="240" y2="252" stroke="black"/>
+<line x1="720" y1="224" x2="720" y2="252" stroke="black"/>
+<line x1="720" y1="235" x2="240" y2="235" stroke="black"/>
+<polygon fill="black" points="240,235 250,241 250,229"/>
+<polygon fill="white" points="323,225 635,225 635,234 323,234"/>
+<text x="324" y="234" textLength="310" font-family="Helvetica" font-size="12" fill="black">
+STATE  (players, creatures, shots), 8 Hz   [unreliable ch 1]
+</text>
+<line x1="240" y1="252" x2="240" y2="280" stroke="black"/>
+<line x1="720" y1="252" x2="720" y2="280" stroke="black"/>
+<line x1="240" y1="263" x2="720" y2="263" stroke="black"/>
+<polygon fill="black" points="720,263 710,269 710,257"/>
+<polygon fill="white" points="383,253 575,253 575,262 383,262"/>
+<text x="384" y="262" textLength="190" font-family="Helvetica" font-size="12" fill="black">
+CHAT  (a typed line)   [reliable ch 0]
+</text>
+<line x1="240" y1="274" x2="240" y2="280" stroke="black"/>
+<line x1="720" y1="274" x2="720" y2="280" stroke="black"/>
+</svg>

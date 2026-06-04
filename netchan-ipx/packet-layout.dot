@@ -1,0 +1,44 @@
+digraph packet {
+    rankdir=TB;
+    node [shape=plaintext, fontname="Helvetica", fontsize=11];
+    bgcolor="transparent";
+
+    encap [label=<
+      <table border="0" cellborder="1" cellspacing="0" cellpadding="6">
+        <tr><td bgcolor="#dde6f0"><b>UDP datagram</b>  (DOSBox IPX tunnel &#8594; ipxrelay)</td></tr>
+        <tr><td>
+          <table border="0" cellborder="1" cellspacing="0" cellpadding="6">
+            <tr><td bgcolor="#e8e0d0"><b>IPX header</b>, 30 B: checksum FFFF, length, net:node:socket x2</td></tr>
+            <tr><td>
+              <table border="0" cellborder="1" cellspacing="0" cellpadding="6">
+                <tr><td bgcolor="#d8ecd8"><b>netchan packet</b>  (fits the 546-byte IPX payload)</td></tr>
+                <tr><td>
+                  <table border="0" cellborder="1" cellspacing="0" cellpadding="5">
+                    <tr>
+                      <td bgcolor="#ffffff">conn_id<br/>u32</td>
+                      <td bgcolor="#ffffff">type<br/>u8</td>
+                      <td bgcolor="#ffffff">flags<br/>u8</td>
+                      <td bgcolor="#ffffff">ack<br/>u16</td>
+                    </tr>
+                  </table>
+                </td></tr>
+                <tr><td><font point-size="9">8-byte header on every packet; ack piggybacks the cumulative reliable ack</font></td></tr>
+                <tr><td>
+                  <table border="0" cellborder="1" cellspacing="0" cellpadding="5">
+                    <tr>
+                      <td bgcolor="#fbf4d8">chan<br/>u8</td>
+                      <td bgcolor="#fbf4d8">mtype<br/>u8</td>
+                      <td bgcolor="#fbf4d8">seq<br/>u16</td>
+                      <td bgcolor="#fbf4d8">len<br/>u16</td>
+                      <td bgcolor="#fbf4d8">payload<br/>len bytes</td>
+                    </tr>
+                  </table>
+                </td></tr>
+                <tr><td><font point-size="9">one or more 6-byte records pack into a packet (reliable or unreliable)</font></td></tr>
+              </table>
+            </td></tr>
+          </table>
+        </td></tr>
+      </table>
+    >];
+}
