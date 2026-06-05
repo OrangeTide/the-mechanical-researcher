@@ -43,6 +43,6 @@ clean:
 # Regenerate the article screenshot (needs ../../tools/term-screenshot).
 screenshot: shot
 	./shot | ../../tools/term-screenshot \
-		-t "Caves of Thor - netchan over IPX" -w 400 -o ../screenshot.svg
+		-t "Conan the ASCII Destroyer - netchan over IPX" -w 400 -o ../screenshot.svg
 
 .PHONY: all dos check clean screenshot
