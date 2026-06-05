@@ -1,54 +1,86 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="400" height="606">
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="486">
+  <defs>
+    <pattern id="shade" width="4" height="4" patternUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="2" height="2" fill="#89b4fa"/>
+      <rect x="2" y="2" width="2" height="2" fill="#89b4fa"/>
+    </pattern>
+  </defs>
   <style>
-    text { font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace; font-size: 13px; white-space: pre; }
-    .bg { fill: #1e1e2e; }
-    .titlebar { fill: #313244; }
-    .title { fill: #cdd6f4; }
-    .t { fill: #cdd6f4; }
-    .bold { fill: #cdd6f4; font-weight: bold; }
-    .red { fill: #f38ba8; }
-    .red-bold { fill: #f38ba8; font-weight: bold; }
-    .green { fill: #a6e3a1; }
-    .green-bold { fill: #a6e3a1; font-weight: bold; }
-    .yellow { fill: #f9e2af; }
-    .yellow-bold { fill: #f9e2af; font-weight: bold; }
-    .blue { fill: #89b4fa; }
-    .blue-bold { fill: #89b4fa; font-weight: bold; }
-    .magenta { fill: #cba6f7; }
-    .magenta-bold { fill: #cba6f7; font-weight: bold; }
-    .cyan { fill: #94e2d5; }
-    .cyan-bold { fill: #94e2d5; font-weight: bold; }
+    text { font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace; font-size: 13px; }
+    .glyph { text-anchor: middle; }
+    .player { fill: #a6e3a1; font-weight: bold; }
+    .creature { fill: #f38ba8; font-weight: bold; }
+    .shot { fill: #f9e2af; font-weight: bold; }
+    .treasure { fill: #f9e2af; }
+    .hud { fill: #94e2d5; }
+    .title { fill: #cdd6f4; font-size: 11px; }
   </style>
-  <rect class="bg" width="400" height="606" rx="8"/>
-  <rect class="titlebar" width="400" height="32" rx="8"/>
-  <rect class="bg" x="0" y="24" width="400" height="8"/>
+  <rect width="400" height="486" rx="8" fill="#1e1e2e"/>
+  <rect width="400" height="32" rx="8" fill="#313244"/>
+  <rect x="0" y="24" width="400" height="8" fill="#313244"/>
   <circle cx="20" cy="16" r="6" fill="#f38ba8"/>
   <circle cx="40" cy="16" r="6" fill="#f9e2af"/>
   <circle cx="60" cy="16" r="6" fill="#a6e3a1"/>
-  <text class="title" x="200" y="20" text-anchor="middle">Conan the ASCII Destroyer - netchan over IPX</text>
-  <text y="56" x="16"><tspan class="t">                          </tspan><tspan class="blue">▒</tspan><tspan class="blue">▒</tspan><tspan class="blue">▒</tspan><tspan class="blue">▒         </tspan><tspan class="blue">▒</tspan></text>
-  <text y="78" x="16"><tspan class="t">                         </tspan><tspan class="blue">▒</tspan><tspan class="blue">▒</tspan><tspan class="blue">▒</tspan><tspan class="blue">▒          </tspan><tspan class="blue">▒</tspan></text>
-  <text y="100" x="16"><tspan class="t">                           </tspan><tspan class="blue">▒           </tspan><tspan class="blue">▒</tspan></text>
-  <text y="122" x="16"><tspan class="t">                        </tspan><tspan class="red-bold">g              </tspan><tspan class="blue">▒</tspan></text>
-  <text y="144" x="16"><tspan class="t">                        </tspan><tspan class="red-bold">g             </tspan><tspan class="blue">▒</tspan><tspan class="blue">▒</tspan></text>
-  <text y="166" x="16"><tspan class="t">                                       </tspan><tspan class="blue">▒</tspan></text>
-  <text y="188" x="16"><tspan class="t">                                       </tspan><tspan class="blue">▒</tspan></text>
-  <text y="210" x="16"><tspan class="t">                     </tspan><tspan class="red-bold">g                 </tspan><tspan class="blue">▒</tspan></text>
-  <text y="232" x="16"><tspan class="t">                                       </tspan><tspan class="blue">▒</tspan></text>
-  <text y="254" x="16"><tspan class="t">           </tspan><tspan class="blue">▒</tspan><tspan class="blue">▒           </tspan><tspan class="yellow-bold">↑              </tspan><tspan class="blue">▒</tspan></text>
-  <text y="276" x="16"><tspan class="t">          </tspan><tspan class="blue">▒</tspan><tspan class="blue">▒</tspan><tspan class="blue">▒</tspan><tspan class="blue">▒</tspan><tspan class="blue">▒                        </tspan><tspan class="blue">▒</tspan></text>
-  <text y="298" x="16"><tspan class="t">            </tspan><tspan class="blue">▒                          </tspan><tspan class="blue">▒</tspan></text>
-  <text y="320" x="16"><tspan class="t">                        </tspan><tspan class="green-bold">@              </tspan><tspan class="blue">▒</tspan></text>
-  <text y="342" x="16"><tspan class="t">               </tspan><tspan class="blue">▒</tspan><tspan class="blue">▒                      </tspan><tspan class="blue">▒</tspan></text>
-  <text y="364" x="16"><tspan class="t">             </tspan><tspan class="red-bold">g                       </tspan><tspan class="blue">▒</tspan><tspan class="blue">▒</tspan><tspan class="blue">▒</tspan></text>
-  <text y="386" x="16"><tspan class="t">                                     </tspan><tspan class="blue">▒</tspan><tspan class="blue">▒</tspan><tspan class="blue">▒</tspan></text>
-  <text y="408" x="16"><tspan class="t">       </tspan><tspan class="red-bold">g                             </tspan><tspan class="blue">▒</tspan><tspan class="blue">▒</tspan><tspan class="blue">▒</tspan></text>
-  <text y="430" x="16"><tspan class="t">                                      </tspan><tspan class="blue">▒</tspan><tspan class="blue">▒</tspan></text>
-  <text y="452" x="16"><tspan class="t">                                      </tspan><tspan class="blue">▒</tspan><tspan class="blue">▒</tspan></text>
-  <text y="474" x="16"><tspan class="t">                                       </tspan><tspan class="blue">▒</tspan></text>
-  <text y="496" x="16"><tspan class="t">                                      </tspan><tspan class="blue">▒</tspan><tspan class="blue">▒</tspan></text>
-  <text y="518" x="16"><tspan class="t">                                       </tspan><tspan class="blue">▒</tspan></text>
-  <text y="540" x="16"><tspan class="t">                                       </tspan><tspan class="blue">▒</tspan></text>
-  <text y="562" x="16"><tspan class="t">                                       </tspan><tspan class="blue">▒</tspan></text>
-  <text y="584" x="16"><tspan class="cyan">P1  HP:10  SCORE:30  creatures:21</tspan></text>
+  <text class="title" x="80" y="20">Conan the ASCII Destroyer &#8212; netchan over IPX</text>
+  <rect x="260" y="36" width="10" height="18" fill="url(#shade)"/>
+  <rect x="270" y="36" width="10" height="18" fill="url(#shade)"/>
+  <rect x="280" y="36" width="10" height="18" fill="url(#shade)"/>
+  <rect x="290" y="36" width="10" height="18" fill="url(#shade)"/>
+  <rect x="390" y="36" width="10" height="18" fill="url(#shade)"/>
+  <rect x="250" y="54" width="10" height="18" fill="url(#shade)"/>
+  <rect x="260" y="54" width="10" height="18" fill="url(#shade)"/>
+  <rect x="270" y="54" width="10" height="18" fill="url(#shade)"/>
+  <rect x="280" y="54" width="10" height="18" fill="url(#shade)"/>
+  <rect x="390" y="54" width="10" height="18" fill="url(#shade)"/>
+  <rect x="270" y="72" width="10" height="18" fill="url(#shade)"/>
+  <rect x="390" y="72" width="10" height="18" fill="url(#shade)"/>
+  <text class="glyph creature" x="245" y="103">g</text>
+  <rect x="390" y="90" width="10" height="18" fill="url(#shade)"/>
+  <text class="glyph creature" x="245" y="121">g</text>
+  <rect x="380" y="108" width="10" height="18" fill="url(#shade)"/>
+  <rect x="390" y="108" width="10" height="18" fill="url(#shade)"/>
+  <rect x="390" y="126" width="10" height="18" fill="url(#shade)"/>
+  <rect x="390" y="144" width="10" height="18" fill="url(#shade)"/>
+  <text class="glyph creature" x="215" y="175">g</text>
+  <rect x="390" y="162" width="10" height="18" fill="url(#shade)"/>
+  <rect x="390" y="180" width="10" height="18" fill="url(#shade)"/>
+  <rect x="110" y="198" width="10" height="18" fill="url(#shade)"/>
+  <rect x="120" y="198" width="10" height="18" fill="url(#shade)"/>
+  <text class="glyph shot" x="245" y="211">↑</text>
+  <rect x="390" y="198" width="10" height="18" fill="url(#shade)"/>
+  <rect x="100" y="216" width="10" height="18" fill="url(#shade)"/>
+  <rect x="110" y="216" width="10" height="18" fill="url(#shade)"/>
+  <rect x="120" y="216" width="10" height="18" fill="url(#shade)"/>
+  <rect x="130" y="216" width="10" height="18" fill="url(#shade)"/>
+  <rect x="140" y="216" width="10" height="18" fill="url(#shade)"/>
+  <rect x="390" y="216" width="10" height="18" fill="url(#shade)"/>
+  <rect x="120" y="234" width="10" height="18" fill="url(#shade)"/>
+  <rect x="390" y="234" width="10" height="18" fill="url(#shade)"/>
+  <text class="glyph player" x="245" y="265">@</text>
+  <rect x="390" y="252" width="10" height="18" fill="url(#shade)"/>
+  <rect x="150" y="270" width="10" height="18" fill="url(#shade)"/>
+  <rect x="160" y="270" width="10" height="18" fill="url(#shade)"/>
+  <rect x="390" y="270" width="10" height="18" fill="url(#shade)"/>
+  <text class="glyph creature" x="135" y="301">g</text>
+  <rect x="370" y="288" width="10" height="18" fill="url(#shade)"/>
+  <rect x="380" y="288" width="10" height="18" fill="url(#shade)"/>
+  <rect x="390" y="288" width="10" height="18" fill="url(#shade)"/>
+  <rect x="370" y="306" width="10" height="18" fill="url(#shade)"/>
+  <rect x="380" y="306" width="10" height="18" fill="url(#shade)"/>
+  <rect x="390" y="306" width="10" height="18" fill="url(#shade)"/>
+  <text class="glyph creature" x="75" y="337">g</text>
+  <rect x="370" y="324" width="10" height="18" fill="url(#shade)"/>
+  <rect x="380" y="324" width="10" height="18" fill="url(#shade)"/>
+  <rect x="390" y="324" width="10" height="18" fill="url(#shade)"/>
+  <rect x="380" y="342" width="10" height="18" fill="url(#shade)"/>
+  <rect x="390" y="342" width="10" height="18" fill="url(#shade)"/>
+  <rect x="380" y="360" width="10" height="18" fill="url(#shade)"/>
+  <rect x="390" y="360" width="10" height="18" fill="url(#shade)"/>
+  <rect x="390" y="378" width="10" height="18" fill="url(#shade)"/>
+  <rect x="380" y="396" width="10" height="18" fill="url(#shade)"/>
+  <rect x="390" y="396" width="10" height="18" fill="url(#shade)"/>
+  <rect x="390" y="414" width="10" height="18" fill="url(#shade)"/>
+  <rect x="390" y="432" width="10" height="18" fill="url(#shade)"/>
+  <rect x="390" y="450" width="10" height="18" fill="url(#shade)"/>
+  <text class="hud" x="4" y="481">P1  HP:10  SCORE:30  creatures:21</text>
 </svg>
