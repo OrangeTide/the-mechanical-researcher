@@ -1,6 +1,7 @@
 ---
 title: "ColdFire Emulator Part 2: Multi-Language Bare-Metal"
 date: 2026-04-22
+revised: 2026-06-05
 abstract: "Seven programming languages, one bare-metal emulator — cross-compiling C++, D, Fortran, Ada, Modula-2, Objective-C, and Objective-C++ for the ColdFire V4e using Ubuntu's GCC cross-toolchains"
 category: systems
 ---
