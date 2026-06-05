@@ -13,6 +13,20 @@ static const uint8_t player_fg[MAX_PLAYERS] = {
     C_YELLOW, C_LCYAN, C_LGREEN, C_LMAGENTA,
 };
 
+/* projectile glyph by travel direction (index with shot dir, 0..7 clockwise
+ * from north). CP437 has cardinal arrows at 0x18..0x1B; the diagonals have no
+ * arrow glyph, so they borrow the slashes that point the same way. */
+static const unsigned char shot_glyph[8] = {
+    0x18,   /* N  up    */
+    '/',    /* NE       */
+    0x1A,   /* E  right */
+    '\\',   /* SE       */
+    0x19,   /* S  down  */
+    '/',    /* SW       */
+    0x1B,   /* W  left  */
+    '\\',   /* NW       */
+};
+
 static int cam_x, cam_y;
 
 static void
@@ -74,7 +88,7 @@ render_world(const struct world *w, int self, const char *status)
         const struct shot *s = &w->shots[i];
         int x = s->x - cam_x, y = s->y - cam_y;
         if (s->alive && x >= 0 && x < SCR_W && y >= 0 && y < VIEW_H)
-            plat_put(x, y, 0x07, ATTR(C_WHITE, C_BLACK));
+            plat_put(x, y, shot_glyph[s->dir & 7], ATTR(C_WHITE, C_BLACK));
     }
 
     /* players */

@@ -19,6 +19,19 @@ static struct world w;
 static int
 sgn(int v) { return v < 0 ? -1 : (v > 0 ? 1 : 0); }
 
+/* projectile glyph by travel direction, to match the in-game CP437 arrows:
+ * Unicode cardinal arrows, slashes for the diagonals. Index with shot dir. */
+static const char *const shot_arrow[8] = {
+    "\xe2\x86\x91",     /* N  up    U+2191 */
+    "/",                /* NE              */
+    "\xe2\x86\x92",     /* E  right U+2192 */
+    "\\",               /* SE              */
+    "\xe2\x86\x93",     /* S  down  U+2193 */
+    "/",                /* SW              */
+    "\xe2\x86\x90",     /* W  left  U+2190 */
+    "\\",               /* NW              */
+};
+
 int
 main(void)
 {
@@ -43,11 +56,11 @@ main(void)
             if (d < bd) { bd = d; bdx = dx; bdy = dy; }
         }
         {
-            uint8_t in = IN_DIR_NONE;
+            uint8_t in = IN_NONE;
             int k;
             for (k = 0; k < 8; k++)
                 if (game_dx[k] == sgn(bdx) && game_dy[k] == sgn(bdy)) {
-                    in = (uint8_t)(k | IN_FIRE);
+                    in = IN_MAKE(k, k);     /* move toward and fire at it */
                     break;
                 }
             game_set_input(&w, 0, in);
@@ -77,7 +90,8 @@ main(void)
             for (i = 0; i < MAX_SHOTS; i++)
                 if (w.shots[i].alive && w.shots[i].x == wx &&
                     w.shots[i].y == wy) {
-                    fputs("\033[1;33m\xe2\x80\xa2", stdout);   /* bullet */
+                    printf("\033[1;33m%s",
+                           shot_arrow[w.shots[i].dir & 7]);
                     drawn = 1;
                     break;
                 }

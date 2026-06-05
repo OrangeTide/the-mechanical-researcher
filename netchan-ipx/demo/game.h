@@ -31,10 +31,16 @@ enum {
     T_TREASURE,
 };
 
-/* input byte: low nibble = move direction, high bit = fire */
+/* input byte: low nibble = move direction, high nibble = fire direction.
+ * Each nibble holds a direction 0..7, or IN_DIR_NONE for "none". The fire
+ * direction is independent of movement, so the controls are twin-stick:
+ * one set of keys steers, another set aims. IN_NONE is the idle byte. */
 #define IN_DIR_NONE 0x0F
-#define IN_FIRE     0x80
-#define IN_DIR(b)   ((b) & 0x0F)
+#define IN_NONE     0xFF
+#define IN_DIR(b)      ((b) & 0x0F)
+#define IN_FIRE_DIR(b) (((b) >> 4) & 0x0F)
+#define IN_MAKE(move, fire) \
+    (uint8_t)(((move) & 0x0F) | (((fire) & 0x0F) << 4))
 
 /* 8 directions, clockwise from north; index with dir */
 extern const int8_t game_dx[8];

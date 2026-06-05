@@ -208,7 +208,7 @@ game_add_player(struct world *w)
             p->facing = 4;
             p->alive = 1;
             p->hp = PLAYER_HP;
-            p->input = IN_DIR_NONE;
+            p->input = IN_NONE;
             p->score = 0;
             if (i + 1 > w->nplayers)
                 w->nplayers = (uint8_t)(i + 1);
@@ -258,7 +258,7 @@ step_players(struct world *w)
     int i;
     for (i = 0; i < MAX_PLAYERS; i++) {
         struct player *p = &w->players[i];
-        uint8_t dir;
+        uint8_t dir, fdir;
         if (!p->alive)
             continue;
         if (fire_cd[i])
@@ -276,14 +276,15 @@ step_players(struct world *w)
                 }
             }
         }
-        if ((p->input & IN_FIRE) && fire_cd[i] == 0) {
+        fdir = (uint8_t)IN_FIRE_DIR(p->input);
+        if (fdir < 8 && fire_cd[i] == 0) {
             int s;
             for (s = 0; s < MAX_SHOTS; s++) {
                 struct shot *sh = &w->shots[s];
                 if (!sh->alive) {
                     sh->x = p->x;
                     sh->y = p->y;
-                    sh->dir = p->facing;
+                    sh->dir = fdir;
                     sh->owner = (uint8_t)i;
                     sh->ttl = SHOT_RANGE;
                     sh->alive = 1;
