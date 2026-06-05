@@ -73,9 +73,9 @@ Once connected, the reliable channel carries setup and the unreliable channel ca
 
 The relay enforces a few rules that the sender has to respect: the IPX checksum field must be `0xFFFF`, both source and destination network numbers must be zero (it is a single, router-less network), and the sender must already be registered. Broadcasts are forwarded to every other registered client; a node even receives its own broadcast back through DOSBox's local loopback, which the client simply ignores.
 
-## The Demo: Caves of Thor Over IPX
+## The Demo: Conan the ASCII Destroyer
 
-The demo is a simplified Gauntlet, dressed in the text-mode look of Apogee's 1989 Caves of Thor: a larger-than-screen cave, a handful of creatures that step toward the nearest player, travelling projectiles, and up to four players, each scrolling its own 40&#215;25 viewport over the shared world.
+The demo is a simplified Gauntlet, dressed in the text-mode look of Todd Replogle's 1989 Caves of Thor (published by Apogee Software): a larger-than-screen cave, a handful of creatures that step toward the nearest player, travelling projectiles, and up to four players, each scrolling its own 40&#215;25 viewport over the shared world.
 
 It is server-authoritative. One instance hosts and also plays; the others join. The host generates the cave (a cellular-automata cave, kept to its largest connected region), simulates everything, and at 8 Hz broadcasts the full world state, which is small enough to fit one datagram with room to spare. Clients send only their input; on a missed input packet the next tick supersedes it, which is exactly what an unreliable channel is for. The map is streamed once to each client in MTU-sized chunks over the reliable channel as its send window allows. Chat rides the reliable channel too.
 
