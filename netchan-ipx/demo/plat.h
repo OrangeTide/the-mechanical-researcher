@@ -11,8 +11,10 @@
 
 /* logical keys polled each frame */
 enum {
-    K_UP, K_DOWN, K_LEFT, K_RIGHT,
+    K_UP, K_DOWN, K_LEFT, K_RIGHT,      /* movement (arrows) */
     K_FIRE, K_QUIT, K_ENTER,
+    K_FIRE_UP, K_FIRE_DOWN,             /* directional fire (WASD) */
+    K_FIRE_LEFT, K_FIRE_RIGHT,
     K_NKEYS,
 };
 

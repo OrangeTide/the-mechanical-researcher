@@ -94,8 +94,12 @@ are `*.o`, DOS objects are `*.obj`, so they never collide.
 
 ### Controls
 
+The game is a keyboard twin-stick shooter: one hand steers, the other aims.
+
 - **Arrow keys** &#8212; move in eight directions (hold to keep moving)
-- **Z or Space** &#8212; fire
+- **W A S D** &#8212; fire north / west / south / east, independent of where
+  you are moving (combine two keys for the diagonals)
+- **Z or Space** &#8212; fire in the direction you last moved (your facing)
 - **Enter** &#8212; open the chat line; type, then Enter to send (Esc cancels)
 - **Q or Esc** &#8212; quit
 

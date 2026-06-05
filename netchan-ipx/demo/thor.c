@@ -77,23 +77,34 @@ static void frame_pace(void)
 static int
 sgn(int v) { return v < 0 ? -1 : (v > 0 ? 1 : 0); }
 
-static uint8_t
-read_input(void)
+static int
+dir_of(int dx, int dy)
 {
-    int dx = plat_key(K_RIGHT) - plat_key(K_LEFT);
-    int dy = plat_key(K_DOWN) - plat_key(K_UP);
-    uint8_t in = IN_DIR_NONE;
-    if (dx || dy) {
-        int k;
-        for (k = 0; k < 8; k++)
-            if (game_dx[k] == sgn(dx) && game_dy[k] == sgn(dy)) {
-                in = (uint8_t)k;
-                break;
-            }
-    }
-    if (plat_key(K_FIRE))
-        in |= IN_FIRE;
-    return in;
+    int k;
+    dx = sgn(dx);
+    dy = sgn(dy);
+    if (!dx && !dy)
+        return -1;
+    for (k = 0; k < 8; k++)
+        if (game_dx[k] == dx && game_dy[k] == dy)
+            return k;
+    return -1;
+}
+
+/* Twin-stick input: arrows steer, WASD aims and fires in that direction.
+ * Z/Space is the simple fire that follows the player's facing (the last
+ * direction moved), which the caller passes in. */
+static uint8_t
+read_input(int facing)
+{
+    int move = dir_of(plat_key(K_RIGHT) - plat_key(K_LEFT),
+                      plat_key(K_DOWN)  - plat_key(K_UP));
+    int fire = dir_of(plat_key(K_FIRE_RIGHT) - plat_key(K_FIRE_LEFT),
+                      plat_key(K_FIRE_DOWN)  - plat_key(K_FIRE_UP));
+    if (fire < 0 && plat_key(K_FIRE))
+        fire = facing;
+    return IN_MAKE(move < 0 ? IN_DIR_NONE : move,
+                   fire < 0 ? IN_DIR_NONE : fire);
 }
 
 static int do_dump;
@@ -231,7 +242,8 @@ run_server(void)
         if (chat_input())
             gserver_say(&srv, host_pi, chat_in);
         game_set_input(&srv.world, host_pi,
-                       chat_mode ? IN_DIR_NONE : read_input());
+                       chat_mode ? IN_NONE
+                                 : read_input(srv.world.players[host_pi].facing));
 
         for (d = 0; d < MAX_DRAIN && (n = tp_recv(buf, &from)) > 0; d++)
             gserver_feed(&srv, buf, (size_t)n, &from);
@@ -273,7 +285,8 @@ run_client(const char *host)
         if (chat_input())
             gclient_chat(&cli, chat_in);
         if (cli.player >= 0)
-            gclient_input(&cli, chat_mode ? IN_DIR_NONE : read_input());
+            gclient_input(&cli, chat_mode ? IN_NONE
+                    : read_input(cli.world.players[cli.player].facing));
         for (d = 0; d < MAX_DRAIN &&
              (n = (int)gclient_pull(&cli, buf, sizeof(buf), &to)) > 0; d++)
             tp_send(buf, n, &to);

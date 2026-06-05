@@ -10,6 +10,10 @@
 /* keyboard scancodes (set 1) */
 #define SC_ESC   0x01
 #define SC_Q     0x10
+#define SC_W     0x11
+#define SC_A     0x1E
+#define SC_S     0x1F
+#define SC_D     0x20
 #define SC_Z     0x2C
 #define SC_ENTER 0x1C
 #define SC_SPACE 0x39
@@ -17,6 +21,15 @@
 #define SC_DOWN  0x50
 #define SC_LEFT  0x4B
 #define SC_RIGHT 0x4D
+
+/* Video page flipping. Mode 01h (40x25) gives 8 display pages in the 16 KB
+ * CGA text buffer; each page is 2 KB. We render into the hidden page and, at
+ * vertical retrace, point the CRTC at it. The displayed page is never touched
+ * while it is on screen, so there is no tearing or mid-rewrite flicker. */
+#define VIDEO_SEG  0xB800
+#define PAGE_BYTES 0x800            /* 2 KB page granularity for 40x25 */
+static int draw_page = 1;           /* hidden page we render into */
+static int show_page = 0;           /* page currently displayed */
 
 static volatile unsigned char keystate[128];
 static volatile unsigned char kbring[16];   /* typed ASCII, for chat entry */
@@ -121,6 +134,18 @@ plat_init(void)
     r.w.cx = 0x2000;
     int86(0x10, &r, &r);
 
+    /* clear both pages so the first hidden frame holds no garbage */
+    {
+        unsigned char __far *v = (unsigned char __far *)MK_FP(VIDEO_SEG, 0);
+        unsigned n;
+        for (n = 0; n < 2 * PAGE_BYTES; n += 2) {
+            v[n] = ' ';
+            v[n + 1] = ATTR(C_GREY, C_BLACK);
+        }
+    }
+    draw_page = 1;
+    show_page = 0;
+
     for (i = 0; i < 128; i++)
         keystate[i] = 0;
     old_int09 = _dos_getvect(0x09);
@@ -170,6 +195,10 @@ plat_key(int k)
     case K_FIRE:  return keystate[SC_Z] || keystate[SC_SPACE];
     case K_QUIT:  return keystate[SC_Q] || keystate[SC_ESC];
     case K_ENTER: return keystate[SC_ENTER];
+    case K_FIRE_UP:    return keystate[SC_W];
+    case K_FIRE_DOWN:  return keystate[SC_S];
+    case K_FIRE_LEFT:  return keystate[SC_A];
+    case K_FIRE_RIGHT: return keystate[SC_D];
     default:      return 0;
     }
 }
@@ -191,15 +220,35 @@ plat_put(int x, int y, unsigned char ch, unsigned char attr)
     unsigned char __far *v;
     if (x < 0 || y < 0 || x >= SCR_W || y >= SCR_H)
         return;
-    v = (unsigned char __far *)MK_FP(0xB800, (unsigned)(y * SCR_W + x) * 2);
+    v = (unsigned char __far *)MK_FP(VIDEO_SEG,
+        (unsigned)(draw_page * PAGE_BYTES) + (unsigned)(y * SCR_W + x) * 2);
     v[0] = ch;
     v[1] = attr;
+}
+
+/* Wait for the start of vertical retrace (0x3DA bit 3). Polling out of an
+ * in-progress retrace first avoids latching onto the tail of the current one. */
+static void
+wait_vretrace(void)
+{
+    while (inp(0x3DA) & 0x08)
+        ;
+    while (!(inp(0x3DA) & 0x08))
+        ;
 }
 
 void
 plat_present(void)
 {
-    /* writes go straight to video memory */
+    union REGS r;
+
+    wait_vretrace();
+    r.h.ah = 0x05;              /* select active display page */
+    r.h.al = (unsigned char)draw_page;
+    int86(0x10, &r, &r);
+
+    show_page = draw_page;
+    draw_page ^= 1;            /* next frame renders into the other page */
 }
 
 static unsigned char
@@ -208,6 +257,10 @@ ascii_of(unsigned char ch)
     switch (ch) {
     case 0x01: return 'o';
     case 0x07: return '*';
+    case 0x18: return '^';      /* shot heading north */
+    case 0x19: return 'v';      /* shot heading south */
+    case 0x1A: return '>';      /* shot heading east  */
+    case 0x1B: return '<';      /* shot heading west  */
     case 0xB1: return '#';
     case 0xDB: return '#';
     case 0xFA: return '.';
@@ -225,7 +278,8 @@ plat_dump(const char *path)
     for (y = 0; y < SCR_H; y++) {
         for (x = 0; x < SCR_W; x++) {
             unsigned char __far *v = (unsigned char __far *)
-                MK_FP(0xB800, (unsigned)(y * SCR_W + x) * 2);
+                MK_FP(VIDEO_SEG, (unsigned)(show_page * PAGE_BYTES) +
+                      (unsigned)(y * SCR_W + x) * 2);
             putc(ascii_of(v[0]), f);
         }
         putc('\n', f);

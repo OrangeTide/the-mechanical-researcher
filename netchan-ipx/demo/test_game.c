@@ -79,12 +79,11 @@ main(void)
             if (d < bd) { bd = d; bdx = dx; bdy = dy; }
         }
         {
-            uint8_t in = IN_DIR_NONE;
-            int dir, k;
+            uint8_t in = IN_NONE;
+            int k;
             for (k = 0; k < 8; k++)
                 if (game_dx[k] == sgn(bdx) && game_dy[k] == sgn(bdy)) {
-                    dir = k;
-                    in = (uint8_t)(dir | IN_FIRE);
+                    in = IN_MAKE(k, k);     /* move toward and fire at it */
                     break;
                 }
             game_set_input(&w, 0, in);

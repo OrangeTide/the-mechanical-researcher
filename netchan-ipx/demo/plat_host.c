@@ -77,6 +77,14 @@ plat_poll(void)
             keydown[K_FIRE] = 1;
         } else if (b[i] == 'q') {
             keydown[K_QUIT] = 1;
+        } else if (b[i] == 'w') {
+            keydown[K_FIRE_UP] = 1;
+        } else if (b[i] == 's') {
+            keydown[K_FIRE_DOWN] = 1;
+        } else if (b[i] == 'a') {
+            keydown[K_FIRE_LEFT] = 1;
+        } else if (b[i] == 'd') {
+            keydown[K_FIRE_RIGHT] = 1;
         }
         /* also feed printable chars, enter, backspace, esc to the typed
          * ring so chat entry works (in play mode the game drains/ignores it) */
@@ -133,6 +141,10 @@ ascii_of(unsigned char ch)
     switch (ch) {
     case 0x01: return 'o';      /* creature */
     case 0x07: return '*';      /* shot */
+    case 0x18: return '^';      /* shot heading north */
+    case 0x19: return 'v';      /* shot heading south */
+    case 0x1A: return '>';      /* shot heading east  */
+    case 0x1B: return '<';      /* shot heading west  */
     case 0xB1: return '#';      /* wall */
     case 0xDB: return '#';
     case 0xFA: return '.';      /* floor */
