@@ -1,6 +1,7 @@
 ---
 title: Netchan on IPX — Reliable Channels for a 16-bit DOS Game
 date: 2026-06-03
+revised: 2026-06-05
 abstract: "Porting a reliable-channel game library to IPX on 16-bit MS-DOS: the INT 2Fh far-call API, a fully static no-fragmentation memory model, and the real-mode and DOSBox bugs found along the way, with a playable Caves-of-Thor-style demo."
 category: networking
 ---
