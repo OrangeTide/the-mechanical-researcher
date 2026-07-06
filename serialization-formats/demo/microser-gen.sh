@@ -1,6 +1,6 @@
 #!/bin/sh
-# gen.sh - microser IDL compiler
-# Usage: ./gen.sh input.idl output_basename
+# microser-gen.sh - microser IDL compiler
+# Usage: ./microser-gen.sh input.idl output_basename
 # Generates output_basename.h and output_basename.c
 
 set -e
@@ -28,8 +28,13 @@ function to_snake(s,    r, i, c) {
     return r
 }
 
+function is_bytes(t) {
+    return (t == "bytes" || t == "string")
+}
+
 function c_type(t) {
     if (t ~ /^u?int(8|16|32|64)$/) return t "_t"
+    if (is_bytes(t)) return ""
     return to_snake(t) "_t"
 }
 
@@ -147,7 +152,8 @@ END {
     gsub(/[^A-Z0-9_]/, "_", guard)
 
     # ---- header ----
-    printf "/* Generated from %s - do not edit */\n\n", FILENAME > h
+    printf "/* Generated from %s - do not edit */\n", FILENAME > h
+    printf "/* Made by a machine. PUBLIC DOMAIN (CC0-1.0) */\n\n" > h
     printf "#ifndef %s\n#define %s\n\n#include \"microser.h\"\n\n", guard, guard > h
 
     for (i = 1; i <= ne; i++) {
@@ -163,8 +169,17 @@ END {
     for (i = 1; i <= nm; i++) {
         sn = to_snake(mn[i])
         printf "struct %s {\n", sn > h
-        for (j = 1; j <= maf[i]; j++)
-            printf "    %s %s;\n", c_type(af_type[i, j]), af_name[i, j] > h
+        for (j = 1; j <= maf[i]; j++) {
+            if (af_type[i, j] == "bytes") {
+                printf "    const uint8_t *%s;\n", af_name[i, j] > h
+                printf "    uint16_t %s_len;\n", af_name[i, j] > h
+            } else if (af_type[i, j] == "string") {
+                printf "    const char *%s;\n", af_name[i, j] > h
+                printf "    uint16_t %s_len;\n", af_name[i, j] > h
+            } else {
+                printf "    %s %s;\n", c_type(af_type[i, j]), af_name[i, j] > h
+            }
+        }
         printf "};\n\n" > h
         printf "int %s_encode(const struct %s *msg, uint8_t *buf, int len);\n", sn, sn > h
         printf "int %s_decode(struct %s *msg, const uint8_t *buf, int len);\n\n", sn, sn > h
@@ -174,8 +189,10 @@ END {
     close(h)
 
     # ---- source ----
-    printf "/* Generated from %s - do not edit */\n\n", FILENAME > c
-    printf "#include \"%s\"\n\n", base ".h" > c
+    printf "/* Generated from %s - do not edit */\n", FILENAME > c
+    printf "/* Made by a machine. PUBLIC DOMAIN (CC0-1.0) */\n\n" > c
+    printf "#include \"%s\"\n", base ".h" > c
+    printf "#include <string.h>\n\n" > c
 
     for (i = 1; i <= nm; i++) {
         sn = to_snake(mn[i])
@@ -185,8 +202,13 @@ END {
         printf "{\n    int pos = 2;\n\n" > c
 
         for (j = 1; j <= mrf[i]; j++) {
-            printf "    pos = ms_write_tag_%s(buf, pos, len, %d, msg->%s);\n", \
-                rw_suffix(rf_type[i, j]), rf_tag[i, j], rf_name[i, j] > c
+            if (is_bytes(rf_type[i, j])) {
+                printf "    pos = ms_write_tag_bytes(buf, pos, len, %d,\n", rf_tag[i, j] > c
+                printf "        msg->%s, msg->%s_len);\n", rf_name[i, j], rf_name[i, j] > c
+            } else {
+                printf "    pos = ms_write_tag_%s(buf, pos, len, %d, msg->%s);\n", \
+                    rw_suffix(rf_type[i, j]), rf_tag[i, j], rf_name[i, j] > c
+            }
             printf "    if (pos < 0) return -1;\n" > c
         }
 
@@ -198,8 +220,13 @@ END {
             for (vi = 1; vi <= mnv[i]; vi++) {
                 printf "    case %d: /* %s */\n", vv[i, vi], vlabel[i, vi] > c
                 for (vfi = 1; vfi <= vnf[i, vi]; vfi++) {
-                    printf "        pos = ms_write_tag_%s(buf, pos, len, %d, msg->%s);\n", \
-                        rw_suffix(vf_type[i, vi, vfi]), vf_tag[i, vi, vfi], vf_name[i, vi, vfi] > c
+                    if (is_bytes(vf_type[i, vi, vfi])) {
+                        printf "        pos = ms_write_tag_bytes(buf, pos, len, %d,\n", vf_tag[i, vi, vfi] > c
+                        printf "            msg->%s, msg->%s_len);\n", vf_name[i, vi, vfi], vf_name[i, vi, vfi] > c
+                    } else {
+                        printf "        pos = ms_write_tag_%s(buf, pos, len, %d, msg->%s);\n", \
+                            rw_suffix(vf_type[i, vi, vfi]), vf_tag[i, vi, vfi], vf_name[i, vi, vfi] > c
+                    }
                     printf "        if (pos < 0) return -1;\n" > c
                 }
                 printf "        break;\n" > c
@@ -224,8 +251,20 @@ END {
 
         for (j = 1; j <= maf[i]; j++) {
             printf "        case %d:\n", af_tag[i, j] > c
-            printf "            pos = ms_read_%s(buf, pos, end, &msg->%s);\n", \
-                rw_suffix(af_type[i, j]), af_name[i, j] > c
+            if (af_type[i, j] == "string") {
+                printf "            {\n" > c
+                printf "                const uint8_t *_tmp = 0;\n" > c
+                printf "                pos = ms_read_bytes(buf, pos, end,\n" > c
+                printf "                    &_tmp, 65535, &msg->%s_len);\n", af_name[i, j] > c
+                printf "                msg->%s = (const char *)_tmp;\n", af_name[i, j] > c
+                printf "            }\n" > c
+            } else if (af_type[i, j] == "bytes") {
+                printf "            pos = ms_read_bytes(buf, pos, end,\n" > c
+                printf "                &msg->%s, 65535, &msg->%s_len);\n", af_name[i, j], af_name[i, j] > c
+            } else {
+                printf "            pos = ms_read_%s(buf, pos, end, &msg->%s);\n", \
+                    rw_suffix(af_type[i, j]), af_name[i, j] > c
+            }
             printf "            break;\n" > c
         }
 
@@ -235,7 +274,7 @@ END {
         printf "        }\n" > c
         printf "        if (pos < 0) return -1;\n" > c
         printf "    }\n" > c
-        printf "    return pos;\n}\n\n" > c
+        printf "    return end;\n}\n\n" > c
     }
 
     close(c)

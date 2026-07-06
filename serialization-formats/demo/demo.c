@@ -16,7 +16,18 @@ static void annotate(const uint8_t *buf, int len)
     while (pos < end) {
         field = buf[pos] >> 3;
         wire = buf[pos] & 7;
+
+        if (wire == 4) {
+            /* length-prefixed bytes: uint16le(len) + len bytes */
+            int blen = buf[pos + 1] | (buf[pos + 2] << 8);
+            printf("  %02x %02x %02x", buf[pos], buf[pos + 1], buf[pos + 2]);
+            printf("      field %d (bytes[%d]) = \"%.*s\"\n",
+                field, blen, blen, (const char *)&buf[pos + 3]);
+            pos += 3 + blen;
+            continue;
+        }
         if (wire > 3) break;
+
         sz = wsz[wire];
         printf("  %02x", buf[pos]);
         val = 0;
@@ -63,6 +74,8 @@ int main(void)
         .firmware_major = 2,
         .firmware_minor = 1,
         .uptime_secs = 86400,
+        .name = "weatherbox",
+        .name_len = 10,
     };
 
     n = device_info_encode(&info, buf, sizeof(buf));
@@ -71,9 +84,10 @@ int main(void)
 
     struct device_info info2 = {0};
     device_info_decode(&info2, buf, n);
-    printf("  decoded: id=0x%04x fw=%d.%d uptime=%u\n",
+    printf("  decoded: id=0x%04x fw=%d.%d uptime=%u name=\"%.*s\"\n",
         info2.device_id, info2.firmware_major,
-        info2.firmware_minor, info2.uptime_secs);
+        info2.firmware_minor, info2.uptime_secs,
+        info2.name_len, info2.name);
 
     return 0;
 }
