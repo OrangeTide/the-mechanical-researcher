@@ -40,6 +40,15 @@
 #define NC_FRAG_SLOTS       4
 #define NC_MAX_FRAGS        32
 
+/* Static memory model: all storage lives in the connection object, which is
+ * allocated once at netchan_open. Nothing is allocated or freed during play.
+ * These tunables bound that storage; raise them for larger messages or more
+ * concurrent channels at the cost of a bigger connection object. */
+#define NC_MAX_CHAN         16      /* concurrent channels (channel pool size) */
+#define NC_MAX_MSG          2048    /* max buffered message, bytes */
+#define NC_POOL_BUFS        64      /* message buffers in the static pool */
+#define NC_NOBUF            (-1)    /* "no buffer" sentinel for slot indices */
+
 #define NC_DEFAULT_MTU      1200
 #define NC_DEFAULT_WINDOW   65536
 #define NC_DEFAULT_IDLE_MS  30000
@@ -118,7 +127,7 @@ nc_random_id(void)
 
 struct nc_outgoing {
     uint16_t seq;
-    uint8_t *data;
+    int      buf;    /* pool index, NC_NOBUF when empty */
     size_t   len;
     uint32_t sent_ms;
     uint8_t  attempts;
@@ -128,13 +137,13 @@ struct nc_outgoing {
 };
 
 struct nc_recv_entry {
-    uint8_t *data;
+    int      buf;    /* pool index, NC_NOBUF when empty */
     size_t   len;
 };
 
 struct nc_reorder {
     uint16_t seq;
-    uint8_t *data;
+    int      buf;    /* pool index, NC_NOBUF when empty */
     size_t   len;
     uint8_t  valid;
 };
@@ -144,9 +153,8 @@ struct nc_frag_asm {
     uint8_t  total;
     uint8_t  have;
     uint32_t bitmask;
-    uint8_t *data;
-    size_t   alloc;
-    size_t  *offsets;
+    int      buf;    /* pool index for the reassembly scratch, NC_NOBUF when empty */
+    size_t   offsets[NC_MAX_FRAGS];
     uint8_t  active;
 };
 
@@ -208,12 +216,57 @@ struct netchan_conn {
     struct netchan_chan *channels[NC_MAX_CHANNELS];
     uint8_t next_chan_id;
 
+    /* channel pool: channels[] entries point into here, no per-open alloc */
+    struct netchan_chan chan_pool[NC_MAX_CHAN];
+    uint8_t chan_used[NC_MAX_CHAN];
+
+    /* message-buffer pool: fixed-size buffers borrowed by the slots above.
+     * pool_free is a stack of available indices. */
+    int     pool_free[NC_POOL_BUFS];
+    int     pool_free_top;
+    uint8_t pool_store[NC_POOL_BUFS * NC_MAX_MSG];
+
     struct netchan_event events[NC_EVENT_QUEUE];
     int ev_head, ev_tail;
 
     uint8_t ctrl_buf[NC_CTRL_BUF_SIZE];
     size_t  ctrl_len;
 };
+
+/****************************************************************
+ * Message-buffer pool -- fixed buffers, borrowed at run time,
+ * allocated once with the connection.
+ ****************************************************************/
+
+static void
+pool_init(struct netchan_conn *c)
+{
+    for (int i = 0; i < NC_POOL_BUFS; i++)
+        c->pool_free[i] = i;
+    c->pool_free_top = NC_POOL_BUFS;
+}
+
+static int
+pool_get(struct netchan_conn *c)
+{
+    if (c->pool_free_top == 0)
+        return NC_NOBUF;
+    return c->pool_free[--c->pool_free_top];
+}
+
+static void
+pool_put(struct netchan_conn *c, int idx)
+{
+    if (idx == NC_NOBUF)
+        return;
+    c->pool_free[c->pool_free_top++] = idx;
+}
+
+static uint8_t *
+pool_ptr(struct netchan_conn *c, int idx)
+{
+    return c->pool_store + (size_t)idx * NC_MAX_MSG;
+}
 
 /****************************************************************
  * Event queue
@@ -358,12 +411,39 @@ max_frag_payload(struct netchan_conn *c)
     return c->cfg.mtu - NC_HDR_FULL_SIZE - 8;
 }
 
+/* Reset every slot's pool index to "empty" after a zeroing memset, so that a
+ * cleared slot never looks like it owns pool buffer 0. */
+static void
+chan_reset_bufs(struct netchan_chan *ch)
+{
+    for (int i = 0; i < NC_OUTGOING_SLOTS; i++)
+        ch->outgoing[i].buf = NC_NOBUF;
+    for (int i = 0; i < NC_RECV_QUEUE; i++)
+        ch->recv_queue[i].buf = NC_NOBUF;
+    for (int i = 0; i < NC_REORDER_SLOTS; i++)
+        ch->reorder[i].buf = NC_NOBUF;
+    for (int i = 0; i < NC_FRAG_SLOTS; i++)
+        ch->frags[i].buf = NC_NOBUF;
+}
+
 static struct netchan_chan *
 chan_new(struct netchan_conn *c, uint8_t id, int type, int dir,
         int role, const char *content_type)
 {
-    struct netchan_chan *ch = calloc(1, sizeof(*ch));
-    if (!ch) return NULL;
+    int slot = -1;
+    for (int i = 0; i < NC_MAX_CHAN; i++) {
+        if (!c->chan_used[i]) {
+            slot = i;
+            break;
+        }
+    }
+    if (slot < 0) return NULL; /* channel pool exhausted */
+
+    struct netchan_chan *ch = &c->chan_pool[slot];
+    memset(ch, 0, sizeof(*ch));
+    chan_reset_bufs(ch);
+    c->chan_used[slot] = 1;
+
     ch->conn = c;
     ch->id = id;
     ch->type = type;
@@ -382,23 +462,21 @@ static void
 chan_free(struct netchan_chan *ch)
 {
     if (!ch) return;
+    struct netchan_conn *c = ch->conn;
     for (int i = 0; i < NC_OUTGOING_SLOTS; i++) {
         if (ch->outgoing[i].active)
-            free(ch->outgoing[i].data);
+            pool_put(c, ch->outgoing[i].buf);
     }
-    for (int i = 0; i < NC_RECV_QUEUE; i++) {
-        free(ch->recv_queue[i].data);
+    for (int i = 0; i < NC_RECV_QUEUE; i++)
+        pool_put(c, ch->recv_queue[i].buf);
+    for (int i = 0; i < NC_REORDER_SLOTS; i++)
+        pool_put(c, ch->reorder[i].buf);
+    for (int i = 0; i < NC_FRAG_SLOTS; i++)
+        pool_put(c, ch->frags[i].buf);
+    if (c) {
+        c->channels[ch->id] = NULL;
+        c->chan_used[ch - c->chan_pool] = 0;
     }
-    for (int i = 0; i < NC_REORDER_SLOTS; i++) {
-        free(ch->reorder[i].data);
-    }
-    for (int i = 0; i < NC_FRAG_SLOTS; i++) {
-        free(ch->frags[i].data);
-        free(ch->frags[i].offsets);
-    }
-    if (ch->conn)
-        ch->conn->channels[ch->id] = NULL;
-    free(ch);
 }
 
 static int
@@ -407,10 +485,13 @@ chan_recv_enqueue(struct netchan_chan *ch, const uint8_t *data, size_t len)
     int next = (ch->rq_tail + 1) % NC_RECV_QUEUE;
     if (next == ch->rq_head)
         return NETCHAN_ERR;
-    ch->recv_queue[ch->rq_tail].data = malloc(len);
-    if (!ch->recv_queue[ch->rq_tail].data)
+    if (len > NC_MAX_MSG)
+        return NETCHAN_ERR_TOOBIG;
+    int b = pool_get(ch->conn);
+    if (b == NC_NOBUF)
         return NETCHAN_ERR_NOMEM;
-    memcpy(ch->recv_queue[ch->rq_tail].data, data, len);
+    memcpy(pool_ptr(ch->conn, b), data, len);
+    ch->recv_queue[ch->rq_tail].buf = b;
     ch->recv_queue[ch->rq_tail].len = len;
     ch->rq_tail = next;
     ch->recv_buffered += len;
@@ -426,10 +507,10 @@ chan_deliver_reordered(struct netchan_chan *ch)
         struct nc_reorder *r = &ch->reorder[slot];
         if (!r->valid || r->seq != ch->recv_seq)
             break;
-        chan_recv_enqueue(ch, r->data, r->len);
+        chan_recv_enqueue(ch, pool_ptr(ch->conn, r->buf), r->len);
         ev_push(ch->conn, NETCHAN_EV_DATA, ch);
-        free(r->data);
-        r->data = NULL;
+        pool_put(ch->conn, r->buf);
+        r->buf = NC_NOBUF;
         r->valid = 0;
         ch->recv_seq++;
     }
@@ -452,23 +533,19 @@ frag_find(struct netchan_chan *ch, uint16_t seq)
 static struct nc_frag_asm *
 frag_alloc(struct netchan_chan *ch, uint16_t seq, uint8_t total)
 {
+    if (total > NC_MAX_FRAGS)
+        return NULL;
     for (int i = 0; i < NC_FRAG_SLOTS; i++) {
         if (!ch->frags[i].active) {
             struct nc_frag_asm *f = &ch->frags[i];
+            int b = pool_get(ch->conn);
+            if (b == NC_NOBUF)
+                return NULL;
             memset(f, 0, sizeof(*f));
             f->seq = seq;
             f->total = total;
             f->active = 1;
-            size_t payload_max = max_frag_payload(ch->conn);
-            f->alloc = payload_max * total;
-            f->data = malloc(f->alloc);
-            f->offsets = calloc(total, sizeof(size_t));
-            if (!f->data || !f->offsets) {
-                free(f->data);
-                free(f->offsets);
-                memset(f, 0, sizeof(*f));
-                return NULL;
-            }
+            f->buf = b;
             return f;
         }
     }
@@ -476,11 +553,11 @@ frag_alloc(struct netchan_chan *ch, uint16_t seq, uint8_t total)
 }
 
 static void
-frag_free(struct nc_frag_asm *f)
+frag_free(struct netchan_chan *ch, struct nc_frag_asm *f)
 {
-    free(f->data);
-    free(f->offsets);
+    pool_put(ch->conn, f->buf);
     memset(f, 0, sizeof(*f));
+    f->buf = NC_NOBUF;
 }
 
 /****************************************************************
@@ -661,30 +738,25 @@ process_data(struct netchan_conn *c, const uint8_t *p, size_t len)
             if (!f) f = frag_alloc(ch, seq, frag_total);
             if (f && frag_idx < f->total && !(f->bitmask & (1u << frag_idx))) {
                 size_t off = (size_t)frag_idx * max_frag_payload(c);
-                if (off + data_len <= f->alloc) {
-                    memcpy(f->data + off, payload, data_len);
+                if (off + data_len <= NC_MAX_MSG) {
+                    memcpy(pool_ptr(c, f->buf) + off, payload, data_len);
                     f->offsets[frag_idx] = data_len;
                     f->bitmask |= (1u << frag_idx);
                     f->have++;
                     if (f->have == f->total) {
-                        size_t total = 0;
-                        for (int i = 0; i < f->total; i++)
-                            total += f->offsets[i];
-                        /* reassemble contiguously */
-                        uint8_t *assembled = malloc(total);
-                        if (assembled) {
-                            size_t pos = 0;
-                            size_t fp = max_frag_payload(c);
-                            for (int i = 0; i < f->total; i++) {
-                                memcpy(assembled + pos, f->data + i * fp,
-                                       f->offsets[i]);
-                                pos += f->offsets[i];
-                            }
-                            chan_recv_enqueue(ch, assembled, total);
-                            ev_push(c, NETCHAN_EV_DATA, ch);
-                            free(assembled);
+                        /* compact fragments in place, then deliver */
+                        uint8_t *base = pool_ptr(c, f->buf);
+                        size_t pos = 0;
+                        size_t fp = max_frag_payload(c);
+                        for (int i = 0; i < f->total; i++) {
+                            if (pos != (size_t)i * fp)
+                                memmove(base + pos, base + i * fp,
+                                        f->offsets[i]);
+                            pos += f->offsets[i];
                         }
-                        frag_free(f);
+                        chan_recv_enqueue(ch, base, pos);
+                        ev_push(c, NETCHAN_EV_DATA, ch);
+                        frag_free(ch, f);
                     }
                 }
             }
@@ -704,11 +776,12 @@ process_data(struct netchan_conn *c, const uint8_t *p, size_t len)
             int16_t diff = (int16_t)(seq - ch->recv_seq);
             if (diff > 0 && diff < NC_REORDER_SLOTS) {
                 int slot = seq % NC_REORDER_SLOTS;
-                if (!ch->reorder[slot].valid) {
-                    ch->reorder[slot].seq = seq;
-                    ch->reorder[slot].data = malloc(data_len);
-                    if (ch->reorder[slot].data) {
-                        memcpy(ch->reorder[slot].data, payload, data_len);
+                if (!ch->reorder[slot].valid && data_len <= NC_MAX_MSG) {
+                    int b = pool_get(c);
+                    if (b != NC_NOBUF) {
+                        memcpy(pool_ptr(c, b), payload, data_len);
+                        ch->reorder[slot].seq = seq;
+                        ch->reorder[slot].buf = b;
                         ch->reorder[slot].len = data_len;
                         ch->reorder[slot].valid = 1;
                     }
@@ -721,49 +794,44 @@ process_data(struct netchan_conn *c, const uint8_t *p, size_t len)
         if (!f) f = frag_alloc(ch, seq, frag_total);
         if (f && frag_idx < f->total && !(f->bitmask & (1u << frag_idx))) {
             size_t off = (size_t)frag_idx * max_frag_payload(c);
-            if (off + data_len <= f->alloc) {
-                memcpy(f->data + off, payload, data_len);
+            if (off + data_len <= NC_MAX_MSG) {
+                memcpy(pool_ptr(c, f->buf) + off, payload, data_len);
                 f->offsets[frag_idx] = data_len;
                 f->bitmask |= (1u << frag_idx);
                 f->have++;
                 if (f->have == f->total) {
-                    size_t total = 0;
-                    for (int i = 0; i < f->total; i++)
-                        total += f->offsets[i];
-                    uint8_t *assembled = malloc(total);
-                    if (assembled) {
-                        size_t pos = 0;
-                        size_t fp = max_frag_payload(c);
-                        for (int i = 0; i < f->total; i++) {
-                            memcpy(assembled + pos, f->data + i * fp,
-                                   f->offsets[i]);
-                            pos += f->offsets[i];
-                        }
-                        /* deliver in order */
-                        if (seq == ch->recv_seq) {
-                            chan_recv_enqueue(ch, assembled, total);
-                            ev_push(c, NETCHAN_EV_DATA, ch);
-                            ch->recv_seq++;
-                            chan_deliver_reordered(ch);
-                        } else {
-                            int16_t diff = (int16_t)(seq - ch->recv_seq);
-                            if (diff > 0 && diff < NC_REORDER_SLOTS) {
-                                int slot = seq % NC_REORDER_SLOTS;
-                                if (!ch->reorder[slot].valid) {
+                    /* compact fragments in place */
+                    uint8_t *base = pool_ptr(c, f->buf);
+                    size_t pos = 0;
+                    size_t fp = max_frag_payload(c);
+                    for (int i = 0; i < f->total; i++) {
+                        if (pos != (size_t)i * fp)
+                            memmove(base + pos, base + i * fp, f->offsets[i]);
+                        pos += f->offsets[i];
+                    }
+                    /* deliver in order */
+                    if (seq == ch->recv_seq) {
+                        chan_recv_enqueue(ch, base, pos);
+                        ev_push(c, NETCHAN_EV_DATA, ch);
+                        ch->recv_seq++;
+                        chan_deliver_reordered(ch);
+                    } else {
+                        int16_t diff = (int16_t)(seq - ch->recv_seq);
+                        if (diff > 0 && diff < NC_REORDER_SLOTS) {
+                            int slot = seq % NC_REORDER_SLOTS;
+                            if (!ch->reorder[slot].valid && pos <= NC_MAX_MSG) {
+                                int b = pool_get(c);
+                                if (b != NC_NOBUF) {
+                                    memcpy(pool_ptr(c, b), base, pos);
                                     ch->reorder[slot].seq = seq;
-                                    ch->reorder[slot].data = malloc(total);
-                                    if (ch->reorder[slot].data) {
-                                        memcpy(ch->reorder[slot].data,
-                                               assembled, total);
-                                        ch->reorder[slot].len = total;
-                                        ch->reorder[slot].valid = 1;
-                                    }
+                                    ch->reorder[slot].buf = b;
+                                    ch->reorder[slot].len = pos;
+                                    ch->reorder[slot].valid = 1;
                                 }
                             }
                         }
-                        free(assembled);
                     }
-                    frag_free(f);
+                    frag_free(ch, f);
                 }
             }
         }
@@ -791,8 +859,8 @@ process_ack(struct netchan_conn *c, const uint8_t *p, size_t len)
         if (diff <= 0) {
             ch->bytes_in_flight -= o->len;
             ch->msgs_acked++;
-            free(o->data);
-            o->data = NULL;
+            pool_put(c, o->buf);
+            o->buf = NC_NOBUF;
             o->active = 0;
         }
     }
@@ -931,6 +999,7 @@ netchan_open(int server)
     c->state = NETCHAN_STATE_NEW;
     c->next_chan_id = server ? 1 : 0;
     c->rtt_ms = 100;
+    pool_init(c);
     netchan_cfg_default(&c->cfg);
     return c;
 }
@@ -1160,7 +1229,7 @@ netchan_send_next(struct netchan_conn *c, void *buf, size_t buflen,
         wr16(p + pos, (uint16_t)dlen); pos += 2;
         p[pos++] = fi;
         p[pos++] = o->frag_total;
-        memcpy(p + pos, o->data + offset, dlen);
+        memcpy(p + pos, pool_ptr(c, o->buf) + offset, dlen);
         pos += dlen;
 
         o->frag_sent++;
@@ -1169,8 +1238,8 @@ netchan_send_next(struct netchan_conn *c, void *buf, size_t buflen,
 
         if (o->frag_sent >= o->frag_total) {
             if (ch->type == NETCHAN_UNRELIABLE) {
-                free(o->data);
-                o->data = NULL;
+                pool_put(c, o->buf);
+                o->buf = NC_NOBUF;
                 o->active = 0;
                 ch->out_head = (ch->out_head + 1) % NC_OUTGOING_SLOTS;
             } else {
@@ -1339,6 +1408,7 @@ netchan_chan_write(struct netchan_chan *ch, const void *data, size_t len)
     if (!ch || ch->role != 0) return NETCHAN_ERR;
     if (ch->state == 3) return NETCHAN_ERR_CLOSED;
     if (len == 0) return 0;
+    if (len > NC_MAX_MSG) return NETCHAN_ERR_TOOBIG;
 
     /* flow control: check window */
     if (ch->type == NETCHAN_RELIABLE && ch->state == 1) {
@@ -1352,10 +1422,11 @@ netchan_chan_write(struct netchan_chan *ch, const void *data, size_t len)
         return NETCHAN_ERR_AGAIN;
 
     struct nc_outgoing *o = &ch->outgoing[ch->out_tail];
+    int b = pool_get(ch->conn);
+    if (b == NC_NOBUF) return NETCHAN_ERR_NOMEM;
     memset(o, 0, sizeof(*o));
-    o->data = malloc(len);
-    if (!o->data) return NETCHAN_ERR_NOMEM;
-    memcpy(o->data, data, len);
+    o->buf = b;
+    memcpy(pool_ptr(ch->conn, b), data, len);
     o->len = len;
     o->seq = ch->send_seq++;
     o->active = 1;
@@ -1364,8 +1435,9 @@ netchan_chan_write(struct netchan_chan *ch, const void *data, size_t len)
     o->frag_total = (uint8_t)((len + frag_payload - 1) / frag_payload);
     if (o->frag_total == 0) o->frag_total = 1;
     if (o->frag_total > NC_MAX_FRAGS) {
-        free(o->data);
+        pool_put(ch->conn, b);
         memset(o, 0, sizeof(*o));
+        o->buf = NC_NOBUF;
         return NETCHAN_ERR_TOOBIG;
     }
 
@@ -1385,9 +1457,9 @@ netchan_chan_read(struct netchan_chan *ch, void *buf, size_t buflen)
 
     struct nc_recv_entry *e = &ch->recv_queue[ch->rq_head];
     size_t n = e->len < buflen ? e->len : buflen;
-    memcpy(buf, e->data, n);
-    free(e->data);
-    e->data = NULL;
+    memcpy(buf, pool_ptr(ch->conn, e->buf), n);
+    pool_put(ch->conn, e->buf);
+    e->buf = NC_NOBUF;
     e->len = 0;
     ch->rq_head = (ch->rq_head + 1) % NC_RECV_QUEUE;
 

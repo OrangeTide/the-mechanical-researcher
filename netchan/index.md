@@ -1,7 +1,8 @@
 ---
 title: Reliable UDP for Games — QuakeWorld, ENet, QUIC, and Netchan Compared
 date: 2026-05-09
-abstract: "A comparison of four UDP multiplexing approaches for game networking, from the 1996 QuakeWorld NetChannel to a near-minimal modern implementation in 1,400 lines of C"
+revised: 2026-07-06
+abstract: "A comparison of four UDP multiplexing approaches for game networking, from the 1996 QuakeWorld NetChannel to a near-minimal modern implementation in 1,500 lines of C"
 category: networking
 ---
 
@@ -14,7 +15,7 @@ The solution, reinvented across three decades of game development, is a reliabil
 - **QuakeWorld NetChannel** — the 1996 protocol that proved client-side prediction could make internet FPS playable over dial-up
 - **ENet** — the de facto library for indie game networking since 2004, used by Sauerbraten, Godot Engine, and others
 - **QUIC** — the IETF-standardized protocol (RFC 9000) that powers HTTP/3, with mandatory TLS 1.3 encryption
-- **Netchan** — a near-minimal multiplexed channel protocol in 1,400 lines of C, designed as a practical baseline for small multiplayer games
+- **Netchan** — a near-minimal multiplexed channel protocol in 1,500 lines of C, designed as a practical baseline for small multiplayer games
 
 ## Abstract
 
@@ -142,7 +143,7 @@ QUIC is feature-rich but mismatched to game networking requirements:
 | ngtcp2 | C | Large codebase |
 | MsQuic (Microsoft) | C | Production-grade, ships in Windows |
 
-Compare this with ENet (~5,000 LOC) or netchan (1,400 LOC).
+Compare this with ENet (~5,000 LOC) or netchan (1,500 LOC).
 
 **Latency tradeoffs.** On fast networks, measurements show UDP+QUIC+HTTP/3 suffering up to 45% data rate reduction versus TCP+TLS+HTTP/2. The per-packet crypto and loss detection overhead isn't free.
 
@@ -152,7 +153,7 @@ QUIC's unreliable datagram extension (RFC 9221) narrows the gap, but the fundame
 
 ## Netchan
 
-Netchan is a multiplexed UDP channel protocol implemented in 1,437 lines of C (160-line header, 1,437-line implementation) with no external dependencies beyond POSIX sockets. The companion source (`netchan.h`, `netchan.c`, `netchan_test.c`) builds with a single `make` invocation and runs ten protocol-level tests. It doesn't require tens of thousands of lines of code to provide per-channel reliability, flow control, fragmentation, connection migration, and congestion detection statistics.
+Netchan is a multiplexed UDP channel protocol implemented in 1,509 lines of C (160-line header, 1,509-line implementation) with no external dependencies beyond POSIX sockets. The companion source (`netchan.h`, `netchan.c`, `netchan_test.c`) builds with a single `make` invocation and runs ten protocol-level tests. It doesn't require tens of thousands of lines of code to provide per-channel reliability, flow control, fragmentation, connection migration, a fully static memory model, and congestion detection statistics.
 
 ### Design Goals
 
@@ -234,6 +235,27 @@ Reliable channels implement credit-based flow control:
 
 This prevents a fast sender from overwhelming a slow receiver without requiring global bandwidth limits.
 
+### Memory Model
+
+Netchan allocates nothing during play. All storage lives inside the connection object, which is allocated once by `netchan_open()` and released by `netchan_close()`. Between those two calls no heap operation occurs: no per-message copy, no per-channel record, no fragment scratch buffer touches the allocator. This is a deliberate departure from the usual "malloc a buffer per message" style, and it is what makes the protocol embeddable in environments where the allocator is slow, absent, or forbidden (16-bit DOS, game consoles, bare-metal firmware).
+
+Two fixed pools inside the connection provide the working memory:
+
+- A **message-buffer pool** of `NC_POOL_BUFS` fixed-size buffers (`NC_MAX_MSG` bytes each). Outgoing message copies, receive-queue entries, reorder slots, and fragment reassembly all borrow a buffer from this pool by index and return it when done. A borrow that finds the pool empty fails gracefully with `NETCHAN_ERR_NOMEM`, the same signal the old heap path returned on `malloc` failure.
+- A **channel pool** of `NC_MAX_CHAN` channel records. Opening a channel claims a free record instead of allocating one; the 256-wide protocol channel-ID space is still addressable, but the number of channels open at once is bounded by the pool.
+
+Fragment reassembly compacts the received fragments in place with a leftward `memmove` rather than allocating a separate contiguous buffer, so even the large-message path stays allocation-free.
+
+Three compile-time tunables set the footprint:
+
+| Tunable | Default | Bounds |
+|---------|---------|--------|
+| `NC_MAX_CHAN` | 16 | Channels open simultaneously |
+| `NC_MAX_MSG` | 2,048 | Largest buffered message, bytes |
+| `NC_POOL_BUFS` | 64 | Messages buffered across the whole connection |
+
+At the defaults the connection object is roughly 218 KB, and its size is fixed the moment it is created. The trade-off is an explicit ceiling on message size: a write larger than `NC_MAX_MSG` returns `NETCHAN_ERR_TOOBIG` rather than growing a buffer to fit. A build that needs larger messages or more channels raises the tunables and pays for it in a bigger, but still single and predictable, allocation.
+
 ### Connection Migration
 
 When a packet arrives from a different address than expected, netchan validates the migration by checking for DATA or ACK frames targeting known channels. Spoofed packets without valid channel context are rejected. On successful validation, the peer address is updated transparently.
@@ -306,6 +328,7 @@ Ten tests exercise the protocol end-to-end using loopback helpers that shuttle p
 | Encryption | No | No | Mandatory TLS 1.3 | No (layer externally) |
 | Connection migration | No | No | Yes | Yes |
 | IPv6 | No | Fork only (ENet6) | Yes | Socket-agnostic |
+| Runtime allocation | None (fixed buffers) | Per-packet heap | Heap / pools | None (static pools) |
 
 ### Packet Overhead
 
@@ -322,7 +345,7 @@ All figures exclude the 28-byte UDP/IPv4 (or 48-byte UDP/IPv6) header that every
 
 | Metric | QuakeWorld | ENet | QUIC (quiche) | Netchan |
 |--------|-----------|------|---------------|---------|
-| Implementation LOC | ~400 | ~5,000 | ~100,000+ | 1,437 |
+| Implementation LOC | ~400 | ~5,000 | ~100,000+ | 1,509 |
 | Header LOC | Inline | ~400 | Thousands | 160 |
 | External dependencies | None | None | TLS library | None |
 | API functions | ~5 | ~50 | ~100+ | 22 |
@@ -418,6 +441,6 @@ Netchan's stats API already covers the detection side: `netchan_conn_stats()` re
 
 The spectrum from QuakeWorld's 400-line netchan to QUIC's six-figure codebase reflects a fundamental tension in protocol design: generality costs complexity. QuakeWorld proved that a reliable UDP layer can be trivially simple when the application's needs are narrow; QUIC proved it can replace TCP+TLS when they're broad. ENet and netchan occupy the practical middle ground where most games live.
 
-Netchan fits the features described above into 1,400 lines of C. It's not the right choice for every game, but it establishes a useful lower bound: if the networking layer is more complex than this and the game's requirements are simpler than QUIC's, something may have gone wrong.
+Netchan fits the features described above into 1,500 lines of C. It's not the right choice for every game, but it establishes a useful lower bound: if the networking layer is more complex than this and the game's requirements are simpler than QUIC's, something may have gone wrong.
 
-The full source (`netchan.h`, `netchan.c`, `netchan_test.c`, and `Makefile`) is available as a companion download. Build with `make` and run `./netchan_test` to exercise all nine protocol tests.
+The full source (`netchan.h`, `netchan.c`, `netchan_test.c`, and `Makefile`) is available as a companion download. Build with `make` and run `./netchan_test` to exercise all ten protocol tests.
