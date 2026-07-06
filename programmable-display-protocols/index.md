@@ -354,7 +354,7 @@ Several important questions remain untested:
 
 **Ecosystem adoption.** Like every display protocol before it, Quaoar requires applications to be written against its widget library. The practical path to adoption would be a GTK or Qt backend that outputs protocol messages rather than rendering locally — the same approach GTK's Broadway backend takes for Canvas-based remote display.
 
-The full source, build instructions, and deployment documentation are in the [`demo/`](https://github.com/OrangeTide/the-mechanical-researcher/tree/gh-pages/programmable-display-protocols/demo) directory and [README](demo/README.md).
+The full source, build instructions, and deployment documentation are in the [`demo/`](https://github.com/OrangeTide/the-mechanical-researcher/tree/main/programmable-display-protocols/demo) directory and [README](demo/README.md).
 
 ## Conclusion
 
