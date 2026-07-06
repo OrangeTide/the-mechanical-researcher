@@ -20,7 +20,7 @@ Topics may also include supplementary files such as formal reports with larger d
 
 ## Static Site Generator
 
-The blog is built with a custom shell script pipeline using **lowdown** for markdown-to-HTML conversion. The site is published to a `gh-pages` branch.
+The blog is built with a custom shell script pipeline using **lowdown** for markdown-to-HTML conversion. The site is published to GitHub Pages by a GitHub Actions workflow on every push to `main`.
 
 ### Markdown and HTML capabilities
 - **lowdown** supports GFM tables natively.
@@ -36,9 +36,10 @@ The blog is built with a custom shell script pipeline using **lowdown** for mark
 ```
 
 ### Deploy
-```sh
-./deploy.sh           # builds the site and pushes to gh-pages branch
-```
+Publishing is automated by GitHub Actions (`.github/workflows/deploy.yml`):
+every push to `main` runs `./build.sh` and deploys `_build/` to GitHub Pages
+via the Pages deployment API. There is no manual deploy step and no `gh-pages`
+branch. To publish, commit and push to `main`.
 
 ### Project layout
 - `build.sh` — main build script

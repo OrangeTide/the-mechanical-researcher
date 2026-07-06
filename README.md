@@ -29,5 +29,8 @@ Requires [lowdown](https://kristaps.bsd.lv/lowdown/).
 
 ```sh
 ./build.sh            # build site to _build/
-./deploy.sh           # build and push to gh-pages
 ```
+
+Deployment is automated: pushing to `main` triggers the GitHub Actions
+workflow (`.github/workflows/deploy.yml`), which builds the site and
+publishes it to GitHub Pages.
