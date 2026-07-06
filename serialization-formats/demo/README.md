@@ -31,18 +31,19 @@ This runs the generator on `sensor.idl` to produce `sensor.h` and
       29 8f 02         field 5 (16-bit) = 655
       decoded: id=7 ts=1712000000 kind=3 temp=234 hum=655
 
-    DeviceInfo (14 bytes on wire):
-      0c 00              length = 12
+    DeviceInfo (27 bytes on wire):
+      19 00              length = 25
       09 34 12         field 1 (16-bit) = 4660
       10 02            field 2 (8-bit) = 2
       18 01            field 3 (8-bit) = 1
       22 80 51 01 00   field 4 (32-bit) = 86400
-      decoded: id=0x1234 fw=2.1 uptime=86400
+      2c 0a 00      field 5 (bytes[10]) = "weatherbox"
+      decoded: id=0x1234 fw=2.1 uptime=86400 name="weatherbox"
 
 ## Files
 
 - `microser.h` - runtime primitives (static inline, zero dependencies)
 - `sensor.idl` - example IDL defining sensor protocol messages
-- `gen.sh` - IDL compiler (shell + awk), generates C code
+- `microser-gen.sh` - IDL compiler (shell + awk), generates C code
 - `demo.c` - demo program showing encode/decode/annotate
 - `Makefile` - build instructions

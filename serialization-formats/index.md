@@ -571,7 +571,7 @@ The demo format encodes each field as a **tag byte** followed by the value bytes
 tag = (field_number << 3) | wire_type
 ```
 
-Four wire types cover all fixed-width integers:
+Five wire types cover the fixed-width integers plus variable-length data:
 
 | Wire Type | Size | Types |
 |-----------|------|-------|
@@ -579,8 +579,9 @@ Four wire types cover all fixed-width integers:
 | 1 | 2 bytes | uint16, int16 |
 | 2 | 4 bytes | uint32, int32 |
 | 3 | 8 bytes | uint64, int64 |
+| 4 | 2-byte length + data | string, bytes |
 
-Values are little-endian. Messages are framed with a 2-byte little-endian length prefix. That's the entire format — no varints, no length-delimited strings, no nested messages. This is deliberate: on an embedded system, you want fixed-width fields with predictable sizes.
+Fixed-width values are little-endian. Wire type 4 carries a variable-length payload — a 2-byte little-endian length followed by that many raw bytes — which covers strings and binary blobs. Messages are framed with a 2-byte little-endian length prefix. That's the entire format: no varints and no nested messages. This is deliberate. On an embedded system you want predictable field sizes, and a single length-prefixed byte type covers the variable-length cases without the complexity of recursive encoding. Because the length prefix tells a decoder exactly how many bytes to skip, unknown variable-length fields stay skippable too, preserving forward compatibility.
 
 ### The IDL
 
@@ -612,7 +613,7 @@ The `case` block is a discriminated union: the `kind` field (tag 3) determines w
 
 ### What the Generator Produces
 
-Running `./gen.sh sensor.idl sensor` produces `sensor.h` and `sensor.c`. The header contains native C structs:
+Running `./microser-gen.sh sensor.idl sensor` produces `sensor.h` and `sensor.c`. The header contains native C structs:
 
 ```c
 struct sensor_reading {
@@ -657,6 +658,20 @@ A combo sensor reading (ID 7, timestamp 1712000000, temperature 23.4 C, humidity
 ```
 
 The same data in JSON — `{"sensor_id":7,"timestamp":1712000000,"kind":3,"temperature":234,"humidity":655}` — is 76 bytes. The tag-number approach is 4.5x more compact, and the decoder is a simple switch statement with no string matching, no memory allocation, and no dependencies beyond `<stdint.h>`.
+
+A `DeviceInfo` carrying a `string name = 5` shows the length-prefixed wire type in action. The `name` field generates a `const char *name` plus a `uint16_t name_len` in the struct, and encodes as tag byte, 2-byte length, then the raw characters:
+
+```
+19 00                        payload length = 25
+09 34 12                     tag 1 (uint16 device_id) = 0x1234
+10 02                        tag 2 (uint8 firmware_major) = 2
+18 01                        tag 3 (uint8 firmware_minor) = 1
+22 80 51 01 00               tag 4 (uint32 uptime_secs) = 86400
+2c 0a 00                     tag 5 (string name), length 10
+77 65 61 74 68 65 72 62 6f 78    "weatherbox"
+```
+
+Decoding is zero-copy: `ms_read_bytes` points `name` straight into the receive buffer and records the length, so no allocation or copy happens. The string is not NUL-terminated on the wire, which is why the length travels alongside the pointer.
 
 The full demo source is in the `demo/` directory.
 

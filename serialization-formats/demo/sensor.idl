@@ -28,4 +28,5 @@ message DeviceInfo
     uint8 firmware_major = 2
     uint8 firmware_minor = 3
     uint32 uptime_secs = 4
+    string name = 5
 end
