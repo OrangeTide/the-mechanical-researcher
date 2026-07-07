@@ -1,4 +1,6 @@
 _build/
+_out/
+compile_commands.json
 notes/pdfs
 coldfire-emulator/demo/smoke_test
 coldfire-emulator/demo/test_harness
@@ -15,3 +17,7 @@ serialization-formats/demo/sensor.h
 serialization-formats/demo/sensor.c
 netchan/demo/netchan_test
 netchan/demo/netchan_example
+netchan-v2/demo/netchan_test
+netchan-v2/demo/netchan_example
+netchan-v2/demo/proto_test
+netchan-v2/demo/nc_udp_test
