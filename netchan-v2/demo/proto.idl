@@ -1,0 +1,38 @@
+# proto.idl -- netchan-v2 demo game wire messages (microser IDL)
+#
+# A minimal server-authoritative protocol for the Caves-of-Thor style
+# 4-player demo. Snapshots are sent as one EntityState per live entity
+# over an unreliable channel (microser has no repeated fields, and an
+# unreliable per-entity stream is the natural fit anyway). Input is one
+# PlayerInput per frame, also unreliable. Welcome is reliable, sent once
+# on join.
+
+enum EntityKind
+    Player = 1
+    Shot = 2
+    Rock = 3
+end
+
+# client -> server, unreliable, one per input frame
+message PlayerInput
+    uint32 seq = 1          # input sequence number, newest wins
+    uint8 buttons = 2       # bitmask: up|down|left|right|fire
+    uint8 aim = 3           # facing octant, 0..7
+end
+
+# server -> client, unreliable, one per entity per snapshot
+message EntityState
+    uint32 tick = 1         # server tick this state belongs to
+    uint16 id = 2           # entity id
+    uint8 kind = 3          # EntityKind value
+    int16 x = 4             # fixed-point world position
+    int16 y = 5
+    uint8 hp = 6            # health; 0 means dead/removed
+end
+
+# server -> client, reliable, sent once when a client joins
+message Welcome
+    uint16 your_id = 1      # entity id assigned to this client
+    uint8 max_players = 2
+    string level = 3        # level name
+end
