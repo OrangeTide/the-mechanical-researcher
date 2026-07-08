@@ -38,8 +38,11 @@ To show the core is now genuinely platform-independent, it also compiles to
 WebAssembly and runs the same test suite under `node`. The first new backend
 follows immediately: an encrypted UDP transport for the desktop, a
 WireGuard/Noise-style decorator built on vendored public-domain crypto, added
-without touching the core. WebRTC and WebSocket backends for a browser client
-are the additive modules that come next.
+without touching the core. To exercise all of this, the demo carries a small
+multiplayer game, *Caves of Thor*, that runs server-authoritative over UDP,
+compiles to a self-contained browser build, and, through a WebSocket backend
+and a relay gateway, lets a browser player and a terminal player share one
+unmodified server at the same time.
 
 ## The Assumption, Made Explicit
 
@@ -238,29 +241,111 @@ nc_crypto tests:
 3/3 tests passed
 ```
 
-## What the Seam Unlocks Next
+## Caves of Thor: An Application for the Seam
 
-The crypto backend proved the pattern on hardware we control. The same seam
-reaches the browser, where the transports are not sockets at all:
+The seam and its backends deserve a program that leans on all of them, so the
+demo carries one: *Caves of Thor*, a four-player top-down shooter borrowed from
+the earlier [netchan-ipx experiment](/netchan-ipx/) and rebuilt on netchan-v2.
 
-- **A WebRTC data channel**, configured unreliable and unordered, behaves like
-  UDP; netchan's own reliability and reordering ride on top. Its address is a
-  handle, not an IP, and `nc_addr` already accommodates that.
-- **A WebSocket** is a reliable, ordered fallback for networks that block
-  everything else. netchan's layer runs over it too, redundantly but correctly,
-  which is the right trade when the alternative is not connecting at all.
+The design is deliberately old-fashioned and server-authoritative. A native
+`game_server` runs the simulation at 5 Hz. Each client opens two channels: a
+reliable one that carries a one-time `Welcome` with the player's slot and the
+map seed, and an unreliable one that streams packed entity snapshots. The map is
+never sent. The client reproduces it deterministically from the seed, so a
+snapshot is only the moving state, 220 bytes on the wire, and input is a single
+byte per tick encoding a twin-stick move-and-fire pair.
 
-Because none of this reaches the core, a single server can in principle accept a
-UDP client and a WebRTC client at once: each connection carries whichever
-`nc_addr` its transport produced, and the protocol logic above is identical. A
-browser-based game demo talking to a Linux server, alongside native UDP clients,
-is where this series is headed.
+Over the UDP backend this is just netchan doing its job. `game_server`
+demultiplexes every client on one socket by connection id; `game_play` is the
+interactive terminal client and `game_client` its headless twin for scripts and
+tests. None of it is new to this article. It is the payoff of the wire schema
+the previous section left "waiting for the browser client to speak it."
+
+Then the browser. Because the core compiles to wasm, the whole client stack,
+game logic, netchan, and a text-grid renderer drawn to a `<canvas>`, compiles
+with it. The first browser build, `web_demo`, is self-contained: it runs the
+server and the client in one module over an in-process loopback, with no network
+at all. It proves the entire stack renders and plays in a browser before any
+real transport exists. What it cannot do is share a world with anyone else.
+
+## The Third Backend: A WebSocket to the Browser
+
+To put that browser player on the real server, the browser has to send datagrams
+to it, and a browser cannot open a UDP socket. It can open a WebSocket.
+
+<img src="gateway-topology.svg" alt="Topology: a browser client (wasm plus nc_web) connects over a WebSocket to ws_gateway, which relays over UDP to an unmodified game_server; a terminal client (game_play plus nc_udp) connects to the same server directly over UDP">
+
+The browser transport is one file, `nc_web`, the exact mirror of `nc_udp`. Where
+`nc_udp` is the only native code that knows `sockaddr`, `nc_web` is the only code
+that knows the browser's `WebSocket` object. It carries no framing of its own,
+because a WebSocket already delivers whole binary messages: one netchan datagram
+is one message, and the datagram boundary survives for free. Sending is a call
+into JavaScript; receiving is JavaScript calling back in. The game and the
+protocol above it are byte-for-byte the native client.
+
+The server still speaks UDP and should not have to learn otherwise, so the bridge
+is a separate process, `ws_gateway`, and it is deliberately dumb. It terminates
+the browser's WebSocket and relays each binary message, unchanged, as a UDP
+datagram to the server, and each of the server's UDP replies back as a binary
+message. It gives every browser its own UDP socket toward the server, so on the
+server a browser is indistinguishable from any other UDP peer, one more
+connection id in the same demux loop. A terminal player and a browser player land
+on the same unmodified `game_server` at once, which is the sentence the whole
+seam was built to make true.
+
+The gateway needs a WebSocket implementation, and rather than pull in a library
+it carries a small one, `nc_ws`: the RFC 6455 handshake with SHA-1 and base64
+bundled in, plus the binary frame codec, about 430 lines with no external
+dependency. That same binary also serves the demo page and the wasm over plain
+HTTP, so the whole browser demo is one server process plus one gateway process.
+
+Verifying a browser path without a browser is the awkward part, and `nc_ws` being
+usable from both ends solves it. A native client, `ws_client`, speaks the same
+handshake and framing a browser would, straight from C. The end-to-end test
+launches the server and the gateway, then runs a WebSocket client and a native
+UDP client against the server at the same time; both must join and receive
+snapshots:
+
+```
+--- WebSocket client ---
+ws_client: welcome, player 1, seed 4660
+ws_client: state=2, player=1, snapshots=12
+--- native UDP client ---
+client: welcome, player 0, seed 4660
+client: state=2, player=0, snapshots=12
+ws_e2e_test: PASS (WebSocket + UDP clients shared one server)
+```
+
+Two players, two transports, one server, the same tick. The frame codec is
+checked separately against the RFC 6455 known-answer vector, and the gateway and
+both clients run clean under AddressSanitizer and UndefinedBehaviorSanitizer with
+live traffic flowing through them. Full build and run steps, including the
+browser-plus-terminal setup, are in the demo README
+([Markdown](demo/README.md), [HTML](demo/README.html)).
+
+A WebSocket runs over TCP, so beneath netchan's own reliability it is reliable
+and ordered, redundant but correct, and fine on a LAN. The closer fit for a game
+is a WebRTC data channel, unreliable and unordered like UDP. That is the fourth
+backend, [`nc_rtc`](demo/nc_rtc/README.md): it terminates a browser's data
+channel with a vendored DTLS/SCTP stack and relays it to the same unmodified
+server, the same gateway shape as the WebSocket path. The browser swaps an
+`RTCDataChannel` in where the `WebSocket` was, and the wasm client above it does
+not change at all.
+
+It earns one asterisk. A data channel is irreducibly ICE, DTLS, and SCTP, real
+libraries where a WebSocket needed none, so `nc_rtc` is native-only and built on
+its own, the single place the demo steps outside the compile-with-`cc` core. It
+is verified the same headless way as the rest: a libpeer client stands in for
+the browser, POSTs an offer, opens a data channel, and gets its datagram back
+through the gateway from the server.
 
 ## Conclusion
 
-This was intentionally a small part. The whole change is one new type, one new
-backend file, and the deletion of every socket header from the core. But it
-converts "port netchan to the browser" from a fork into an afternoon, and it
-does so without giving up any of the protocol capability the first article
-built. The groundwork is laid; the next part steps through the seam and out the
-other side, into a transport that has no sockets at all.
+The change at the center of this part stays small: one new type, `nc_addr`, and
+the removal of every socket header from the core. Everything after it is
+additive. An encrypted UDP decorator, a WebSocket gateway, and a WebRTC gateway
+were each a file or two the core never saw. The proof is a browser player and a
+terminal player in the same game on one unmodified server, reached through
+transports the protocol logic above them cannot tell apart. Porting netchan to
+the browser turned out to be the afternoon the seam promised, and the next
+transport, whatever it is, is another file.

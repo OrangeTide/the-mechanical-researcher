@@ -14,3 +14,4 @@ serialization-formats
 portable-compiler
 netchan
 netchan-ipx
+netchan-v2
