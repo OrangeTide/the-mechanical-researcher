@@ -1,0 +1,21 @@
+/* gateway-topology.dot : mixed-transport demo topology */
+/* Made by a machine. PUBLIC DOMAIN (CC0-1.0) */
+digraph gateway {
+    rankdir=LR;
+    bgcolor="white";
+    node [fontname="Helvetica", fontsize=12, shape=box, style="rounded",
+          color="#2c2420", fontcolor="#2c2420", penwidth=1.2];
+    edge [fontname="Helvetica", fontsize=11, color="#2c2420",
+          fontcolor="#2c2420", penwidth=1.2];
+
+    browser  [label="Browser client\nwasm + nc_web"];
+    gateway  [label="ws_gateway\nrelay + static files"];
+    terminal [label="Terminal client\ngame_play + nc_udp"];
+    server   [label="game_server\n(unmodified)", style="rounded,bold"];
+
+    browser  -> gateway  [label="WebSocket"];
+    gateway  -> server   [label="UDP"];
+    terminal -> server   [label="UDP"];
+
+    { rank=same; browser; terminal; }
+}

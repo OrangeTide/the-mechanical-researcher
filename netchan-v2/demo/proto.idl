@@ -1,38 +1,24 @@
 # proto.idl -- netchan-v2 demo game wire messages (microser IDL)
 #
 # A minimal server-authoritative protocol for the Caves-of-Thor style
-# 4-player demo. Snapshots are sent as one EntityState per live entity
-# over an unreliable channel (microser has no repeated fields, and an
-# unreliable per-entity stream is the natural fit anyway). Input is one
-# PlayerInput per frame, also unreliable. Welcome is reliable, sent once
-# on join.
-
-enum EntityKind
-    Player = 1
-    Shot = 2
-    Rock = 3
-end
+# 4-player demo. The static map is derived deterministically from a seed
+# the client receives at join time (it runs game_init(seed) locally), so
+# each tick only has to broadcast the dynamic entity state.
 
 # client -> server, unreliable, one per input frame
 message PlayerInput
     uint32 seq = 1          # input sequence number, newest wins
-    uint8 buttons = 2       # bitmask: up|down|left|right|fire
-    uint8 aim = 3           # facing octant, 0..7
-end
-
-# server -> client, unreliable, one per entity per snapshot
-message EntityState
-    uint32 tick = 1         # server tick this state belongs to
-    uint16 id = 2           # entity id
-    uint8 kind = 3          # EntityKind value
-    int16 x = 4             # fixed-point world position
-    int16 y = 5
-    uint8 hp = 6            # health; 0 means dead/removed
+    uint8 input = 2         # twin-stick byte: low nibble move dir, high nibble fire dir
 end
 
 # server -> client, reliable, sent once when a client joins
 message Welcome
-    uint16 your_id = 1      # entity id assigned to this client
-    uint8 max_players = 2
-    string level = 3        # level name
+    uint16 your_player = 1  # this client's player slot, 0..3
+    uint16 seed = 2         # map seed; client runs game_init(seed) for the static map
+end
+
+# server -> clients, unreliable, one per simulation tick
+message Snapshot
+    uint32 tick = 1
+    bytes state = 2         # packed players | creatures | shots (see game_wire.h)
 end

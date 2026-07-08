@@ -21,3 +21,8 @@ netchan-v2/demo/netchan_test
 netchan-v2/demo/netchan_example
 netchan-v2/demo/proto_test
 netchan-v2/demo/nc_udp_test
+netchan-v2/demo/game/web/web_demo.js
+netchan-v2/demo/game/web/web_demo.wasm
+netchan-v2/demo/game/web/web_client.js
+netchan-v2/demo/game/web/web_client.wasm
+netchan-v2/demo/nc_rtc/build/
