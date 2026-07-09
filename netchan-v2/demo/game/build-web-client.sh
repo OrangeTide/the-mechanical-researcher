@@ -12,12 +12,18 @@
 set -e
 cd "$(dirname "$0")"
 
-emcc -O2 -I. -I.. \
+# proto.c/proto.h are generated, not checked in. Emit them into a scratch dir
+# (gitignored) so this standalone emcc build has them without dirtying the tree.
+GEN=.gen
+mkdir -p "$GEN"
+( cd "$GEN" && ../../third_party/microser-gen.sh ../proto.idl proto )
+
+emcc -O2 -I. -I.. -I../third_party -I"$GEN" \
     -sMODULARIZE=1 -sEXPORT_NAME=createGameClient \
     -sEXPORTED_FUNCTIONS=_main,_web_step,_web_client_recv,_nc_web_inbuf,_web_client_player,_web_client_snaps \
     -sEXPORTED_RUNTIME_METHODS=ccall,HEAPU8 \
     web_client.c nc_web.c plat_web.c render.c game.c rng.c game_wire.c \
-    ../netchan.c ../proto.c \
+    ../netchan.c "$GEN/proto.c" \
     -o web/web_client.js
 
 echo "built web/web_client.js + web/web_client.wasm"
