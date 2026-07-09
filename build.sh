@@ -268,10 +268,16 @@ for index_md in */index.md; do
     CARDS_UNSORTED="${CARDS_UNSORTED}
 ${date}	{\"title\":\"${js_title}\",\"abstract\":\"${js_abstract}\",\"date\":\"${date}\",\"dateDisplay\":\"${date_display}\",\"revisedDisplay\":\"${js_revised_display}\",\"category\":\"${js_category}\",\"url\":\"${slug}/index.html\"}"
 
-    # ZIP source code directories (demo/) for download
+    # ZIP source code directories (demo/) for download. Prefer the tracked
+    # file list so build output (_out/, _build/, cmake build/, .gen/) stays out
+    # of the archive; fall back to a plain recursive zip outside a git checkout.
     if [ -d "$topic_dir/demo" ]; then
         zip_name="${slug}-source.zip"
-        (cd "$topic_dir" && zip -qr - demo) > "$OUT_DIR/$slug/$zip_name"
+        if (cd "$topic_dir" && git rev-parse --is-inside-work-tree >/dev/null 2>&1); then
+            (cd "$topic_dir" && git ls-files demo | zip -q -@ -) > "$OUT_DIR/$slug/$zip_name"
+        else
+            (cd "$topic_dir" && zip -qr - demo) > "$OUT_DIR/$slug/$zip_name"
+        fi
         zip_size="$(wc -c < "$OUT_DIR/$slug/$zip_name")"
         if [ "$zip_size" -ge 1073741824 ]; then
             zip_display="$(awk "BEGIN{printf \"%.1f GB\", $zip_size/1073741824}")"
