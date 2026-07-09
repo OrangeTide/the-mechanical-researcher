@@ -147,7 +147,7 @@ bar is that the old behaviour is still exactly the old behaviour.
 
 - The original ten loopback tests pass unchanged. They pack an `nc_addr` by hand
   as an opaque token, since the loopback harness never touches a real socket.
-- A new real-socket test (`nc_udp_test`) drives the actual `nc_udp` backend over
+- A new real-socket test (`test_nc_udp`) drives the actual `nc_udp` backend over
   two live loopback UDP sockets: it round-trips both an IPv4 and an IPv6 address
   through `from_sockaddr`/`to_sockaddr` and checks every field survives, then
   runs a full session and migrates the client to a new socket mid-connection,

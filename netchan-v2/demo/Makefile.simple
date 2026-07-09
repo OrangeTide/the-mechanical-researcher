@@ -1,3 +1,9 @@
+# Makefile.simple : a plain-cc build of netchan, no modular-make driver.
+#   make -f Makefile.simple
+# It builds the core, the UDP example, and (to show the third-party seam) the
+# encrypted-session test. See VENDORING.md for what the third-party bits are.
+# Made by a machine. PUBLIC DOMAIN (CC0-1.0)
+
 CFLAGS = -Wall -W
 ifneq (release,)
   # Release
@@ -8,11 +14,25 @@ else
 endif
 CFLAGS += $(if $(PKGS),$(shell pkg-config --cflags $(PKGS)))
 LDLIBS += $(if $(PKGS),$(shell pkg-config --libs $(PKGS)))
-CPPFLAGS += -Iinclude/
+
+# Point this at your copy of the vendored libraries (monocypher, microser).
+# Only the crypto backend needs it; the core and nc_udp need nothing external.
+THIRD_PARTY ?= third_party
+
+CPPFLAGS += -I. -I$(THIRD_PARTY)
 RM ?= rm -f
-all :: netchan_test netchan_example
-clean :: ; $(RM) netchan_test netchan_example
-netchan_test : netchan_test.c netchan.c netchan.h nc_addr.h
-	$(CC) $(CFLAGS) -o $@ netchan_test.c netchan.c
-netchan_example : netchan_example.c netchan.c nc_udp.c netchan.h nc_addr.h nc_udp.h
-	$(CC) $(CFLAGS) -o $@ netchan_example.c netchan.c nc_udp.c
+
+all :: netchan_test netchan_example test_nc_crypto
+clean :: ; $(RM) netchan_test netchan_example test_nc_crypto
+
+netchan_test : test/test_netchan.c netchan.c netchan.h nc_addr.h
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ test/test_netchan.c netchan.c
+
+netchan_example : examples/netchan_example.c netchan.c nc_udp.c netchan.h nc_addr.h nc_udp.h
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ examples/netchan_example.c netchan.c nc_udp.c
+
+# The encrypted backend is the one part that pulls in a third-party library:
+# monocypher, from $(THIRD_PARTY). This is the whole "how to point at it" story.
+test_nc_crypto : test/test_nc_crypto.c netchan.c nc_crypto.c $(THIRD_PARTY)/monocypher.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ \
+	    test/test_nc_crypto.c netchan.c nc_crypto.c $(THIRD_PARTY)/monocypher.c

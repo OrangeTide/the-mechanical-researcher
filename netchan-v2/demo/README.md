@@ -26,11 +26,12 @@ browser onto the server as an ordinary UDP peer.
 
 ```sh
 make               # native: server, terminal clients, gateway, tests
-make run-tests     # the socketless test suite (protocol, crypto, wire, WebSocket)
+make run-tests     # every test_* target (protocol, UDP, WebSocket, crypto, wire)
 ```
 
-Binaries land in `_out/<triplet>/bin/`. A minimal `cc`-only build is also kept
-in `Makefile.simple`.
+Binaries land in `_out/<triplet>/bin/`. A minimal `cc`-only build of the core is
+also kept in `Makefile.simple` (`make -f Makefile.simple`); see
+[VENDORING.md](VENDORING.md).
 
 ## Play in the terminal
 
@@ -81,7 +82,13 @@ client against one server at once:
 game/ws_e2e_test.sh              # PASS => both transports shared one server
 ```
 
-## Files
+## Layout
+
+The top level is netchan itself, so it is easy to vendor; everything that only
+*uses* netchan is in a subdirectory. See [VENDORING.md](VENDORING.md) for what to
+copy and which third-party libraries the optional pieces need.
+
+Top level, the library:
 
 - `nc_addr.h` — the opaque transport address the core copies but never reads.
 - `netchan.{c,h}` — the protocol core (no socket headers).
@@ -89,10 +96,24 @@ game/ws_e2e_test.sh              # PASS => both transports shared one server
 - `nc_ws.{c,h}` — a dependency-free WebSocket codec (handshake + framing), used
   by the gateway and the native `ws_client`. The browser gets the same behaviour
   from its built-in `WebSocket`.
-- `ws_gateway.c` — WebSocket-to-UDP relay, plus a tiny static file server.
-- `nc_crypto.{c,h}` + `monocypher.*` — the encrypted UDP decorator (desktop).
+- `nc_crypto.{c,h}` — the encrypted UDP decorator (desktop); its one dependency,
+  Monocypher, lives in `third_party/`.
+- `module.mk` / `Makefile.simple` / `GNUmakefile` — the build (see below).
+
+Subdirectories:
+
+- `test/` — every test, named `test_<thing>`; run them with `make run-tests`.
+- `examples/` — `netchan_example.c` (UDP chat) and `ws_gateway.c` (the
+  WebSocket-to-UDP relay plus a tiny static file server).
+- `third_party/` — vendored libraries: Monocypher (for `nc_crypto`) and microser
+  (the IDL runtime + codegen the game's wire schema uses). See VENDORING.md.
 - `game/` — the game: deterministic sim (`game.c`, `rng.c`), wire packing
-  (`game_wire.c`), the clients, and the browser transport `nc_web.{c,h}`.
+  (`game_wire.c`), the wire schema (`proto.idl`), the clients, and the browser
+  transport `nc_web.{c,h}`.
+- `nc_rtc/` — the WebRTC gateway backend (native-only, opt-in; see below).
+
+`proto.c` / `proto.h` are generated from `game/proto.idl` at build time into
+`_build/`, never the work tree.
 
 ## WebRTC
 
