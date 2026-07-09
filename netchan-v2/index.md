@@ -241,6 +241,79 @@ nc_crypto tests:
 3/3 tests passed
 ```
 
+## Why Not QUIC, and What It Costs
+
+Calling the handshake "deliberately not QUIC" invites the obvious question: QUIC
+is the modern, scrutinised transport, so what is being given up by not using it?
+Two things it does that netchan's single X25519 exchange does not: 0-RTT
+reconnection, and a handshake with machine-checked security proofs. Both are real,
+and neither is worth what it costs *here*.
+
+**0-RTT** is a latency optimisation. A normal TLS 1.3 or QUIC handshake is
+*1-RTT*: the client sends its first flight, waits for the server's reply to
+establish keys, and only then can send encrypted application data. One round trip
+of setup before the first useful byte. 0-RTT — *zero* round-trip time — removes
+even that on a *resumed* connection. When a client has talked to this server
+before, it caches a resumption secret the server issued last time, and on the next
+connection it encrypts application data with a key derived from that cached secret
+and sends it in the very first packet, before any reply. The response can come
+back in a single round trip. For the web, where a browser opens many short-lived
+HTTPS connections to load one page, that saved round trip is a large slice of the
+total, which is exactly why QUIC has it.
+
+netchan's exchange is 1-RTT and has no resumption at all. Both sides send a
+`HELLO` carrying an ephemeral public key, and neither can seal a `DATA` packet
+until the peer's `HELLO` arrives, because the key is derived from the two
+ephemerals together. `nc_crypto_seal` refuses until the session is ready. There
+is no cached secret, so there is nothing to resume from and no 0-RTT path.
+
+That is the right shape for a game and the wrong shape for the web, because the
+economics are inverted. A browser pays the handshake cost on every page because it
+reconnects constantly; a game pays it *once*, at join, and then holds the
+connection open for the length of the match while thousands of snapshot and input
+packets flow over it. The one round trip 0-RTT would save is amortised to nothing
+across a session that long. And 0-RTT is not free: its early data is *replayable*
+by design. An attacker who records the client's first flight can resend it, and
+the server, holding no per-flight state, may act on it twice, so 0-RTT is
+restricted to idempotent requests and needs its own anti-replay defence. A
+server-authoritative game gains a round trip it does not need in exchange for a
+replay hazard it would then have to reason about. Bad trade.
+
+The **formal analysis** is the more honest concession. TLS 1.3's handshake was
+designed alongside machine-checked proofs (Tamarin, ProVerif, miTLS in F\*), and
+the Noise patterns netchan borrows its shape from have their own verified models.
+netchan's handshake is not one of those proven instances. It *resembles* Noise's
+`NN` pattern, an ephemeral-ephemeral exchange, with an optional pre-shared key
+mixed into the KDF, but it is hand-written, and a hand-written construction earns
+none of the assurance the analysed pattern carries. The sharper caveat is what
+`NN` itself gives you: protection against a *passive* eavesdropper, but not an
+active man-in-the-middle, who can substitute their own ephemeral key on each side
+and sit in the cleartext between them. Nothing in the bare exchange authenticates
+the peer. The pre-shared key closes exactly that gap, which is why it is the
+recommended posture for a closed LAN game and not merely an option, and it is also
+the one place netchan could do a 0-RTT-style first packet, since a static PSK is a
+secret both sides already hold, though the backend does not.
+
+Laid out directly:
+
+| | netchan crypto backend | QUIC / TLS 1.3 |
+|---|---|---|
+| First encrypted byte, fresh | 1-RTT | 1-RTT |
+| First encrypted byte, resumed | 1-RTT (no resumption) | 0-RTT |
+| Peer authentication | only via pre-shared key | certificate + PKI |
+| Handshake proofs | none (hand-rolled, Noise-`NN`-shaped) | machine-checked |
+| Replay exposure on setup | none | 0-RTT early data replayable |
+| Forward secrecy | yes (ephemeral X25519) | yes (0-RTT flight excepted) |
+| Footprint | ~200 lines on vendored CC0 crypto | TLS stack, cert chain, PKI |
+
+So the choice is not that QUIC is worse; it is that QUIC is priced for a different
+job. Its 0-RTT and its proofs and its PKI all buy properties a match against a
+trusted or LAN-local server does not need, and they arrive bundled with a TLS
+state machine and a certificate chain the decorator exists specifically to avoid.
+netchan takes the small, auditable, forward-secret exchange, tells the reader
+plainly that it is unauthenticated without the PSK and unproven either way, and
+spends the 200 lines that buys instead of the several thousand QUIC would.
+
 ## Caves of Thor: An Application for the Seam
 
 The seam and its backends deserve a program that leans on all of them, so the
