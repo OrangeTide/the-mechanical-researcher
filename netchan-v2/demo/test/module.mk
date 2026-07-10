@@ -41,9 +41,9 @@ define test_proto_TESTCMD
 $(test_proto_RUN)
 endef
 TEST_TARGETS += test_proto
-# test_proto.c includes the game's generated proto.h; on a clean build wait for
-# it (PROTO_GEN_H is defined in game/module.mk, loaded before this file).
-$(BUILDDIR)/$(ROOT)test_proto.o : | $(PROTO_GEN_H)
+# test_proto.c includes the game's generated proto.h; ordering and the include
+# path come automatically from proto's _GENERATED_HDRS declaration (test_proto
+# lists proto in _LIBS), so no order-only prerequisite is needed here.
 
 # --- game sim + snapshot round-trip test (socketless) ---
 EXECUTABLES += test_game_wire
