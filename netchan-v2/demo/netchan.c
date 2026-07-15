@@ -1109,6 +1109,26 @@ netchan_feed(struct netchan_conn *c, const void *pkt, size_t len,
     return parse_frames(c, p + hdr_size, len - hdr_size);
 }
 
+/*
+ * Find the next outgoing entry that still needs a fragment sent, scanning
+ * the in-flight window [out_head, out_tail).  A reliable entry stays in the
+ * window after all its fragments are sent (it waits there for an ACK, and
+ * retransmit re-arms it by resetting frag_sent), so out_head cannot be used
+ * as the send cursor.  out_head only advances when an entry is ACKed
+ * (reliable) or freed (unreliable).  Returns NULL if nothing needs sending.
+ */
+static struct nc_outgoing *
+chan_next_sendable(struct netchan_chan *ch)
+{
+    for (int idx = ch->out_head; idx != ch->out_tail;
+         idx = (idx + 1) % NC_OUTGOING_SLOTS) {
+        struct nc_outgoing *o = &ch->outgoing[idx];
+        if (o->active && o->frag_sent < o->frag_total)
+            return o;
+    }
+    return NULL;
+}
+
 size_t
 netchan_send_next(struct netchan_conn *c, void *buf, size_t buflen,
                   struct nc_addr *to)
@@ -1121,7 +1141,7 @@ netchan_send_next(struct netchan_conn *c, void *buf, size_t buflen,
         for (int i = 0; i < NC_MAX_CHANNELS; i++) {
             struct netchan_chan *ch = c->channels[i];
             if (!ch || ch->role != 0) continue;
-            if (ch->state == 1 && ch->out_head != ch->out_tail)
+            if (ch->state == 1 && chan_next_sendable(ch))
                 has_data = 1;
             if (ch->need_ack || ch->need_window_update)
                 has_data = 1;
@@ -1200,10 +1220,9 @@ netchan_send_next(struct netchan_conn *c, void *buf, size_t buflen,
     for (int i = 0; i < NC_MAX_CHANNELS && pos + 9 <= mtu; i++) {
         struct netchan_chan *ch = c->channels[i];
         if (!ch || ch->role != 0 || ch->state != 1) continue;
-        if (ch->out_head == ch->out_tail) continue;
 
-        struct nc_outgoing *o = &ch->outgoing[ch->out_head];
-        if (!o->active) continue;
+        struct nc_outgoing *o = chan_next_sendable(ch);
+        if (!o) continue;
 
         size_t frag_payload = max_frag_payload(c);
         size_t avail = mtu - pos - 8;
@@ -1226,19 +1245,22 @@ netchan_send_next(struct netchan_conn *c, void *buf, size_t buflen,
 
         o->frag_sent++;
         o->sent_ms = nc_now_ms();
-        o->attempts = 1;
+        /* first transmission counts as attempt 1; retransmits are owned by
+         * netchan_service, which bumps attempts -- don't reset it here or the
+         * backoff never grows and a dead peer is never given up on. */
+        if (o->attempts == 0)
+            o->attempts = 1;
 
-        if (o->frag_sent >= o->frag_total) {
-            if (ch->type == NETCHAN_UNRELIABLE) {
-                pool_put(c, o->buf);
-                o->buf = NC_NOBUF;
-                o->active = 0;
+        if (o->frag_sent >= o->frag_total && ch->type == NETCHAN_UNRELIABLE) {
+            /* unreliable: done once transmitted, free and advance past it */
+            pool_put(c, o->buf);
+            o->buf = NC_NOBUF;
+            o->active = 0;
+            while (ch->out_head != ch->out_tail &&
+                   !ch->outgoing[ch->out_head].active)
                 ch->out_head = (ch->out_head + 1) % NC_OUTGOING_SLOTS;
-            } else {
-                /* keep in outgoing for retransmit until ACKed */
-                ch->out_head = (ch->out_head + 1) % NC_OUTGOING_SLOTS;
-            }
         }
+        /* reliable: keep in outgoing for retransmit; out_head advances on ACK */
     }
 
     /* report destination address (len 0 if we have no peer yet) */
