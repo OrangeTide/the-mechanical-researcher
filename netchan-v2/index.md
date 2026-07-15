@@ -1,6 +1,7 @@
 ---
 title: "netchan-v2: Revisited — A Transport Seam for the Browser"
 date: 2026-07-06
+revised: 2026-07-15
 abstract: "Part two of the netchan story: cutting one clean seam through the protocol core so the same code can run over UDP on the desktop and, soon, over WebRTC or WebSockets in a browser."
 category: networking
 ---
@@ -147,6 +148,10 @@ bar is that the old behaviour is still exactly the old behaviour.
 
 - The original ten loopback tests pass unchanged. They pack an `nc_addr` by hand
   as an opaque token, since the loopback harness never touches a real socket.
+- Two loss tests (`reliable_retransmit` and `reliable_giveup`) were added later,
+  after the reliable channel turned out to have a retransmit bug no happy-path
+  test could see. They are the subject of the [retrospective below](#three-bugs-that-a-green-test-suite-hid),
+  and they fail against the code as it originally shipped.
 - A new real-socket test (`test_nc_udp`) drives the actual `nc_udp` backend over
   two live loopback UDP sockets: it round-trips both an IPv4 and an IPv6 address
   through `from_sockaddr`/`to_sockaddr` and checks every field survives, then
@@ -187,9 +192,11 @@ Both test binaries, compiled to wasm, pass under `node`:
 ```
 netchan tests:
   handshake                     OK
+  reliable_retransmit           OK
+  reliable_giveup               OK
   ...
   stats                         OK
-10/10 tests passed
+12/12 tests passed
 
 proto round-trip OK (player_input, entity_state, welcome)
 ```
@@ -411,6 +418,80 @@ its own, the single place the demo steps outside the compile-with-`cc` core. It
 is verified the same headless way as the rest: a libpeer client stands in for
 the browser, POSTs an offer, opens a data channel, and gets its datagram back
 through the gateway from the server.
+
+## Three Bugs That a Green Test Suite Hid
+
+The seam work above shipped with a green test suite, and the suite was lying by
+omission. Every test delivered every packet. A reliable transport whose tests
+never drop anything is exercising the easy half of the code and leaving the half
+that justifies the word "reliable" completely unrun. The gap surfaced when this
+same core was reused in another project whose stress test did the honest thing:
+a lossy, reordering pump that delivered forty index-stamped messages under
+one-in-three packet loss, then again under reordering, then under both at once.
+The very first message it dropped never arrived. netchan's reliable channel
+was not retransmitting at all.
+
+The cause was a one-word confusion about what a send cursor means. netchan keeps
+outgoing messages in a ring, with `out_head` marking the oldest message not yet
+acknowledged and `out_tail` the newest queued. The send loop advanced `out_head`
+as soon as a message was *transmitted*:
+
+```c
+/* buggy: advance the unacked cursor when we send */
+struct nc_outgoing *o = &ch->outgoing[ch->out_head];
+/* ... write the fragment ... */
+if (o->frag_sent >= o->frag_total)
+    ch->out_head = (ch->out_head + 1) % NC_OUTGOING_SLOTS;
+```
+
+But `out_head` is the retransmit window's floor, and the window's floor may only
+rise when the receiver acknowledges, not when the sender speaks. Advancing it on
+transmit meant a message was considered done the instant it left the socket. If
+that packet was then lost, the message sat in the ring still marked unacked, but
+now *behind* `out_head`, in a region the send loop no longer scanned and the
+retransmit timer could no longer reach. It could never be sent again. The fix is
+to advance `out_head` only when an ack clears the slot (or, for an unreliable
+message, when it is freed), and to have the send loop scan the whole in-flight
+window `[out_head, out_tail)` for any entry that still owes a fragment, rather
+than reading only the slot at `out_head`.
+
+Fixing the cursor exposed a second bug hiding directly behind it. `netchan_send_next`
+begins with a cheap "do I have anything to send?" check so it can return zero and
+let the caller sleep. That check still asked the old question, whether the window
+was non-empty. Once the cursor stopped advancing on transmit, the window stayed
+non-empty while messages waited for their acks, so the early-out kept answering
+"yes" and the function kept emitting packets with a header and no payload,
+spinning hot. The lesson was concrete: the "should I send" predicate and the
+"what do I send" loop have to compute the same thing. Both now call one helper
+that returns the next entry actually owing a fragment, so they can never disagree.
+
+The third bug was the quietest, because it had been dead code the whole time.
+Each transmission stamped the attempt count back to one:
+
+```c
+o->attempts = 1;   /* runs on every send, including resends */
+```
+
+The retransmit timer in `netchan_service` increments `attempts` and uses it for
+two things: exponential backoff, `retransmit_ms << (attempts - 1)`, and giving up
+after `NC_MAX_RT_ATTEMPTS`. As long as retransmission never happened, resetting
+the counter was harmless. The moment retransmission started working, this line
+quietly undid the timer's bookkeeping on every resend. Backoff never grew past
+its first step, and a message to a peer that had gone away would retransmit
+forever instead of declaring the channel dead. The repair is one guard,
+`if (o->attempts == 0) o->attempts = 1;`, so the first send counts as attempt one
+and the timer owns the count after that.
+
+Three bugs, one root cause. The reliability machinery had never actually run, so
+nothing downstream of a lost packet had ever executed in anger. Two regression
+tests now close the gap. `reliable_retransmit` drops an entire multi-fragment
+message, fires the timer, and demands byte-exact delivery. `reliable_giveup`
+drops everything to a vanished peer and demands the channel die within a bounded
+number of rounds. Both fail against the code as it first shipped, and both are
+now part of the twelve that pass natively and under `node`. The takeaways travel
+past this protocol: a green suite proves only what it exercises, a sliding
+window's floor tracks acknowledgment and never transmission, and reviving dead
+code can wake more dead code sleeping behind it.
 
 ## Conclusion
 

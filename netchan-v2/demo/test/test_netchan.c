@@ -260,6 +260,182 @@ test_reliable_datagram(void)
     PASS();
 }
 
+/* Virtual clock seeded from the same source netchan records timestamps with
+ * (CLOCK_MONOTONIC via nc_now_ms), so a now_ms we feed to netchan_service
+ * lines up with the sent_ms it stamped on outgoing messages. */
+static uint32_t
+vclock_now(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint32_t)(ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
+}
+
+/* Regression test for the retransmit bug: a lost reliable message must be
+ * resent.  The whole first transmission (a multi-fragment message spanning
+ * several packets) is dropped, then the retransmit timer is fired and a
+ * normal pump must deliver every byte in order.  Against the buggy code the
+ * send cursor advanced past the message on transmit, so it fell out of the
+ * in-flight window and could never be resent -- this test hangs undelivered. */
+static void
+test_reliable_retransmit(void)
+{
+    TEST(reliable_retransmit);
+
+    struct netchan_conn *client = netchan_open(0);
+    struct netchan_conn *server = netchan_open(1);
+
+    /* Neutralise idle timeout so the virtual-clock jump can't disconnect us;
+     * keep a short, known retransmit interval. */
+    struct netchan_cfg cfg = {
+        .mtu = 1200,
+        .chan_window = 65536,
+        .idle_timeout_ms = 3600000,
+        .retransmit_ms = 100,
+    };
+    netchan_config(client, &cfg);
+    netchan_config(server, &cfg);
+
+    struct nc_addr caddr = make_addr(0x7f000001, 10010);
+    struct nc_addr saddr = make_addr(0x7f000001, 20010);
+
+    netchan_connect(client, &saddr);
+    pump(client, server, &caddr);
+    netchan_accept(server);
+    pump_both(client, server, &caddr, &saddr);
+
+    struct netchan_event ev;
+    while (netchan_poll(client, &ev)) {}
+    while (netchan_poll(server, &ev)) {}
+
+    struct netchan_chan *ch = netchan_chan_open(client, NETCHAN_RELIABLE,
+                                               NETCHAN_DIR_SEND, "gamestate");
+    CHECK(ch != NULL, "chan_open failed");
+    pump_both(client, server, &caddr, &saddr);
+    while (netchan_poll(server, &ev)) {}
+    while (netchan_poll(client, &ev)) {}
+    CHECK(netchan_chan_state(ch) == 1, "client channel not open");
+
+    /* A message spanning several fragments (larger than the 1200-byte MTU). */
+    unsigned char msg[2000];
+    for (size_t i = 0; i < sizeof(msg); i++)
+        msg[i] = (unsigned char)(i * 31 + 7);
+    int wr = netchan_chan_write(ch, msg, sizeof(msg));
+    CHECK(wr == (int)sizeof(msg), "write failed");
+
+    /* Drop the entire first transmission: pull every packet the client wants
+     * to send and throw it away. */
+    uint8_t junk[2048];
+    struct nc_addr dst;
+    int dropped = 0;
+    for (;;) {
+        size_t n = netchan_send_next(client, junk, sizeof(junk), &dst);
+        if (n == 0) break;
+        dropped++;
+    }
+    CHECK(dropped > 0, "client sent nothing to drop");
+
+    /* Nothing sendable remains until the retransmit timer fires (proves the
+     * header-only spin bug is also fixed: send_next returns 0 here). */
+    CHECK(netchan_send_next(client, junk, sizeof(junk), &dst) == 0,
+          "client spins with nothing to send");
+
+    /* Fire the retransmit timer. */
+    uint32_t now = vclock_now() + cfg.retransmit_ms + 50;
+    netchan_service(client, now);
+
+    /* Normal delivery + ACK must now succeed. */
+    pump_both(client, server, &caddr, &saddr);
+
+    struct netchan_chan *sch = NULL;
+    while (netchan_poll(server, &ev)) {
+        if (ev.type == NETCHAN_EV_DATA && ev.ch)
+            sch = ev.ch;
+    }
+    CHECK(sch != NULL, "no data event on server after retransmit");
+
+    unsigned char buf[2000];
+    int rd = netchan_chan_read(sch, buf, sizeof(buf));
+    CHECK(rd == (int)sizeof(msg), "read wrong size after retransmit");
+    CHECK(memcmp(buf, msg, sizeof(msg)) == 0, "data mismatch after retransmit");
+
+    struct netchan_chan_stats st;
+    netchan_chan_stats(ch, &st);
+    CHECK(st.retransmissions > 0, "no retransmission recorded");
+    CHECK(st.msgs_acked == 1, "message not acked after retransmit");
+
+    netchan_close(client);
+    netchan_close(server);
+    PASS();
+}
+
+/* Regression test for the attempts counter: when the peer is gone, a reliable
+ * message must stop retransmitting after NC_MAX_RT_ATTEMPTS and the channel
+ * must be declared dead.  If send_next reset attempts on every resend the
+ * give-up threshold would never be reached and this loop would never finish. */
+static void
+test_reliable_giveup(void)
+{
+    TEST(reliable_giveup);
+
+    struct netchan_conn *client = netchan_open(0);
+    struct netchan_conn *server = netchan_open(1);
+
+    struct netchan_cfg cfg = {
+        .mtu = 1200,
+        .chan_window = 65536,
+        .idle_timeout_ms = 3600000,
+        .retransmit_ms = 100,
+    };
+    netchan_config(client, &cfg);
+    netchan_config(server, &cfg);
+
+    struct nc_addr caddr = make_addr(0x7f000001, 10011);
+    struct nc_addr saddr = make_addr(0x7f000001, 20011);
+
+    netchan_connect(client, &saddr);
+    pump(client, server, &caddr);
+    netchan_accept(server);
+    pump_both(client, server, &caddr, &saddr);
+
+    struct netchan_event ev;
+    while (netchan_poll(client, &ev)) {}
+    while (netchan_poll(server, &ev)) {}
+
+    struct netchan_chan *ch = netchan_chan_open(client, NETCHAN_RELIABLE,
+                                               NETCHAN_DIR_SEND, "gamestate");
+    CHECK(ch != NULL, "chan_open failed");
+    pump_both(client, server, &caddr, &saddr);
+    while (netchan_poll(server, &ev)) {}
+    while (netchan_poll(client, &ev)) {}
+    CHECK(netchan_chan_state(ch) == 1, "client channel not open");
+
+    const char *msg = "into the void";
+    CHECK(netchan_chan_write(ch, msg, strlen(msg)) == (int)strlen(msg),
+          "write failed");
+
+    /* Drop every transmission and keep firing the retransmit timer.  The
+     * channel must give up within a bounded number of rounds. */
+    uint8_t junk[2048];
+    struct nc_addr dst;
+    uint32_t vnow = vclock_now();
+    int dead = 0;
+    for (int round = 0; round < 32 && !dead; round++) {
+        while (netchan_send_next(client, junk, sizeof(junk), &dst) > 0)
+            ;
+        vnow += cfg.retransmit_ms * 64; /* past any backed-off timeout */
+        netchan_service(client, vnow);
+        while (netchan_poll(client, &ev))
+            if (ev.type == NETCHAN_EV_CHAN_CLOSE)
+                dead = 1;
+    }
+    CHECK(dead, "channel never gave up on a dead peer");
+
+    netchan_close(client);
+    netchan_close(server);
+    PASS();
+}
+
 static void
 test_bidirectional_channels(void)
 {
@@ -658,6 +834,8 @@ main(void)
     test_handshake();
     test_unreliable_datagram();
     test_reliable_datagram();
+    test_reliable_retransmit();
+    test_reliable_giveup();
     test_bidirectional_channels();
     test_multiple_messages();
     test_connection_migration();
