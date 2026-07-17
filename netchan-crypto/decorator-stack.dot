@@ -1,0 +1,20 @@
+digraph decorator {
+    rankdir = TB;
+    bgcolor = "transparent";
+    node [shape=box, style="rounded,filled", fontname="Helvetica",
+          fontsize=11, color="#2c2420", penwidth=1.2];
+    edge [fontname="Helvetica", fontsize=9, color="#6b5d4f"];
+
+    app   [label="application\n(echo, game, IPC)", fillcolor="#f4ecdd"];
+    core  [label="netchan core\nreliable channels, reorder, flow control\n(no socket, no crypto)", fillcolor="#e8dcc4"];
+    crypto[label="nc_crypto decorator\nseal() after send_next  ·  open() before feed\nX25519 handshake + XChaCha20-Poly1305", fillcolor="#cfe6d8"];
+    udp   [label="nc_udp backend\nnc_addr <-> sockaddr", fillcolor="#e8dcc4"];
+    sock  [label="UDP socket", shape=ellipse, fillcolor="#dfe7f0"];
+
+    app   -> core   [label="plaintext frames"];
+    core  -> crypto [label="plaintext datagram"];
+    crypto-> udp    [label="sealed datagram"];
+    udp   -> sock   [label="bytes"];
+
+    { rank=same; crypto }
+}
