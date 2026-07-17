@@ -1,0 +1,22 @@
+msc {
+    hscale = "1.6";
+
+    C [label="client (initiator)"],
+    S [label="server (responder)"];
+
+    C => S [label="HELLO  [0x01 | eph_pk_C]  (unsealed, 33 B)"];
+    S box S [label="X25519(eph_sk_S, eph_pk_C)\nderive tx/rx keys"];
+    S => C [label="HELLO  [0x01 | eph_pk_S]  (unsealed, 33 B)"];
+    C box C [label="X25519(eph_sk_C, eph_pk_S)\nderive tx/rx keys"];
+
+    |||;
+
+    C => S [label="DATA  seal(netchan SYN)     counter 1"];
+    S => C [label="DATA  seal(netchan SYN-ACK) counter 1"];
+    C => S [label="DATA  seal(netchan ACK)     counter 2"];
+
+    |||;
+
+    C => S [label="DATA  seal(app bytes)       counter 3 .."];
+    S => C [label="DATA  seal(echo bytes)      counter 3 .."];
+}

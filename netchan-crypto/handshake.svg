@@ -1,0 +1,110 @@
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+ "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1"
+ width="960px" height="308px"
+ viewBox="0 0 960 308"
+ xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges"
+ stroke-width="1" text-rendering="geometricPrecision">
+<polygon fill="white" points="199,7 279,7 279,16 199,16"/>
+<text x="240" y="16" textLength="78" font-family="Helvetica" font-size="12" fill="black" text-anchor="middle">
+
+client (initiator)
+</text>
+<polygon fill="white" points="669,7 769,7 769,16 669,16"/>
+<text x="720" y="16" textLength="99" font-family="Helvetica" font-size="12" fill="black" text-anchor="middle">
+
+server (responder)
+</text>
+<line x1="240" y1="22" x2="240" y2="50" stroke="black"/>
+<line x1="720" y1="22" x2="720" y2="50" stroke="black"/>
+<line x1="240" y1="33" x2="720" y2="33" stroke="black"/>
+<polygon fill="black" points="720,33 710,39 710,27"/>
+<polygon fill="white" points="359,23 599,23 599,32 359,32"/>
+<text x="360" y="32" textLength="238" font-family="Helvetica" font-size="12" fill="black">
+HELLO  [0x01 | eph_pk_C]  (unsealed, 33 B)
+</text>
+<line x1="240" y1="50" x2="240" y2="78" stroke="black"/>
+<line x1="720" y1="50" x2="720" y2="78" stroke="black"/>
+<polygon fill="white" points="488,50 952,50 952,72 488,72"/>
+<line x1="488" y1="50" x2="952" y2="50" stroke="black"/>
+<line x1="488" y1="72" x2="952" y2="72" stroke="black"/>
+<line x1="488" y1="50" x2="488" y2="72" stroke="black"/>
+<line x1="952" y1="50" x2="952" y2="72" stroke="black"/>
+<polygon fill="white" points="636,51 802,51 802,60 636,60"/>
+<text x="637" y="60" textLength="164" font-family="Helvetica" font-size="12" fill="black">
+X25519(eph_sk_S, eph_pk_C)
+</text>
+<polygon fill="white" points="675,62 764,62 764,71 675,71"/>
+<text x="676" y="71" textLength="87" font-family="Helvetica" font-size="12" fill="black">
+derive tx/rx keys
+</text>
+<line x1="240" y1="78" x2="240" y2="106" stroke="black"/>
+<line x1="720" y1="78" x2="720" y2="106" stroke="black"/>
+<line x1="720" y1="89" x2="240" y2="89" stroke="black"/>
+<polygon fill="black" points="240,89 250,95 250,83"/>
+<polygon fill="white" points="360,79 599,79 599,88 360,88"/>
+<text x="361" y="88" textLength="237" font-family="Helvetica" font-size="12" fill="black">
+HELLO  [0x01 | eph_pk_S]  (unsealed, 33 B)
+</text>
+<line x1="240" y1="106" x2="240" y2="134" stroke="black"/>
+<line x1="720" y1="106" x2="720" y2="134" stroke="black"/>
+<polygon fill="white" points="8,106 472,106 472,128 8,128"/>
+<line x1="8" y1="106" x2="472" y2="106" stroke="black"/>
+<line x1="8" y1="128" x2="472" y2="128" stroke="black"/>
+<line x1="8" y1="106" x2="8" y2="128" stroke="black"/>
+<line x1="472" y1="106" x2="472" y2="128" stroke="black"/>
+<polygon fill="white" points="156,107 322,107 322,116 156,116"/>
+<text x="157" y="116" textLength="164" font-family="Helvetica" font-size="12" fill="black">
+X25519(eph_sk_C, eph_pk_S)
+</text>
+<polygon fill="white" points="195,118 284,118 284,127 195,127"/>
+<text x="196" y="127" textLength="87" font-family="Helvetica" font-size="12" fill="black">
+derive tx/rx keys
+</text>
+<line x1="240" y1="134" x2="240" y2="151" stroke="black"/>
+<line x1="720" y1="134" x2="720" y2="151" stroke="black"/>
+<line x1="240" y1="151" x2="240" y2="179" stroke="black"/>
+<line x1="720" y1="151" x2="720" y2="179" stroke="black"/>
+<line x1="240" y1="162" x2="720" y2="162" stroke="black"/>
+<polygon fill="black" points="720,162 710,168 710,156"/>
+<polygon fill="white" points="375,152 583,152 583,161 375,161"/>
+<text x="376" y="161" textLength="206" font-family="Helvetica" font-size="12" fill="black">
+DATA  seal(netchan SYN)     counter 1
+</text>
+<line x1="240" y1="179" x2="240" y2="207" stroke="black"/>
+<line x1="720" y1="179" x2="720" y2="207" stroke="black"/>
+<line x1="720" y1="190" x2="240" y2="190" stroke="black"/>
+<polygon fill="black" points="240,190 250,196 250,184"/>
+<polygon fill="white" points="368,180 591,180 591,189 368,189"/>
+<text x="369" y="189" textLength="221" font-family="Helvetica" font-size="12" fill="black">
+DATA  seal(netchan SYN-ACK) counter 1
+</text>
+<line x1="240" y1="207" x2="240" y2="235" stroke="black"/>
+<line x1="720" y1="207" x2="720" y2="235" stroke="black"/>
+<line x1="240" y1="218" x2="720" y2="218" stroke="black"/>
+<polygon fill="black" points="720,218 710,224 710,212"/>
+<polygon fill="white" points="375,208 583,208 583,217 375,217"/>
+<text x="376" y="217" textLength="206" font-family="Helvetica" font-size="12" fill="black">
+DATA  seal(netchan ACK)     counter 2
+</text>
+<line x1="240" y1="235" x2="240" y2="252" stroke="black"/>
+<line x1="720" y1="235" x2="720" y2="252" stroke="black"/>
+<line x1="240" y1="252" x2="240" y2="280" stroke="black"/>
+<line x1="720" y1="252" x2="720" y2="280" stroke="black"/>
+<line x1="240" y1="263" x2="720" y2="263" stroke="black"/>
+<polygon fill="black" points="720,263 710,269 710,257"/>
+<polygon fill="white" points="376,253 582,253 582,262 376,262"/>
+<text x="377" y="262" textLength="204" font-family="Helvetica" font-size="12" fill="black">
+DATA  seal(app bytes)       counter 3 ..
+</text>
+<line x1="240" y1="280" x2="240" y2="308" stroke="black"/>
+<line x1="720" y1="280" x2="720" y2="308" stroke="black"/>
+<line x1="720" y1="291" x2="240" y2="291" stroke="black"/>
+<polygon fill="black" points="240,291 250,297 250,285"/>
+<polygon fill="white" points="375,281 584,281 584,290 375,290"/>
+<text x="376" y="290" textLength="207" font-family="Helvetica" font-size="12" fill="black">
+DATA  seal(echo bytes)      counter 3 ..
+</text>
+<line x1="240" y1="302" x2="240" y2="308" stroke="black"/>
+<line x1="720" y1="302" x2="720" y2="308" stroke="black"/>
+</svg>
