@@ -16,3 +16,4 @@ netchan
 netchan-ipx
 netchan-v2
 netchan-crypto
+netchan-auth

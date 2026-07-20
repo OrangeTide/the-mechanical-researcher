@@ -24,6 +24,7 @@ A collection of research topics, primarily gathered through agentic AI sessions,
 - [Netchan on IPX: Reliable Channels for a 16-bit DOS Game](netchan-ipx/)
 - [netchan-v2: Revisited — A Transport Seam for the Browser](netchan-v2/)
 - [netchan-v3: Encrypting the Datagram](netchan-crypto/)
+- [netchan-v4: Authenticating the Peer](netchan-auth/)
 
 ## Build & Deploy
 

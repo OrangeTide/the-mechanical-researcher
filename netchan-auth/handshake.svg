@@ -1,0 +1,210 @@
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+ "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1"
+ width="960px" height="566px"
+ viewBox="0 0 960 566"
+ xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges"
+ stroke-width="1" text-rendering="geometricPrecision">
+<polygon fill="white" points="224,7 254,7 254,16 224,16"/>
+<text x="240" y="16" textLength="28" font-family="Helvetica" font-size="12" fill="black" text-anchor="middle">
+
+client
+</text>
+<polygon fill="white" points="702,7 736,7 736,16 702,16"/>
+<text x="720" y="16" textLength="33" font-family="Helvetica" font-size="12" fill="black" text-anchor="middle">
+
+server
+</text>
+<line x1="240" y1="22" x2="240" y2="39" stroke="black"/>
+<line x1="720" y1="22" x2="720" y2="39" stroke="black"/>
+<line x1="240" y1="39" x2="240" y2="67" stroke="black"/>
+<line x1="720" y1="39" x2="720" y2="67" stroke="black"/>
+<polygon fill="white" points="8,39 940,39 940,61 8,61"/>
+<polygon fill="white" points="8,51 952,51 952,61 8,61"/>
+<polygon fill="white" points="940,39 952,51 940,51"/>
+<line x1="8" y1="39" x2="940" y2="39" stroke="black"/>
+<line x1="8" y1="61" x2="952" y2="61" stroke="black"/>
+<line x1="8" y1="39" x2="8" y2="61" stroke="black"/>
+<line x1="952" y1="51" x2="952" y2="61" stroke="black"/>
+<line x1="940" y1="39" x2="952" y2="51" stroke="black"/>
+<line x1="940" y1="39" x2="940" y2="51" stroke="black"/>
+<line x1="952" y1="51" x2="940" y2="51" stroke="black"/>
+<polygon fill="white" points="322,46 636,46 636,55 322,55"/>
+<text x="323" y="55" textLength="312" font-family="Helvetica" font-size="12" fill="black">
+nc_crypto: one round trip, and the server proves its identity
+</text>
+<line x1="240" y1="67" x2="240" y2="95" stroke="black"/>
+<line x1="720" y1="67" x2="720" y2="95" stroke="black"/>
+<line x1="240" y1="78" x2="720" y2="78" stroke="black"/>
+<polygon fill="black" points="720,78 710,84 710,72"/>
+<polygon fill="white" points="408,68 551,68 551,77 408,77"/>
+<text x="409" y="77" textLength="141" font-family="Helvetica" font-size="12" fill="black">
+HELLO  eph_pk_c, 00...00
+</text>
+<line x1="240" y1="95" x2="240" y2="123" stroke="black"/>
+<line x1="720" y1="95" x2="720" y2="123" stroke="black"/>
+<line x1="720" y1="106" x2="240" y2="106" stroke="black"/>
+<polygon fill="black" points="240,106 250,112 250,100"/>
+<polygon fill="white" points="396,96 563,96 563,105 396,105"/>
+<text x="397" y="105" textLength="165" font-family="Helvetica" font-size="12" fill="black">
+HELLO  eph_pk_s, static_pk_s
+</text>
+<line x1="240" y1="123" x2="240" y2="151" stroke="black"/>
+<line x1="720" y1="123" x2="720" y2="151" stroke="black"/>
+<polygon fill="white" points="8,123 472,123 472,145 8,145"/>
+<line x1="8" y1="123" x2="472" y2="123" stroke="black"/>
+<line x1="8" y1="145" x2="472" y2="145" stroke="black"/>
+<line x1="8" y1="123" x2="8" y2="145" stroke="black"/>
+<line x1="472" y1="123" x2="472" y2="145" stroke="black"/>
+<polygon fill="white" points="202,124 277,124 277,133 202,133"/>
+<text x="203" y="133" textLength="73" font-family="Helvetica" font-size="12" fill="black">
+known_hosts:
+</text>
+<polygon fill="white" points="181,135 297,135 297,144 181,144"/>
+<text x="182" y="144" textLength="114" font-family="Helvetica" font-size="12" fill="black">
+seen this key before?
+</text>
+<line x1="240" y1="151" x2="240" y2="179" stroke="black"/>
+<line x1="720" y1="151" x2="720" y2="179" stroke="black"/>
+<polygon fill="white" points="8,151 940,151 940,173 8,173"/>
+<polygon fill="white" points="8,163 952,163 952,173 8,173"/>
+<polygon fill="white" points="940,151 952,163 940,163"/>
+<line x1="8" y1="151" x2="940" y2="151" stroke="black"/>
+<line x1="8" y1="173" x2="952" y2="173" stroke="black"/>
+<line x1="8" y1="151" x2="8" y2="173" stroke="black"/>
+<line x1="952" y1="163" x2="952" y2="173" stroke="black"/>
+<line x1="940" y1="151" x2="952" y2="163" stroke="black"/>
+<line x1="940" y1="151" x2="940" y2="163" stroke="black"/>
+<line x1="952" y1="163" x2="940" y2="163" stroke="black"/>
+<polygon fill="white" points="311,158 647,158 647,167 311,167"/>
+<text x="312" y="167" textLength="334" font-family="Helvetica" font-size="12" fill="black">
+keys derived from ee + es; only the real server can compute es
+</text>
+<line x1="240" y1="179" x2="240" y2="196" stroke="black"/>
+<line x1="720" y1="179" x2="720" y2="196" stroke="black"/>
+<line x1="240" y1="196" x2="240" y2="224" stroke="black"/>
+<line x1="720" y1="196" x2="720" y2="224" stroke="black"/>
+<polygon fill="white" points="8,196 940,196 940,218 8,218"/>
+<polygon fill="white" points="8,208 952,208 952,218 8,218"/>
+<polygon fill="white" points="940,196 952,208 940,208"/>
+<line x1="8" y1="196" x2="940" y2="196" stroke="black"/>
+<line x1="8" y1="218" x2="952" y2="218" stroke="black"/>
+<line x1="8" y1="196" x2="8" y2="218" stroke="black"/>
+<line x1="952" y1="208" x2="952" y2="218" stroke="black"/>
+<line x1="940" y1="196" x2="952" y2="208" stroke="black"/>
+<line x1="940" y1="196" x2="940" y2="208" stroke="black"/>
+<line x1="952" y1="208" x2="940" y2="208" stroke="black"/>
+<polygon fill="white" points="326,203 633,203 633,212 326,212"/>
+<text x="327" y="212" textLength="305" font-family="Helvetica" font-size="12" fill="black">
+netchan: its own handshake, every packet already sealed
+</text>
+<line x1="240" y1="224" x2="240" y2="252" stroke="black"/>
+<line x1="720" y1="224" x2="720" y2="252" stroke="black"/>
+<line x1="240" y1="235" x2="720" y2="235" stroke="black"/>
+<polygon fill="black" points="720,235 710,241 710,229"/>
+<polygon fill="white" points="466,225 493,225 493,234 466,234"/>
+<text x="467" y="234" textLength="25" font-family="Helvetica" font-size="12" fill="black">
+SYN
+</text>
+<line x1="240" y1="252" x2="240" y2="280" stroke="black"/>
+<line x1="720" y1="252" x2="720" y2="280" stroke="black"/>
+<line x1="720" y1="263" x2="240" y2="263" stroke="black"/>
+<polygon fill="black" points="240,263 250,269 250,257"/>
+<polygon fill="white" points="452,253 507,253 507,262 452,262"/>
+<text x="453" y="262" textLength="53" font-family="Helvetica" font-size="12" fill="black">
+SYN-ACK
+</text>
+<line x1="240" y1="280" x2="240" y2="308" stroke="black"/>
+<line x1="720" y1="280" x2="720" y2="308" stroke="black"/>
+<line x1="240" y1="291" x2="720" y2="291" stroke="black"/>
+<polygon fill="black" points="720,291 710,297 710,285"/>
+<polygon fill="white" points="466,281 493,281 493,290 466,290"/>
+<text x="467" y="290" textLength="25" font-family="Helvetica" font-size="12" fill="black">
+ACK
+</text>
+<line x1="240" y1="308" x2="240" y2="325" stroke="black"/>
+<line x1="720" y1="308" x2="720" y2="325" stroke="black"/>
+<line x1="240" y1="325" x2="240" y2="353" stroke="black"/>
+<line x1="720" y1="325" x2="720" y2="353" stroke="black"/>
+<polygon fill="white" points="8,325 940,325 940,347 8,347"/>
+<polygon fill="white" points="8,337 952,337 952,347 8,347"/>
+<polygon fill="white" points="940,325 952,337 940,337"/>
+<line x1="8" y1="325" x2="940" y2="325" stroke="black"/>
+<line x1="8" y1="347" x2="952" y2="347" stroke="black"/>
+<line x1="8" y1="325" x2="8" y2="347" stroke="black"/>
+<line x1="952" y1="337" x2="952" y2="347" stroke="black"/>
+<line x1="940" y1="325" x2="952" y2="337" stroke="black"/>
+<line x1="940" y1="325" x2="940" y2="337" stroke="black"/>
+<line x1="952" y1="337" x2="940" y2="337" stroke="black"/>
+<polygon fill="white" points="314,332 645,332 645,341 314,341"/>
+<text x="315" y="341" textLength="329" font-family="Helvetica" font-size="12" fill="black">
+nc_auth: reliable messages, signature bound to the session id
+</text>
+<line x1="240" y1="353" x2="240" y2="381" stroke="black"/>
+<line x1="720" y1="353" x2="720" y2="381" stroke="black"/>
+<line x1="240" y1="364" x2="720" y2="364" stroke="black"/>
+<polygon fill="black" points="720,364 710,370 710,358"/>
+<polygon fill="white" points="439,354 520,354 520,363 439,363"/>
+<text x="440" y="363" textLength="79" font-family="Helvetica" font-size="12" fill="black">
+HELLO  &quot;alice&quot;
+</text>
+<line x1="240" y1="381" x2="240" y2="409" stroke="black"/>
+<line x1="720" y1="381" x2="720" y2="409" stroke="black"/>
+<line x1="720" y1="392" x2="240" y2="392" stroke="black"/>
+<polygon fill="black" points="240,392 250,398 250,386"/>
+<polygon fill="white" points="389,382 569,382 569,391 389,391"/>
+<text x="390" y="391" textLength="178" font-family="Helvetica" font-size="12" fill="black">
+METHODS  publickey | password
+</text>
+<line x1="240" y1="409" x2="240" y2="437" stroke="black"/>
+<line x1="720" y1="409" x2="720" y2="437" stroke="black"/>
+<line x1="240" y1="420" x2="720" y2="420" stroke="black"/>
+<polygon fill="black" points="720,420 710,426 710,414"/>
+<polygon fill="white" points="387,410 571,410 571,419 387,419"/>
+<text x="388" y="419" textLength="182" font-family="Helvetica" font-size="12" fill="black">
+PUBKEY  pk, sign(sid || user || pk)
+</text>
+<line x1="240" y1="437" x2="240" y2="465" stroke="black"/>
+<line x1="720" y1="437" x2="720" y2="465" stroke="black"/>
+<polygon fill="white" points="488,437 952,437 952,459 488,459"/>
+<line x1="488" y1="437" x2="952" y2="437" stroke="black"/>
+<line x1="488" y1="459" x2="952" y2="459" stroke="black"/>
+<line x1="488" y1="437" x2="488" y2="459" stroke="black"/>
+<line x1="952" y1="437" x2="952" y2="459" stroke="black"/>
+<polygon fill="white" points="675,438 764,438 764,447 675,447"/>
+<text x="676" y="447" textLength="87" font-family="Helvetica" font-size="12" fill="black">
+check signature,
+</text>
+<polygon fill="white" points="661,449 777,449 777,458 661,458"/>
+<text x="662" y="458" textLength="114" font-family="Helvetica" font-size="12" fill="black">
+then authorized_keys
+</text>
+<line x1="240" y1="465" x2="240" y2="493" stroke="black"/>
+<line x1="720" y1="465" x2="720" y2="493" stroke="black"/>
+<line x1="720" y1="476" x2="240" y2="476" stroke="black"/>
+<polygon fill="black" points="240,476 250,482 250,470"/>
+<polygon fill="white" points="470,466 489,466 489,475 470,475"/>
+<text x="471" y="475" textLength="17" font-family="Helvetica" font-size="12" fill="black">
+OK
+</text>
+<line x1="240" y1="493" x2="240" y2="510" stroke="black"/>
+<line x1="720" y1="493" x2="720" y2="510" stroke="black"/>
+<line x1="240" y1="510" x2="240" y2="538" stroke="black"/>
+<line x1="720" y1="510" x2="720" y2="538" stroke="black"/>
+<line x1="240" y1="521" x2="720" y2="521" stroke="black"/>
+<polygon fill="black" points="720,521 710,527 710,515"/>
+<polygon fill="white" points="436,511 522,511 522,520 436,520"/>
+<text x="437" y="520" textLength="84" font-family="Helvetica" font-size="12" fill="black">
+application data
+</text>
+<line x1="240" y1="538" x2="240" y2="566" stroke="black"/>
+<line x1="720" y1="538" x2="720" y2="566" stroke="black"/>
+<line x1="720" y1="549" x2="240" y2="549" stroke="black"/>
+<polygon fill="black" points="240,549 250,555 250,543"/>
+<polygon fill="white" points="436,539 522,539 522,548 436,548"/>
+<text x="437" y="548" textLength="84" font-family="Helvetica" font-size="12" fill="black">
+application data
+</text>
+<line x1="240" y1="560" x2="240" y2="566" stroke="black"/>
+<line x1="720" y1="560" x2="720" y2="566" stroke="black"/>
+</svg>
