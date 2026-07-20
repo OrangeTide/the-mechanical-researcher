@@ -1,0 +1,26 @@
+digraph layers {
+    rankdir = TB;
+    bgcolor = "transparent";
+    node [shape=box, style="rounded,filled", fontname="Helvetica",
+          fontsize=11, color="#2c2420", penwidth=1.2];
+    edge [fontname="Helvetica", fontsize=9, color="#6b5d4f"];
+
+    app    [label="application\n(echo, game, IPC)", fillcolor="#f4ecdd"];
+    auth   [label="nc_auth\nwho the client is\nHELLO / METHODS / PUBKEY / PASSWORD\nsignature bound to the session id",
+            fillcolor="#e5d5e8"];
+    core   [label="netchan core\nreliable channels, reorder, flow control\n(no socket, no crypto, no login)",
+            fillcolor="#e8dcc4"];
+    crypto [label="nc_crypto decorator\nseal() after send_next  ·  open() before feed\nX25519 ee + es  ·  XChaCha20-Poly1305\nverify_peer() decides whether to trust the host key",
+            fillcolor="#cfe6d8"];
+    udp    [label="nc_udp backend\nnc_addr <-> sockaddr", fillcolor="#e8dcc4"];
+    sock   [label="UDP socket", shape=ellipse, fillcolor="#dfe7f0"];
+
+    app    -> auth   [label="waits for the login"];
+    auth   -> core   [label="tagged messages on a reliable channel"];
+    core   -> crypto [label="plaintext datagram"];
+    crypto -> udp    [label="sealed datagram"];
+    udp    -> sock   [label="bytes"];
+
+    crypto -> auth [label="session id", style=dashed, constraint=false,
+                    color="#a05c3c", fontcolor="#a05c3c"];
+}

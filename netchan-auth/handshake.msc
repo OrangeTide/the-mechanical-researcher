@@ -1,0 +1,30 @@
+msc {
+    hscale = "1.6", wordwraparcs = "true";
+
+    C [label="client"], S [label="server"];
+
+    |||;
+    C note S [label = "nc_crypto: one round trip, and the server proves its identity"];
+    C => S [label = "HELLO  eph_pk_c, 00...00"];
+    S => C [label = "HELLO  eph_pk_s, static_pk_s"];
+    C box C [label = "known_hosts:\nseen this key before?"];
+    C note S [label = "keys derived from ee + es; only the real server can compute es"];
+
+    |||;
+    C note S [label = "netchan: its own handshake, every packet already sealed"];
+    C => S [label = "SYN"];
+    S => C [label = "SYN-ACK"];
+    C => S [label = "ACK"];
+
+    |||;
+    C note S [label = "nc_auth: reliable messages, signature bound to the session id"];
+    C => S [label = "HELLO  \"alice\""];
+    S => C [label = "METHODS  publickey | password"];
+    C => S [label = "PUBKEY  pk, sign(sid || user || pk)"];
+    S box S [label = "check signature,\nthen authorized_keys"];
+    S => C [label = "OK"];
+
+    |||;
+    C => S [label = "application data"];
+    S => C [label = "application data"];
+}

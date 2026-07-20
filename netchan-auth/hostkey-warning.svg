@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="430">
+  <style>
+    text { font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace; font-size: 13px; white-space: pre; }
+    .bg { fill: #1e1e2e; }
+    .titlebar { fill: #313244; }
+    .title { fill: #cdd6f4; }
+    .t { fill: #cdd6f4; }
+    .bold { fill: #cdd6f4; font-weight: bold; }
+    .red { fill: #f38ba8; }
+    .red-bold { fill: #f38ba8; font-weight: bold; }
+    .green { fill: #a6e3a1; }
+    .green-bold { fill: #a6e3a1; font-weight: bold; }
+    .yellow { fill: #f9e2af; }
+    .yellow-bold { fill: #f9e2af; font-weight: bold; }
+    .blue { fill: #89b4fa; }
+    .blue-bold { fill: #89b4fa; font-weight: bold; }
+    .magenta { fill: #cba6f7; }
+    .magenta-bold { fill: #cba6f7; font-weight: bold; }
+    .cyan { fill: #94e2d5; }
+    .cyan-bold { fill: #94e2d5; font-weight: bold; }
+  </style>
+  <rect class="bg" width="860" height="430" rx="8"/>
+  <rect class="titlebar" width="860" height="32" rx="8"/>
+  <rect class="bg" x="0" y="24" width="860" height="8"/>
+  <circle cx="20" cy="16" r="6" fill="#f38ba8"/>
+  <circle cx="40" cy="16" r="6" fill="#f9e2af"/>
+  <circle cx="60" cy="16" r="6" fill="#a6e3a1"/>
+  <text class="title" x="80" y="20">netchan-auth: the host key changed</text>
+  <text y="56" x="16"><tspan class="green-bold">$</tspan><tspan class="t"> mv host_key host_key.orig   # the server was reinstalled</tspan></text>
+  <text y="78" x="16"></text>
+  <text y="100" x="16"><tspan class="green-bold">$</tspan><tspan class="t"> auth_server --port 9001</tspan></text>
+  <text y="122" x="16"></text>
+  <text y="144" x="16"><tspan class="green-bold">$</tspan><tspan class="t"> auth_client --port 9001 --user alice</tspan></text>
+  <text y="166" x="16"><tspan class="t">connecting to 127.0.0.1:9001 as alice</tspan></text>
+  <text y="188" x="16"></text>
+  <text y="210" x="16"><tspan class="t">  WARNING: THE HOST IDENTIFICATION HAS CHANGED</tspan></text>
+  <text y="232" x="16"><tspan class="t">  Someone could be eavesdropping on you right now.</tspan></text>
+  <text y="254" x="16"><tspan class="t">  The key for 127.0.0.1 in known_hosts is</tspan></text>
+  <text y="276" x="16"><tspan class="t">    01bef0accce16cac1b64004679470e9275ea830bfc639d35d48feb2c9eb5c44c</tspan></text>
+  <text y="298" x="16"><tspan class="t">  but the server presented</tspan></text>
+  <text y="320" x="16"><tspan class="t">    ae7ff3dc79d0cff6d26599c346340f4f53b605c3faebe4fef42c191ddffa220a</tspan></text>
+  <text y="342" x="16"><tspan class="t">  Remove the stale line if you know why it changed.</tspan></text>
+  <text y="364" x="16"></text>
+  <text y="386" x="16"><tspan class="t">client: host key not accepted</tspan></text>
+  <text y="408" x="16"><tspan class="t">exit status 1</tspan></text>
+</svg>
