@@ -1,6 +1,7 @@
 ---
 title: "netchan-v3: Encrypting the Datagram"
 date: 2026-07-16
+revised: 2026-07-20
 abstract: "Part three of the netchan story: a 200-line WireGuard-shaped encryption decorator, weighed honestly against IPsec, QUIC, DTLS, and the Noise framework, and where a fixed-suite, no-PKI design earns its keep."
 category: networking
 ---
@@ -411,3 +412,8 @@ the seam promised: encryption became another file, and the core never noticed.
 - **Demo source:** [`demo/`](demo/) holds the encrypted echo, the `secure_link`
   glue, and the loopback test. See [`demo/README.md`](demo/README.html) for the
   full build and run steps.
+- **Upstream:** netchan now lives at
+  [github.com/OrangeTide/netchan](https://github.com/OrangeTide/netchan),
+  reorganised into layers and carrying fixes made after this was written. The
+  demo here is the snapshot the article describes, so take the repository for
+  code to build on and this directory for code to read alongside the text.
