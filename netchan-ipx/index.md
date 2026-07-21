@@ -1,7 +1,7 @@
 ---
 title: Netchan on IPX — Reliable Channels for a 16-bit DOS Game
 date: 2026-06-03
-revised: 2026-06-05
+revised: 2026-07-20
 abstract: "Porting a reliable-channel game library to IPX on 16-bit MS-DOS: the INT 2Fh far-call API, a fully static no-fragmentation memory model, and the real-mode and DOSBox bugs found along the way, with a playable Caves-of-Thor-style demo."
 category: networking
 ---
@@ -130,3 +130,12 @@ To play over IPX, start a relay, then point two DOSBox instances at it and run `
 ## Conclusion
 
 Netchan's design survives the move to IPX and 16-bit DOS without much trouble; reliable and unreliable multiplexed channels are a small, well-understood idea. What the move demands is discipline about memory, a static worst case allocated once and never touched again, and respect for the layer underneath: the far-call ABI, the driver's register promises, the emulator's clock. The reward is a reliable game transport that cannot fragment, cannot fail an allocation in the middle of a match, and fits comfortably in the machine it was written for. The bugs that cost the most were never in the protocol; they were in the seam between portable C and a real-mode world, which is precisely where this kind of project earns its keep.
+
+- **Upstream:** netchan now lives at
+  [github.com/OrangeTide/netchan](https://github.com/OrangeTide/netchan), and
+  the 16-bit variant this article describes is `microchan/` there, carrying
+  the IPX and UDP transports, the `thor` game, and the Open Watcom makefile.
+  It was renamed on import from `nc_*` to `mc_*`, because the two trees
+  otherwise both define `struct nc_addr` with different layouts. The demo
+  here is the snapshot the article describes, so take the repository for code
+  to build on and this directory for code to read alongside the text.
