@@ -1,7 +1,7 @@
 ---
 title: "netchan-v2: Revisited — A Transport Seam for the Browser"
 date: 2026-07-06
-revised: 2026-07-15
+revised: 2026-07-20
 abstract: "Part two of the netchan story: cutting one clean seam through the protocol core so the same code can run over UDP on the desktop and, soon, over WebRTC or WebSockets in a browser."
 category: networking
 ---
@@ -503,3 +503,9 @@ terminal player in the same game on one unmodified server, reached through
 transports the protocol logic above them cannot tell apart. Porting netchan to
 the browser turned out to be the afternoon the seam promised, and the next
 transport, whatever it is, is another file.
+
+- **Upstream:** netchan now lives at
+  [github.com/OrangeTide/netchan](https://github.com/OrangeTide/netchan),
+  reorganised into layers and carrying fixes made after this was written. The
+  demo here is the snapshot the article describes, so take the repository for
+  code to build on and this directory for code to read alongside the text.
