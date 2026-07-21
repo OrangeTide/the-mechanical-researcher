@@ -1,6 +1,7 @@
 ---
 title: "netchan-v4: Authenticating the Peer"
 date: 2026-07-19
+revised: 2026-07-20
 abstract: "Part four of the netchan story: a long-term host key, a known_hosts file, and an ssh-shaped login, weighed against X.509, WireGuard's pre-shared statics, and the temptation to invent a token."
 category: networking
 ---
@@ -472,3 +473,8 @@ aware of the other, joined only by a 32-byte session id.
 - **Demo source:** [`demo/`](demo/) holds the server, the client, the keygen
   tool, and the three tests. See [`demo/README.md`](demo/README.html) for the
   full build and run steps, including how to make the host-key warning appear.
+- **Upstream:** netchan now lives at
+  [github.com/OrangeTide/netchan](https://github.com/OrangeTide/netchan),
+  reorganised into layers and carrying fixes made after this was written. The
+  demo here is the snapshot the article describes, so take the repository for
+  code to build on and this directory for code to read alongside the text.
