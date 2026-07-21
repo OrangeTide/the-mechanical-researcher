@@ -9,7 +9,16 @@
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <sys/random.h>
+
+/* OS entropy backend; see the note in nc_crypto.c. */
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || \
+    defined(__NetBSD__) || defined(__DragonFly__)
+#  define KS_RANDOM_ARC4 1
+#elif defined(__linux__)
+#  define KS_RANDOM_GETRANDOM 1
+#  include <sys/random.h>
+#  include <errno.h>
+#endif
 
 /*
  * Argon2id parameters. 8 MiB and three passes is far below what a password
@@ -28,19 +37,42 @@ static const char KEYFILE_MAGIC[] = "netchan-key-v1";
  * Small helpers
  ****************************************************************/
 
+/* The same three-way selection nc_crypto.c makes, repeated rather than
+ * shared: the two layers are vendored independently. */
 static int
 ks_random(uint8_t *buf, size_t n)
 {
+#if defined(KS_RANDOM_ARC4)
+    arc4random_buf(buf, n);
+    return 0;
+#else
+    FILE *f;
+    size_t got;
+
+#  if defined(KS_RANDOM_GETRANDOM)
     size_t off = 0;
 
     while (off < n) {
         ssize_t r = getrandom(buf + off, n - off, 0);
 
-        if (r < 0)
-            return -1;
+        if (r < 0) {
+            if (errno == EINTR)
+                continue;
+            break;              /* ENOSYS on an old kernel: use the file */
+        }
         off += (size_t)r;
     }
-    return 0;
+    if (off == n)
+        return 0;
+#  endif
+
+    f = fopen("/dev/urandom", "rb");
+    if (!f)
+        return -1;
+    got = fread(buf, 1, n, f);
+    fclose(f);
+    return got == n ? 0 : -1;
+#endif
 }
 
 void
