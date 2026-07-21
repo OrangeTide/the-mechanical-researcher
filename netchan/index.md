@@ -1,7 +1,7 @@
 ---
 title: Reliable UDP for Games — QuakeWorld, ENet, QUIC, and Netchan Compared
 date: 2026-05-09
-revised: 2026-07-06
+revised: 2026-07-20
 abstract: "A comparison of four UDP multiplexing approaches for game networking, from the 1996 QuakeWorld NetChannel to a near-minimal modern implementation in 1,500 lines of C"
 category: networking
 ---
@@ -444,3 +444,9 @@ The spectrum from QuakeWorld's 400-line netchan to QUIC's six-figure codebase re
 Netchan fits the features described above into 1,500 lines of C. It's not the right choice for every game, but it establishes a useful lower bound: if the networking layer is more complex than this and the game's requirements are simpler than QUIC's, something may have gone wrong.
 
 The full source (`netchan.h`, `netchan.c`, `netchan_test.c`, and `Makefile`) is available as a companion download. Build with `make` and run `./netchan_test` to exercise all ten protocol tests.
+
+- **Upstream:** netchan now lives at
+  [github.com/OrangeTide/netchan](https://github.com/OrangeTide/netchan),
+  reorganised into layers and carrying fixes made after this was written. The
+  demo here is the snapshot the article describes, so take the repository for
+  code to build on and this directory for code to read alongside the text.
