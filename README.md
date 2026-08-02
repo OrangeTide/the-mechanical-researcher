@@ -25,6 +25,7 @@ A collection of research topics, primarily gathered through agentic AI sessions,
 - [netchan-v2: Revisited — A Transport Seam for the Browser](netchan-v2/)
 - [netchan-v3: Encrypting the Datagram](netchan-crypto/)
 - [netchan-v4: Authenticating the Peer](netchan-auth/)
+- [A Compact RV32 Engine, Verified Against QEMU](rv32-emulator/)
 
 ## Build & Deploy
 

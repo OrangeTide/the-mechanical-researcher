@@ -1,0 +1,24 @@
+# Build products
+*.o
+*.elf
+*.bin
+*.wasm
+*.gcno
+*.gcda
+*.gcov
+coverage-build/
+archtest-work/
+
+# Host tools
+test_harness
+test_fp
+test_mem
+test_zcmp
+lockstep
+fuzz
+archtest-run
+bench_rv32
+bench_coldfire
+
+# Generated page
+wasm/index.html

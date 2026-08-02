@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RV32IMFC in WebAssembly</title>
+<style>
+:root {
+    --bg: #17130f;
+    --panel: #221b15;
+    --ink: #f0e6d8;
+    --dim: #a2917c;
+    --line: #3a2f26;
+    --accent: #d98a3d;
+}
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    padding: 1.5rem 1rem 2.5rem;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.6 "IBM Plex Sans", system-ui, sans-serif;
+}
+main { max-width: 46rem; margin: 0 auto; }
+h1 {
+    font-size: 1.35rem;
+    font-weight: 600;
+    margin: 0 0 .25rem;
+    letter-spacing: -.01em;
+}
+p.lede { color: var(--dim); margin: 0 0 1.25rem; }
+figure { margin: 0 0 1rem; }
+canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    background: #0e0b09;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    image-rendering: pixelated;
+}
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    align-items: center;
+    margin: .75rem 0 1rem;
+}
+button {
+    font: inherit;
+    color: var(--ink);
+    background: var(--panel);
+    border: 1px solid #2c2420;
+    border-radius: 3px;
+    padding: .3rem .85rem;
+    cursor: pointer;
+}
+button:hover { border-color: var(--accent); }
+label { color: var(--dim); font-size: .85rem; }
+input[type=range] { vertical-align: middle; accent-color: var(--accent); }
+.stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+    gap: .5rem;
+    margin-bottom: 1rem;
+}
+.stat {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: .5rem .7rem;
+}
+.stat .k {
+    display: block;
+    font: 11px/1.4 "IBM Plex Mono", ui-monospace, monospace;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--dim);
+}
+.stat .v {
+    font: 600 1.05rem/1.3 "IBM Plex Mono", ui-monospace, monospace;
+    color: var(--accent);
+}
+pre.console {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: .6rem .7rem;
+    margin: 0 0 1rem;
+    font: 12px/1.5 "IBM Plex Mono", ui-monospace, monospace;
+    color: var(--dim);
+    white-space: pre-wrap;
+    min-height: 2.4rem;
+}
+footer { color: var(--dim); font-size: .85rem; border-top: 1px solid var(--line); padding-top: 1rem; }
+code { font-family: "IBM Plex Mono", ui-monospace, monospace; color: var(--ink); }
+@media (prefers-color-scheme: light) {
+    :root {
+        --bg: #f4efe6; --panel: #fffdf8; --ink: #2c2420;
+        --dim: #6d5f51; --line: #d4c9b8; --accent: #b4622a;
+    }
+    canvas { background: #1b1410; }
+}
+</style>
+</head>
+<body>
+<main>
+<h1>An RV32IMFC interpreter running in WebAssembly</h1>
+<p class="lede">
+Every particle below is moved by RISC-V machine code. The physics, the
+bouncing and the square roots that set each dot's size all run inside a
+32-bit RISC-V interpreter compiled to WebAssembly. The page never computes
+a position: it only draws what the guest asks it to.
+</p>
+
+<figure>
+<canvas id="screen" width="640" height="360"></canvas>
+</figure>
+
+<div class="controls">
+<button id="toggle">Pause</button>
+<button id="reset">Restart</button>
+<label>Instruction budget per frame
+<input id="budget" type="range" min="1000" max="200000" step="1000" value="50000">
+<span id="budgetval">50,000</span>
+</label>
+</div>
+
+<div class="stats">
+<div class="stat"><span class="k">Instructions / frame</span><span class="v" id="ipf">0</span></div>
+<div class="stat"><span class="k">Total retired</span><span class="v" id="total">0</span></div>
+<div class="stat"><span class="k">Throughput</span><span class="v" id="mips">0</span></div>
+<div class="stat"><span class="k">Module size</span><span class="v" id="wasmsize">0</span></div>
+</div>
+
+<pre class="console" id="console"></pre>
+
+<footer>
+<p>
+The guest is a freestanding C program cross-compiled with
+<code>riscv64-linux-gnu-gcc -march=rv32imfc -mabi=ilp32f</code> and loaded as
+a flat binary. It reaches the page only through <code>ecall</code>: one call
+per particle to draw it, one per frame to yield. The interpreter imports
+nothing from JavaScript, so a guest cannot touch anything outside the
+megabyte of memory it was given.
+</p>
+</footer>
+</main>
+
+<script>
+const WASM_B64 = "__WASM_B64__";
+const GUEST_B64 = "__GUEST_B64__";
+
+function decode(b64) {
+    const raw = atob(b64);
+    const out = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++)
+        out[i] = raw.charCodeAt(i);
+    return out;
+}
+
+const PALETTE = [];
+for (let i = 0; i < 64; i++) {
+    const h = 20 + (i * 5.6) % 340;
+    PALETTE.push(`hsl(${h} 72% 62%)`);
+}
+
+const canvas = document.getElementById("screen");
+const ctx = canvas.getContext("2d");
+const el = {
+    toggle: document.getElementById("toggle"),
+    reset: document.getElementById("reset"),
+    budget: document.getElementById("budget"),
+    budgetval: document.getElementById("budgetval"),
+    ipf: document.getElementById("ipf"),
+    total: document.getElementById("total"),
+    mips: document.getElementById("mips"),
+    wasmsize: document.getElementById("wasmsize"),
+    console: document.getElementById("console"),
+};
+
+const fmt = n => n.toLocaleString("en-US");
+
+let vm = null, running = true, total = 0, lastStats = 0, sampled = 0, sampledTime = 0;
+
+async function boot() {
+    const wasmBytes = decode(WASM_B64);
+    const guest = decode(GUEST_B64);
+    const {instance} = await WebAssembly.instantiate(wasmBytes, {});
+    vm = instance.exports;
+    el.wasmsize.textContent = (wasmBytes.length / 1024).toFixed(1) + " KB";
+    start(guest);
+    requestAnimationFrame(frame);
+}
+
+function start(guest) {
+    const mem = new Uint8Array(vm.memory.buffer);
+    const base = vm.rvw_memory();
+    mem.fill(0, base, base + vm.rvw_memory_size());
+    mem.set(guest, base + 0x1000);
+    vm.rvw_reset(0x1000);
+    total = 0;
+    el.console.textContent = "";
+}
+
+let guestImage = null;
+
+function frame(now) {
+    requestAnimationFrame(frame);
+    if (!running || !vm) return;
+
+    const budget = +el.budget.value;
+    const t0 = performance.now();
+    const executed = vm.rvw_run_frame(budget);
+    const dt = performance.now() - t0;
+    total += executed;
+
+    sampled += executed;
+    sampledTime += dt;
+
+    const count = vm.rvw_draw_count();
+    const cmds = new Int32Array(vm.memory.buffer, vm.rvw_draw_cmds(), count * 4);
+
+    ctx.fillStyle = "#0e0b09";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    for (let i = 0; i < count; i++) {
+        const x = cmds[i * 4], y = cmds[i * 4 + 1];
+        const size = cmds[i * 4 + 2], colour = cmds[i * 4 + 3];
+        ctx.fillStyle = PALETTE[colour & 63];
+        ctx.beginPath();
+        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    if (now - lastStats > 250) {
+        el.ipf.textContent = fmt(executed);
+        el.total.textContent = fmt(total);
+        const mips = sampledTime > 0 ? (sampled / sampledTime / 1000) : 0;
+        el.mips.textContent = mips.toFixed(1) + " MIPS";
+        sampled = 0; sampledTime = 0;
+        lastStats = now;
+
+        const len = vm.rvw_console_len();
+        if (len) {
+            const chars = new Uint32Array(vm.memory.buffer, vm.rvw_console(), len);
+            el.console.textContent = String.fromCharCode(...chars);
+        }
+        if (vm.rvw_halted())
+            el.console.textContent += "\n[guest halted at pc " +
+                vm.rvw_pc().toString(16) + "]";
+    }
+}
+
+el.toggle.onclick = () => {
+    running = !running;
+    el.toggle.textContent = running ? "Pause" : "Resume";
+};
+el.reset.onclick = () => start(decode(GUEST_B64));
+el.budget.oninput = () => {
+    el.budgetval.textContent = fmt(+el.budget.value);
+};
+
+boot().catch(e => {
+    el.console.textContent = "failed to start: " + e;
+});
+</script>
+</body>
+</html>
