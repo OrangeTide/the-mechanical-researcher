@@ -85,6 +85,39 @@ static inline uint32_t fetch32(cf_cpu *cpu)
 #define SZ_WORD  2
 #define SZ_LONG  4
 
+/* The EMAC accumulators are 48 bits. They are held here in an int64_t,
+ * sign-extended from bit 47, so ordinary signed arithmetic works on them
+ * and the extension words are just the top 16 bits. */
+static int64_t
+sign_extend48(int64_t v)
+{
+    return (int64_t)((uint64_t)v << 16) >> 16;
+}
+
+static int64_t
+sign_extend40(int64_t v)
+{
+    return (int64_t)((uint64_t)v << 24) >> 24;
+}
+
+/* Pack bits 47:32 of accumulators n and n+1 into one longword, the
+ * lower-numbered accumulator in the low half, as ACCext01/ACCext23. */
+static uint32_t
+acc_ext_pair(const cf_cpu *cpu, int n)
+{
+    return (uint32_t)(((cpu->acc[n + 1] >> 32) & 0xFFFF) << 16) |
+           (uint32_t)((cpu->acc[n] >> 32) & 0xFFFF);
+}
+
+static void
+set_acc_ext_pair(cf_cpu *cpu, int n, uint32_t val)
+{
+    cpu->acc[n] = sign_extend48(((int64_t)(val & 0xFFFF) << 32) |
+                                (cpu->acc[n] & 0xFFFFFFFF));
+    cpu->acc[n + 1] = sign_extend48(((int64_t)(val >> 16) << 32) |
+                                    (cpu->acc[n + 1] & 0xFFFFFFFF));
+}
+
 /* MACSR register bits */
 #define MACSR_PAV3  (1 << 15)
 #define MACSR_PAV2  (1 << 14)
@@ -1552,31 +1585,60 @@ static void exec_groupA(cf_cpu *cpu, uint16_t op)
                 val = (uint32_t)(cpu->acc[emac_reg] & 0xFFFFFFFF);
                 break;
             case 4: val = cpu->macsr; break;
-            case 5: val = ((uint32_t)cpu->accext[1] << 8) |
-                           (uint32_t)cpu->accext[0]; break;
+            /* ACCext01 and ACCext23 are the top 16 bits of two
+             * accumulators packed into one longword, the lower-numbered
+             * accumulator in the low half. They are not a separate piece
+             * of state: reading them exposes bits 47:32 of the
+             * accumulators themselves. */
+            case 5: val = acc_ext_pair(cpu, 0); break;
             case 6: val = cpu->mask; break;
-            case 7: val = ((uint32_t)cpu->accext[3] << 8) |
-                           (uint32_t)cpu->accext[2]; break;
+            case 7: val = acc_ext_pair(cpu, 2); break;
             default: val = 0; break;
             }
             cpu->d[rn] = val;
+
+            /* MOVCLR.L ACCn,Dn is the same encoding with bit 6 set. It
+             * reads the accumulator and zeroes it, along with its
+             * extension byte and its product/accumulation overflow flag,
+             * so a filter can drain a result and start the next window in
+             * one instruction. Only the accumulators have the form; bit 6
+             * on MACSR means MOVE MACSR,CCR, handled above. */
+            if (special && emac_reg <= 3) {
+                cpu->acc[emac_reg] = 0;
+                cpu->macsr &= ~(uint32_t)(MACSR_PAV0 << emac_reg);
+            }
         } else {
             /* Write Dn → EMAC register */
             uint32_t val = cpu->d[rn];
+            uint32_t ext;
+
             switch (emac_reg) {
             case 0: case 1: case 2: case 3:
-                cpu->acc[emac_reg] = (int64_t)(int32_t)val;
+                /* Loading an accumulator also sets its extension, from
+                 * the mode rather than from the operand: signed integer
+                 * sign-extends bit 31 across all 16 bits, unsigned
+                 * integer clears them, and fractional sign-extends only
+                 * the upper byte and clears the lower one. */
+                if (cpu->macsr & MACSR_FI)
+                    ext = (val & 0x80000000u) ? 0xFF00u : 0x0000u;
+                else if (cpu->macsr & MACSR_SU)
+                    ext = 0x0000u;
+                else
+                    ext = (val & 0x80000000u) ? 0xFFFFu : 0x0000u;
+                cpu->acc[emac_reg] =
+                    sign_extend48(((int64_t)ext << 32) | (int64_t)val);
+                cpu->macsr &= ~(uint32_t)(MACSR_N | MACSR_Z | MACSR_V |
+                                          MACSR_EV |
+                                          (MACSR_PAV0 << emac_reg));
+                if (cpu->acc[emac_reg] == 0)
+                    cpu->macsr |= MACSR_Z;
+                if (cpu->acc[emac_reg] < 0)
+                    cpu->macsr |= MACSR_N;
                 break;
             case 4: cpu->macsr = val; break;
-            case 5:
-                cpu->accext[0] = val & 0xFF;
-                cpu->accext[1] = (val >> 8) & 0xFF;
-                break;
+            case 5: set_acc_ext_pair(cpu, 0, val); break;
             case 6: cpu->mask = val; break;
-            case 7:
-                cpu->accext[2] = val & 0xFF;
-                cpu->accext[3] = (val >> 8) & 0xFF;
-                break;
+            case 7: set_acc_ext_pair(cpu, 2, val); break;
             }
         }
     } else {
@@ -1609,11 +1671,17 @@ static void exec_groupA(cf_cpu *cpu, uint16_t op)
          * instead made every multiply-accumulate return zero once a
          * program wrote a restrictive MASK. */
 
+        /* MACSR[S/U] reads 0 for signed and 1 for unsigned, which is the
+         * opposite way round from what the bit's name suggests. The CFPRM
+         * pseudocode is explicit: signed integer mode is
+         * MACSR[S/U,F/I] == 00, unsigned integer mode is 10. Reset leaves
+         * MACSR zero, so signed is also the mode compiled code gets
+         * without touching the register. */
         int64_t product;
         if (cpu->macsr & MACSR_SU)
-            product = (int64_t)(int32_t)rx_val * (int64_t)(int32_t)ry_val;
+            product = (int64_t)((uint64_t)rx_val * (uint64_t)ry_val);
         else
-            product = (int64_t)(uint64_t)rx_val * (uint64_t)ry_val;
+            product = (int64_t)(int32_t)rx_val * (int64_t)(int32_t)ry_val;
 
         if (sf == 1)
             product <<= 1;
@@ -1626,29 +1694,52 @@ static void exec_groupA(cf_cpu *cpu, uint16_t op)
         else
             result = cpu->acc[acc_idx] + product;
 
-        /* 48-bit saturation if OMC set */
-        if (cpu->macsr & MACSR_OMC) {
+        /* The accumulator is 48 bits wide. OMC pins the result at the
+         * limit; without it the value wraps, and only the overflow flags
+         * record that it did. Either way the stored value must be
+         * confined to 48 bits, or a later read of the extension words
+         * would report bits the hardware does not have. */
+        {
             int64_t max48 = ((int64_t)1 << 47) - 1;
             int64_t min48 = -((int64_t)1 << 47);
-            if (result > max48) {
-                result = max48;
-                cpu->macsr |= MACSR_V;
-                cpu->macsr |= (MACSR_PAV0 << acc_idx);
-            } else if (result < min48) {
-                result = min48;
-                cpu->macsr |= MACSR_V;
-                cpu->macsr |= (MACSR_PAV0 << acc_idx);
+            uint32_t pav = (uint32_t)(MACSR_PAV0 << acc_idx);
+            int ev;
+
+            if (result > max48 || result < min48) {
+                cpu->macsr |= pav;
+                if (cpu->macsr & MACSR_OMC)
+                    result = result > max48 ? max48 : min48;
+                else
+                    result = sign_extend48(result);
             }
+
+            cpu->acc[acc_idx] = result;
+
+            /* The three overflow flags mean different things. PAVx is
+             * sticky and records that this accumulator has overflowed at
+             * some point. V is not stored state, it is PAVx plus whatever
+             * this operation did. EV is narrower than either: it asks
+             * whether the value has outgrown the low 32 bits of the
+             * accumulator, or the low 40 in fractional mode, which is
+             * where a caller reading only ACCn would start losing it. */
+            if (cpu->macsr & MACSR_FI)
+                ev = result != sign_extend40(result);
+            else if (cpu->macsr & MACSR_SU)
+                ev = (uint64_t)result > 0xFFFFFFFFu;
+            else
+                ev = result != (int64_t)(int32_t)result;
+
+            cpu->macsr &= ~(uint32_t)(MACSR_N | MACSR_Z | MACSR_V |
+                                      MACSR_EV);
+            if (cpu->macsr & pav)
+                cpu->macsr |= MACSR_V;
+            if (ev)
+                cpu->macsr |= MACSR_EV;
+            if (result == 0)
+                cpu->macsr |= MACSR_Z;
+            if (result < 0)
+                cpu->macsr |= MACSR_N;
         }
-
-        cpu->acc[acc_idx] = result;
-
-        /* Update MACSR N/Z from result */
-        cpu->macsr &= ~(MACSR_N | MACSR_Z);
-        if (result == 0)
-            cpu->macsr |= MACSR_Z;
-        if (result < 0)
-            cpu->macsr |= MACSR_N;
     }
 }
 
