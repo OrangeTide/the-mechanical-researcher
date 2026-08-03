@@ -1,6 +1,7 @@
 ---
 title: "Triton Audio: 16-Channel PCM Mixer"
 date: 2026-03-27
+revised: 2026-08-03
 abstract: "Building a 16-channel PCM audio mixer with IMA ADPCM support, stereo panning, and SDL3 output — the sound chip for a console that never shipped"
 category: systems
 ---
@@ -19,7 +20,7 @@ The audio mixer is 361 lines of host-side C. The register header is 118 lines. A
 
 ## Abstract
 
-We present a 16-channel PCM audio mixer for the Triton fantasy game console. The mixer is exposed to guest programs as a 1 KB memory-mapped register file at address `0x01100000`, with 16 channels of 32 bytes each and global registers for master volume and interrupt control. Each channel DMA-reads sample data from main RAM and supports three formats: 16-bit signed PCM, 8-bit signed PCM (scaled to 16-bit range), and 4-bit IMA ADPCM with per-channel decoder state. Pitch control uses an 8.8 fixed-point frequency register that scales the playback rate relative to 44.1 kHz, enabling arbitrary pitch without resampling the source data. The mixer accumulates all active channels into a stereo int32 accumulator, applies per-channel and master volume, clips to int16, and writes the result to an SDL3 audio stream via a callback-based output path. In headless mode, mixing still advances channel state (position, ADPCM decoder, loop/end detection) with the output discarded. An interrupt mechanism fires on loop and end-of-sample events, with delivery deferred to the CPU thread via a pending-bit scheme that avoids mutexes. The implementation adds 479 lines of new host-side code (361 mixer + 118 header) and 365 lines of guest demo code. All 36 test assertions pass under valgrind with zero leaks.
+We present a 16-channel PCM audio mixer for the Triton fantasy game console. The mixer is exposed to guest programs as a 1 KB memory-mapped register file at address `0x01100000`, with 16 channels of 32 bytes each and global registers for master volume and interrupt control. Each channel DMA-reads sample data from main RAM and supports three formats: 16-bit signed PCM, 8-bit signed PCM (scaled to 16-bit range), and 4-bit IMA ADPCM with per-channel decoder state. Pitch control uses an 8.8 fixed-point frequency register that scales the playback rate relative to 44.1 kHz, enabling arbitrary pitch without resampling the source data. The mixer accumulates all active channels into a stereo int32 accumulator, applies per-channel and master volume, clips to int16, and writes the result to an SDL3 audio stream via a callback-based output path. In headless mode, mixing still advances channel state (position, ADPCM decoder, loop/end detection) with the output discarded. An interrupt mechanism fires on loop and end-of-sample events, with delivery deferred to the CPU thread via a pending-bit scheme that avoids mutexes. The implementation adds 478 lines of new host-side code (360 mixer + 118 header) and 365 lines of guest demo code. All 36 test assertions pass under valgrind with zero leaks.
 
 ## The Triton Sound Chip
 
@@ -494,7 +495,7 @@ All 96 assertions pass. Valgrind reports zero leaks, zero errors on both test su
 
 ## Conclusion
 
-The audio mixer adds 479 lines of host-side code (361 mixer + 118 header) to the Triton system emulator. The guest-side sound demo is 365 lines. The expanded common library adds 119 lines. Together with the libgcc integration and Makefile changes, Part 4 contributes approximately 1,000 lines of new code — smaller than the CPU emulator (2,221 lines) or the rasterizer (1,541 lines), reflecting the relative simplicity of a sample-playback mixer compared to a pixel pipeline.
+The audio mixer adds 478 lines of host-side code (360 mixer + 118 header) to the Triton system emulator. The guest-side sound demo is 365 lines. The expanded common library adds 119 lines. Together with the libgcc integration and Makefile changes, Part 4 contributes approximately 1,000 lines of new code — smaller than the CPU emulator (2,641 lines) or the rasterizer (1,598 lines), reflecting the relative simplicity of a sample-playback mixer compared to a pixel pipeline.
 
 What the mixer implements: 16 channels of DMA-from-RAM sample playback, three audio formats, per-channel pitch control and stereo panning, loop points with sticky status bits, clear-on-read semantics, and interrupt generation. SDL3 audio output with a callback-based push model. Headless state advancement for testing and CI.
 
