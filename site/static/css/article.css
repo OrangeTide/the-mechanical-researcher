@@ -68,6 +68,7 @@ body {
 .article-meta {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.75rem;
   margin-top: 0.75rem;
 }
@@ -107,7 +108,8 @@ body {
   font-size: inherit;
 }
 
-.source-zip {
+.source-zip,
+.wasm-demo {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.8rem;
   color: #6b5b4a;
@@ -116,10 +118,30 @@ body {
   border-radius: 3px;
   padding: 0.15rem 0.5rem;
   background: #fffef7;
+  touch-action: manipulation;
 }
 
-.source-zip:hover {
+.source-zip:hover,
+.wasm-demo:hover {
   background: #f0e8d8;
+}
+
+.source-zip:focus-visible,
+.wasm-demo:focus-visible {
+  outline: 2px solid #2c2420;
+  outline-offset: 2px;
+}
+
+/* Of the two header links, the live demo is the one worth reaching for,
+   so it carries ink-dark text and a warmer fill while the archive link
+   stays muted. Both keep the thin black border that marks a control. */
+.wasm-demo {
+  color: #2c2420;
+  background: #f7efdd;
+}
+
+.wasm-demo:hover {
+  background: #ecdfc4;
 }
 
 .article-body h2 {

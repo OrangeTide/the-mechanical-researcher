@@ -200,6 +200,7 @@ for index_md in */index.md; do
                 "REVISED" "" \
                 "CATEGORY" "$category" \
                 "SOURCE_ZIP" "" \
+                "WASM_DEMO" "" \
                 "ROOT" "$(printf '%s' "$rel" | sed 's|[^/]||g; s|/|../|g').." \
             | _AWK_BODY="$suppl_body" awk 'BEGIN{body=ENVIRON["_AWK_BODY"]} {
                 idx = index($0, "{{BODY}}")
@@ -222,6 +223,33 @@ for index_md in */index.md; do
         source_zip_html=""
     fi
 
+    # Browser demonstration. A topic that ships demo/wasm/build-wasm.sh has
+    # that script run here, and the self-contained page it writes is
+    # published at /<slug>/wasm/. The script builds into a scratch
+    # directory so its intermediates stay out of the site and out of the
+    # source tree; only the page itself is deployed.
+    #
+    # The toolchain it needs is not required to build the site. If it is
+    # missing the demo is skipped with a warning and everything else still
+    # builds, so a plain checkout without a cross-compiler works.
+    wasm_demo_html=""
+    if [ -x "$topic_dir/demo/wasm/build-wasm.sh" ]; then
+        wasm_tmp="$OUT_DIR/.wasm-build-$slug"
+        mkdir -p "$wasm_tmp"
+        if OUT="$wasm_tmp" "$topic_dir/demo/wasm/build-wasm.sh" \
+                > "$wasm_tmp/build.log" 2>&1 &&
+           [ -f "$wasm_tmp/index.html" ]; then
+            mkdir -p "$OUT_DIR/$slug/wasm"
+            cp "$wasm_tmp/index.html" "$OUT_DIR/$slug/wasm/index.html"
+            wasm_demo_html="<a class=\"wasm-demo\" href=\"wasm/\">Run in browser</a>"
+            echo "  wasm demo: $slug ($(wc -c < "$wasm_tmp/index.html") bytes)"
+        else
+            echo "  wasm demo: $slug SKIPPED (build failed; see log below)" >&2
+            tail -5 "$wasm_tmp/build.log" >&2 || true
+        fi
+        rm -rf "$wasm_tmp"
+    fi
+
     # Render article template
     # For the article body which contains HTML, we use a two-pass approach
     cat "$TEMPLATE_DIR/article.html" \
@@ -232,6 +260,7 @@ for index_md in */index.md; do
             "REVISED" "$revised_html" \
             "CATEGORY" "$category" \
             "SOURCE_ZIP" "$source_zip_html" \
+            "WASM_DEMO" "$wasm_demo_html" \
             "ROOT" ".." \
         | _AWK_BODY="$article_body" awk 'BEGIN{body=ENVIRON["_AWK_BODY"]} {
             idx = index($0, "{{BODY}}")

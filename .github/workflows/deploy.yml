@@ -24,6 +24,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y lowdown zip
+          # For topics that ship a browser demonstration: clang supplies the
+          # wasm32 target and the RISC-V cross-compiler builds the guest.
+          # build.sh skips such a demo rather than failing if these are
+          # absent, so they are only needed to publish it.
+          sudo apt-get install -y clang gcc-riscv64-linux-gnu binutils-riscv64-linux-gnu
 
       - name: Build site
         run: ./build.sh
