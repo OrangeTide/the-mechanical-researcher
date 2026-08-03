@@ -1,19 +1,20 @@
 ---
 title: "Triton GPU: Software Rasterizer"
 date: 2026-03-26
+revised: 2026-08-03
 abstract: "Implementing a Glide 3.0 software rasterizer for a fantasy console — triangle setup, perspective-correct texturing, and the pixel pipeline that makes the Banshee sing"
 category: systems
 ---
 
 ## Introduction
 
-[Part 1](../coldfire-emulator/) built a ColdFire V4e CPU emulator in 2,221 lines of C. [Part 2](../triton-system-emulator/) wrapped it in a system emulator — memory-mapped peripherals, a monitor ROM, UART output, SDL3 display — and booted guest programs that draw colored rectangles to VRAM. The CPU can run code. The system can boot. But the GPU is a stub: a 64 KB register file that returns "idle" and "vblank" to anything that polls it.
+[Part 1](../coldfire-emulator/) built a ColdFire V4e CPU emulator in 2,641 lines of C. [Part 2](../triton-system-emulator/) wrapped it in a system emulator — memory-mapped peripherals, a monitor ROM, UART output, SDL3 display — and booted guest programs that draw colored rectangles to VRAM. The CPU can run code. The system can boot. But the GPU is a stub: a 64 KB register file that returns "idle" and "vblank" to anything that polls it.
 
 The Triton's Banshee-derived GPU has a specific programming interface: 3Dfx's Glide 3.0 API, the same API that powered Quake, Unreal, and half the PC games of 1997–1999. Glide is not an abstraction over hardware the way OpenGL or Direct3D are — it *is* the hardware. Every Glide function maps directly to a register write or a FIFO command. `grDrawTriangle` does not ask a driver to please consider drawing a triangle sometime; it writes three vertices into the command FIFO and the rasterizer starts filling pixels before the function returns.
 
 This directness is what made Glide fast and what makes it a natural fit for a console. There is no driver layer. There is no shader compiler. There are no state validation checks. A Glide call is a hardware command, and on the Triton, a Glide call is a hypercall — a single LINE_A instruction that traps from guest code into the host rasterizer with zero overhead.
 
-This article implements that rasterizer. We take the ~45 Tier 1 functions from the Glide 3.0 API specification and implement them as a software pixel pipeline: triangle setup with edge functions, perspective-correct texture mapping, a configurable color combine unit, depth testing, alpha blending, and fog. The rasterizer is 1,541 lines of host-side C. The guest-side Glide header — inline assembly wrappers for every function — is another 598 lines. A spinning textured cube demo exercises the full pipeline in 381 lines of freestanding ColdFire C.
+This article implements that rasterizer. We take the ~45 Tier 1 functions from the Glide 3.0 API specification and implement them as a software pixel pipeline: triangle setup with edge functions, perspective-correct texture mapping, a configurable color combine unit, depth testing, alpha blending, and fog. The rasterizer is 1,598 lines of host-side C. The guest-side Glide header — inline assembly wrappers for every function — is another 602 lines. A spinning textured cube demo exercises the full pipeline in 383 lines of freestanding ColdFire C.
 
 <img src="images/fr000149.png" alt="Textured spinning cube rendered by the Triton GPU rasterizer — three visible faces show a checkerboard texture tinted red, blue, and magenta by per-vertex colors">
 
@@ -572,7 +573,7 @@ triton: halted after 3372349 instructions
 
 ## Conclusion
 
-The Glide 3.0 software rasterizer adds 1,541 lines of host-side C to the Triton system emulator. The guest-side header adds 598 lines. Together with the 381-line cube demo, Part 3 contributes 2,520 new lines of code — comparable in scope to the 2,221-line CPU emulator from Part 1.
+The Glide 3.0 software rasterizer adds 1,598 lines of host-side C to the Triton system emulator. The guest-side header adds 602 lines. Together with the 383-line cube demo, Part 3 contributes 2,583 new lines of code — comparable in scope to the 2,641-line CPU emulator from Part 1.
 
 What the rasterizer implements: the full Glide pixel pipeline from triangle setup through framebuffer write. Forty-five Tier 1 functions that do real work — drawing, texturing, combining, testing, blending. Twenty Tier 2 stubs that return success silently. A configurable color combine unit that matches the Glide combine equation. Perspective-correct texture mapping with five texture formats. Double-buffered rendering with pointer-swap buffer exchange.
 
