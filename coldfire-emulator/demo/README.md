@@ -1,6 +1,6 @@
 # ColdFire V4e Emulator Demo
 
-A standalone ColdFire V4e CPU emulator in 2,550 lines of C, validated against
+A standalone ColdFire V4e CPU emulator in 2,641 lines of C, validated against
 GCC-compiled bare-metal programs and QEMU.
 
 ## Quick Start (Smoke Test)
@@ -228,7 +228,7 @@ confirmed against the ColdFire Family Programmer's Reference Manual, Rev. 3:
 
 | File | Description |
 |---|---|
-| `coldfire.c` | ColdFire V4e emulator (2,550 lines) |
+| `coldfire.c` | ColdFire V4e emulator (2,641 lines) |
 | `coldfire.h` | Public API (250 lines) |
 | `test_coldfire.c` | Self-contained test with embedded binary, 72 checks |
 | `test_instructions.c` | Instruction-level suite, cross-compiled |
