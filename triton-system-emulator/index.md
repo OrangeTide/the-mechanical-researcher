@@ -1,13 +1,14 @@
 ---
 title: "The Triton: System Emulator and Monitor ROM"
 date: 2026-03-26
+revised: 2026-08-03
 abstract: "Wrapping a ColdFire V4e CPU in a complete system emulator — memory-mapped peripherals, a cross-compiled monitor ROM, and the console startup that built a company's dream"
 category: systems
 ---
 
 ## Introduction
 
-[Part 1](../coldfire-emulator/) built a ColdFire V4e emulator in 2,221 lines of C. It executes instructions, passes tests, validates against QEMU — and cannot boot. A CPU without a system around it is like an engine on a test stand: it runs, but it goes nowhere.
+[Part 1](../coldfire-emulator/) built a ColdFire V4e emulator in 2,641 lines of C. It executes instructions, passes tests, validates against QEMU — and cannot boot. A CPU without a system around it is like an engine on a test stand: it runs, but it goes nowhere.
 
 The gap between "executes instructions" and "boots a program" is the system layer: a memory map that routes addresses to RAM, ROM, and peripherals; a boot ROM that initializes hardware and loads software; a display that shows pixels; a serial port that prints text. Every real computer has this layer. Every emulator needs it.
 
@@ -15,7 +16,7 @@ This article builds that layer. We take the ColdFire V4e CPU from Part 1 and emb
 
 ## Abstract
 
-We present a system emulator for the Triton fantasy game console. The emulator wraps the 2,221-line ColdFire V4e CPU from Part 1 in a memory-mapped address space covering 8 MB RAM, 8 MB VRAM, 4 MB NOR flash, and peripheral registers for GPU, audio, UART, SCSI, MMC, input, timer, and DMA — most as stubs, with the UART providing host-bridged serial output. A monitor ROM cross-compiled for the ColdFire boots from NOR flash, initializes hardware registers, parses an ELF binary staged in guest RAM, loads its segments, and jumps to the entry point. The system emulator adds approximately 800 lines of host-side C and 250 lines of guest-side ColdFire C. The monitor successfully boots a test program that prints to the UART and draws colored rectangles to the framebuffer, running 2.6 million emulated instructions to completion.
+We present a system emulator for the Triton fantasy game console. The emulator wraps the 2,641-line ColdFire V4e CPU from Part 1 in a memory-mapped address space covering 8 MB RAM, 8 MB VRAM, 4 MB NOR flash, and peripheral registers for GPU, audio, UART, SCSI, MMC, input, timer, and DMA — most as stubs, with the UART providing host-bridged serial output. A monitor ROM cross-compiled for the ColdFire boots from NOR flash, initializes hardware registers, parses an ELF binary staged in guest RAM, loads its segments, and jumps to the entry point. The system emulator adds 576 lines of host-side C and 360 lines of guest-side ColdFire C. The monitor successfully boots a test program that prints to the UART and draws colored rectangles to the framebuffer, running 2.6 million emulated instructions to completion.
 
 ## Vertex Technologies
 
@@ -400,7 +401,7 @@ The included `fetch-sdl3.sh` script downloads SDL3 3.4.2 and builds it as a stat
 
 ## Conclusion
 
-The system emulator adds approximately 800 lines of host-side C (`triton.c` + `triton.h`) and 250 lines of guest-side ColdFire C (`monitor.c`) to the 2,221-line CPU emulator from Part 1. The total system — CPU, bus dispatch, peripherals, monitor ROM — is under 3,300 lines of C.
+The system emulator adds 576 lines of host-side C (`triton.c` at 475 plus a 101-line header) and 360 lines of guest-side ColdFire C (`monitor.c`) to the 2,641-line CPU emulator from Part 1. The total system — CPU, bus dispatch, peripherals, monitor ROM — is 3,577 lines of C.
 
 What Part 2 proves: a CPU emulator becomes a system emulator when you add address decoding and a single working peripheral. The UART alone is enough to get output, debug problems, and develop software. Everything else — the GPU, audio, storage, input — can be stubbed and filled in later. The monitor ROM demonstrates that guest-side firmware works: ELF parsing runs on the emulated CPU, not the host, using the same memory bus that the loaded program will use. The boot chain is real.
 
