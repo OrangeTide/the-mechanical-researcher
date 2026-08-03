@@ -1600,8 +1600,14 @@ static void exec_groupA(cf_cpu *cpu, uint16_t op)
 
         uint32_t rx_val = rx_is_addr ? cpu->a[rx_num] : cpu->d[rx_num];
         uint32_t ry_val = ry_is_addr ? cpu->a[ry_num] : cpu->d[ry_num];
-        rx_val &= cpu->mask;
-        ry_val &= cpu->mask;
+
+        /* MASK is deliberately not applied here. It is ANDed with an
+         * operand *address*, to hold a pointer inside a circular buffer
+         * addressed with (Ay)+, and never with a register operand. Those
+         * memory-referencing MAC forms are not implemented, so MASK has
+         * nothing to act on in this path. Masking the register values
+         * instead made every multiply-accumulate return zero once a
+         * program wrote a restrictive MASK. */
 
         int64_t product;
         if (cpu->macsr & MACSR_SU)
