@@ -1,6 +1,6 @@
 # ColdFire V4e Emulator Demo
 
-A standalone ColdFire V4e CPU emulator in 2,239 lines of C, validated against
+A standalone ColdFire V4e CPU emulator in 2,544 lines of C, validated against
 GCC-compiled bare-metal programs and QEMU.
 
 ## Quick Start (Smoke Test)
@@ -12,15 +12,17 @@ needed. Any system with a C compiler and `make` can run it:
 make smoke
 ```
 
-Expected output:
+It runs the five compute tests and then 67 single-instruction checks across
+every opcode group, ending with:
 
 ```
-  fibonacci(10)        got 55         expected 55         PASS
-  gcd(252, 105)        got 21         expected 21         PASS
-  sum_to(100)          got 5050       expected 5050       PASS
-  bit_test(0xAB)       got 2645       expected 2645       PASS
-  sqrt(2)*1000         got 1414       expected 1414       PASS
-5/5 smoke tests passed (1528 instructions)
+ok   fibonacci(10)
+ok   gcd(252, 105)
+ok   sum_to(100)
+ok   bit_test(0xAB)
+ok   sqrt(2)*1000
+...
+72 passed, 0 failed
 ```
 
 ## Full Test (Requires Cross-Compiler)
@@ -31,6 +33,19 @@ ELF binary into the emulator, and checks results:
 ```sh
 make test
 ```
+
+```
+--- Test Results ---
+  fibonacci(10)        @ 0x000103c2: got 55         expected 55         PASS
+  gcd(252, 105)        @ 0x000103be: got 21         expected 21         PASS
+  sum_to(100)          @ 0x000103ba: got 5050       expected 5050       PASS
+  bit_test(0xAB)       @ 0x000103b6: got 2645       expected 2645       PASS
+  sqrt(2)*1000         @ 0x000103b2: got 1414       expected 1414       PASS
+
+5/5 tests passed
+```
+
+That program executes 1,528 instructions.
 
 ## QEMU Validation (Requires Cross-Compiler + QEMU)
 
@@ -122,21 +137,46 @@ make smoke
 
 | Target | Cross-compiler | QEMU | Description |
 |---|---|---|---|
-| `make smoke` | No | No | Runs embedded binary through emulator |
+| `make smoke` | No | No | Runs embedded binary through emulator, 72 checks |
 | `make test` | Yes | No | Cross-compiles test program, runs through emulator |
 | `make validate` | Yes | Yes | Runs same tests under QEMU for comparison |
+| `make instrtest` | Yes | No | Instruction-level suite, 162 checks (see below) |
+| `make instrtest-qemu` | Yes | Yes | The same suite under QEMU, 138 checks |
+| `make coverage` | Yes | No | gcov line coverage of the emulator |
 | `make valgrind` | Yes | No | Memory-checks the emulator with valgrind |
 | `make disasm` | Yes | No | Disassembles the test program ELF |
+| `make sections` | Yes | No | Shows ELF section headers |
+
+### Known failure: `make instrtest`
+
+`make instrtest` currently reports **155/162**. All seven failures are in the
+EMAC group, and all of them are checks that read an accumulator back after a
+`mac.l`: the accumulator reads as zero where the test expects a product. The
+MACSR and MASK registers read and write correctly, so the register interface
+works and the multiply-accumulate itself does not.
+
+This is not covered by `make instrtest-qemu`. That target builds the same
+source with `-DQEMU_USERMODE`, which compiles out the EMAC, ISA_C and legacy
+groups because they are hand-assembled opcodes QEMU may reject. The EMAC tests
+have therefore never been checked against an independent implementation, and
+whether the emulator or the test is wrong is still open. Settling it needs the
+CFPRM's MAC.L encoding rather than another test run.
+
+The other targets are unaffected: the five compute tests, the 72-check smoke
+suite and the QEMU validation all pass.
 
 ## Files
 
 | File | Description |
 |---|---|
-| `coldfire.c` | ColdFire V4e emulator (2,239 LOC) |
-| `coldfire.h` | Public API (117 lines) |
-| `smoke_test.c` | Self-contained test with embedded binary |
+| `coldfire.c` | ColdFire V4e emulator (2,544 lines) |
+| `coldfire.h` | Public API (250 lines) |
+| `test_coldfire.c` | Self-contained test with embedded binary, 72 checks |
+| `test_instructions.c` | Instruction-level suite, cross-compiled |
 | `test_harness.c` | ELF-loading test runner |
 | `test_program.c` | Bare-metal test program (cross-compiled) |
+| `test_program.s` | Assembly listing of the test program |
+| `test_program.dis` | Disassembly of the test program |
 | `qemu_validate.c` | QEMU validation program (cross-compiled) |
 | `elf_loader.c/h` | Minimal ELF32 big-endian loader |
 | `link.ld` | Linker script for bare-metal programs |
