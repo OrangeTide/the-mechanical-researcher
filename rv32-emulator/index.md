@@ -10,7 +10,7 @@ category: systems
 The [ColdFire V4e emulator](/coldfire-emulator/) built in an earlier article
 answered a specific question: which real CPU architecture is cheapest to
 emulate while still having a working GCC behind it. The answer was
-Motorola's ColdFire, at 2,544 lines of C.
+Motorola's ColdFire, at 2,550 lines of C.
 
 That emulator has a problem it cannot fix. It is big-endian, and the place
 this kind of engine is most useful now is inside a browser, where
@@ -293,7 +293,7 @@ check on the whole stack.
 
 | | rv32 | coldfire |
 |---|---|---|
-| Implementation | 1,998 lines | 2,544 lines |
+| Implementation | 1,998 lines | 2,550 lines |
 | Header | 318 lines | 250 lines |
 | Architectural state | 432 bytes | 320 bytes |
 
