@@ -142,6 +142,7 @@ make smoke
 | `make validate` | Yes | Yes | Runs same tests under QEMU for comparison |
 | `make instrtest` | Yes | No | Instruction-level suite, 162 checks |
 | `make instrtest-qemu` | Yes | Yes | The same suite under QEMU, 138 checks |
+| `make emactest` | Yes | Yes | EMAC differential test, 12 records against QEMU |
 | `make coverage` | Yes | No | gcov line coverage of the emulator |
 | `make valgrind` | Yes | No | Memory-checks the emulator with valgrind |
 | `make disasm` | Yes | No | Disassembles the test program ELF |
@@ -175,6 +176,54 @@ And `qemu-m68k -cpu cfv4e` computes the full product with MASK set to
 A smoke test had asserted the old behaviour, so it was locking the bug in place;
 it now checks that a `mac.l` result does not depend on MASK.
 
+### Comparing the EMAC against QEMU
+
+The MASK bug survived because EMAC expectations were hand-written against a
+hand-written implementation. `make emactest` closes that loop. It builds one
+source, `test_emac.c`, twice: once bare-metal for the emulator and once for
+`qemu-m68k`. Both print one line per recorded state, and the two are diffed.
+Nothing is hand-assembled, since GNU as accepts every EMAC mnemonic for
+`-mcpu=5475`.
+
+QEMU can only arbitrate part of it. Measured against `-cpu cfv4e`:
+
+| Behaviour | QEMU | Required |
+|---|---|---|
+| `mac.l` accumulate, 3x5 then 4x6 | 39 | 39 |
+| `msac.l` from a zeroed accumulator | +15 | -15 |
+| A product of 2^46, read back from `accext01` | 0 | 0x4000 |
+
+So QEMU's cfv4e EMAC gets `mac.l` right, treats `msac.l` as an add, and does
+not carry a product past 32 bits into the 48-bit accumulator. The target
+therefore compares only the subset QEMU models, 12 records, and runs the
+saturation cases separately as an emulator-only regression baseline. Matching
+QEMU on the rest would mean adopting its gaps.
+
+The 12 comparable records agree exactly. Getting there took four fixes, all
+confirmed against the ColdFire Family Programmer's Reference Manual, Rev. 3:
+
+- **`movclr.l` did not clear.** The instruction is `move.l ACCn,Dn` with bit 6
+  set, and bit 6 was ignored, so the accumulator was read but never zeroed.
+  The manual gives the operation as `0 -> ACCx, ACCextx, MACSR[PAVx]`. QEMU
+  caught this one directly.
+- **MACSR[S/U] was inverted.** The bit reads 0 for signed and 1 for unsigned,
+  which is the opposite of what the name suggests. The manual's pseudocode is
+  explicit: signed integer mode is `MACSR[S/U,F/I] == 00`. Reset leaves MACSR
+  zero, so the emulator had been giving compiled code unsigned multiplies by
+  default. Two tests had encoded the same misreading and were locking it in.
+- **The accumulator extensions were 8 bits wide instead of 16, and were dead
+  state.** `ACCext01` packs bits 47:32 of two accumulators into one longword,
+  the lower-numbered accumulator in the low half. They were held in a separate
+  array that `mac.l` never updated, so reading `accext01` after accumulating
+  returned zero however large the result. They are now derived from the
+  accumulators, and the separate array is gone.
+- **Results were not confined to 48 bits, and the overflow flags were
+  conflated.** Without OMC the value must wrap rather than grow without bound.
+  The three flags mean different things: `PAVx` is sticky, `V` is `PAVx` plus
+  whatever the current operation did, and `EV` is narrower than either, asking
+  whether the value has outgrown the low 32 bits of the accumulator (40 in
+  fractional mode).
+
 ## Files
 
 | File | Description |
@@ -183,6 +232,8 @@ it now checks that a `mac.l` result does not depend on MASK.
 | `coldfire.h` | Public API (250 lines) |
 | `test_coldfire.c` | Self-contained test with embedded binary, 72 checks |
 | `test_instructions.c` | Instruction-level suite, cross-compiled |
+| `test_emac.c` | EMAC differential test, built for both the emulator and QEMU |
+| `emac_dump.c` | Runs `test_emac.elf` on the emulator and prints its results |
 | `test_harness.c` | ELF-loading test runner |
 | `test_program.c` | Bare-metal test program (cross-compiled) |
 | `test_program.s` | Assembly listing of the test program |

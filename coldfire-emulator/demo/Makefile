@@ -71,6 +71,44 @@ instrtest: $(HARNESS) $(INSTR_ELF)
 instrtest-qemu: $(QEMU_INSTR)
 	qemu-m68k -cpu cfv4e ./$(QEMU_INSTR)
 
+# EMAC differential test against QEMU.
+#
+# Only the subset qemu-m68k models faithfully is compared. Its cfv4e EMAC
+# gets mac.l right but treats msac.l as an add and does not carry a
+# product past 32 bits into the 48-bit accumulator, so the saturation
+# cases are run separately rather than diffed against a model that does
+# not implement them.
+EMAC_ELF   = test_emac.elf
+EMAC_QEMU  = test_emac_qemu
+EMAC_FULL  = test_emac_full.elf
+EMAC_DUMP  = emac_dump
+
+$(EMAC_ELF): test_emac.c link.ld
+	$(M68K_CC) $(M68K_CFLAGS) -DEMAC_COMPARABLE $(M68K_LD) -o $@ $<
+
+$(EMAC_FULL): test_emac.c link.ld
+	$(M68K_CC) $(M68K_CFLAGS) $(M68K_LD) -o $@ $<
+
+$(EMAC_QEMU): test_emac.c
+	$(M68K_CC) $(M68K_CFLAGS) -fno-builtin -DQEMU_USERMODE \
+	    -DEMAC_COMPARABLE -o $@ $<
+
+$(EMAC_DUMP): emac_dump.c coldfire.c elf_loader.c coldfire.h elf_loader.h
+	$(CC) $(CFLAGS) -o $@ emac_dump.c coldfire.c elf_loader.c -lm
+
+emactest: $(EMAC_DUMP) $(EMAC_ELF) $(EMAC_QEMU) $(EMAC_FULL)
+	@./$(EMAC_DUMP) $(EMAC_ELF) > emac-ours.txt
+	@qemu-m68k -cpu cfv4e ./$(EMAC_QEMU) > emac-qemu.txt
+	@if diff -q emac-ours.txt emac-qemu.txt > /dev/null; then \
+	    echo "emac: $$(wc -l < emac-ours.txt) records match qemu"; \
+	else \
+	    echo "emac: DIFFERS from qemu"; \
+	    diff emac-ours.txt emac-qemu.txt; exit 1; \
+	fi
+	@./$(EMAC_DUMP) $(EMAC_FULL) > emac-full.txt
+	@echo "emac: $$(wc -l < emac-full.txt) records from the full set" \
+	     "(saturation included, emulator only)"
+
 # Memory check
 valgrind: $(HARNESS) $(TEST_ELF)
 	valgrind --leak-check=full ./$(HARNESS) $(TEST_ELF)
@@ -98,5 +136,6 @@ coverage: $(COV_SMOKE) $(COV_HARNESS) $(INSTR_ELF)
 clean:
 	rm -f $(HARNESS) $(SMOKE) $(TEST_ELF) $(QEMU_VALID) $(INSTR_ELF) $(QEMU_INSTR)
 	rm -f $(COV_SMOKE) $(COV_HARNESS) *.gcno *.gcda *.gcov
+	rm -f $(EMAC_ELF) $(EMAC_FULL) $(EMAC_QEMU) $(EMAC_DUMP) emac-*.txt
 
-.PHONY: all test smoke disasm sections validate valgrind instrtest instrtest-qemu coverage clean
+.PHONY: all test smoke disasm sections validate valgrind instrtest instrtest-qemu emactest coverage clean

@@ -150,10 +150,11 @@ typedef struct cf_cpu {
     uint32_t fpiar;         /* FP instruction address register */
 
     /* EMAC */
+    /* ACCext01 and ACCext23 are not held separately. They are bits 47:32
+     * of these accumulators, packed two to a longword when read. */
     int64_t  acc[4];        /* ACC0-ACC3, 48-bit accumulators */
     uint32_t macsr;         /* MAC status register */
     uint32_t mask;          /* MAC mask register */
-    uint8_t  accext[8];     /* accumulator extensions */
 
     /* Emulator state */
     int      halted;        /* HALT/STOP flag */

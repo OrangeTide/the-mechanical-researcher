@@ -1,7 +1,7 @@
 ---
 title: Building a ColdFire V4e Emulator
 date: 2026-03-25
-revised: 2026-05-11
+revised: 2026-08-03
 abstract: "From ISA selection through implementation — a standalone ColdFire V4e CPU emulator in C, validated against GCC-compiled bare-metal programs"
 category: systems
 ---
@@ -986,6 +986,28 @@ QEMU ColdFire V4e validation
 ```
 
 All five results match between our emulator, the self-contained test, and QEMU. The QEMU validation program uses raw Linux syscalls instead of libc to avoid glibc alignment faults — ColdFire enforces word and long alignment on memory accesses, and the standard m68k glibc contains unaligned access patterns from the 68020 (which relaxed the 68000's alignment requirement).
+
+### The EMAC, and the Limits of a Reference
+
+One part of the emulator sat outside all of this. The instruction suite compiles the EMAC group out under `-DQEMU_USERMODE`, because that group hand-assembles opcodes QEMU might reject. So the EMAC's expectations were hand-written against a hand-written implementation, checked only against themselves. That is how a bug survived in which the MASK register was ANDed into both register operands of a multiply-accumulate, making every `mac.l` return zero once a program wrote a restrictive MASK.
+
+The fix for that pattern is a differential test, `make emactest`. One source builds twice, bare-metal for the emulator and user-mode for QEMU, and the two outputs are diffed. Nothing is hand-assembled: GNU as accepts every EMAC mnemonic for `-mcpu=5475`, so the assembler picks the encodings and both models see identical instruction streams.
+
+The interesting result is what the reference could not settle. QEMU's `cfv4e` EMAC is a partial model:
+
+| Behaviour | QEMU | Required |
+|---|---|---|
+| `mac.l` accumulate, 3x5 then 4x6 | 39 | 39 |
+| `msac.l` from a zeroed accumulator | +15 | -15 |
+| A product of 2^46, read back from `accext01` | 0 | 0x4000 |
+
+It gets `mac.l` right, treats `msac.l` as an add, and never carries a product past 32 bits into the 48-bit accumulator. Saturation is precisely the behaviour that depends on the 48-bit width, so the one part of the EMAC that most needed an independent check is the part QEMU cannot provide. The test therefore compares only the 12 records QEMU models faithfully, and runs the saturation cases separately as an emulator-only baseline. Matching QEMU on the rest would have meant adopting its gaps.
+
+Within that narrower comparison, four defects surfaced, all then confirmed against the *ColdFire Family Programmer's Reference Manual*, Rev. 3. QEMU caught the first directly: `movclr.l` is `move.l ACCn,Dn` with bit 6 set, bit 6 was ignored, and the accumulator was read but never cleared. The manual gives the operation as `0 -> ACCx, ACCextx, MACSR[PAVx]`.
+
+The other three the manual caught, and they are the more instructive ones, because each was a plausible misreading rather than a slip. `MACSR[S/U]` reads 0 for signed and 1 for unsigned, the opposite of what the name suggests; the emulator had the polarity inverted, and since reset leaves MACSR zero, compiled code had been getting unsigned multiplies by default. The accumulator extensions were modelled 8 bits wide instead of 16, held in a separate array that `mac.l` never wrote, so reading `accext01` after accumulating returned zero however large the result had grown. And the three overflow flags had been conflated: `PAVx` is sticky, `V` is `PAVx` plus whatever the current operation did, and `EV` is narrower than either, asking whether the value has outgrown the low 32 bits of the accumulator rather than the full 48.
+
+Two of the emulator's own tests had encoded the S/U misreading as an expectation, which is the same failure mode as the original MASK bug: a test written from the same misunderstanding as the code cannot detect it. What breaks that loop is not more tests but a second opinion, and when the second opinion is incomplete, the specification has to supply the rest.
 
 ## Conclusion
 

@@ -669,7 +669,7 @@ test_emac_mac(void)
     cf_reset(&cpu);
     cpu.d[2] = 5;
     cpu.d[3] = 3;
-    cpu.macsr |= (1 << 6); /* SU = signed */
+    /* MACSR[S/U] = 0 selects signed integer mode, which reset already gives */
     cpu.pc = pc;
     cf_run(&cpu, 10);
     EXPECT_EQ((uint32_t)(cpu.acc[0] & 0xFFFFFFFF), 15u, "mac.l 3*5 ACC0");
@@ -708,7 +708,7 @@ test_emac_signed_negative(void)
     cf_reset(&cpu);
     cpu.d[2] = 5;
     cpu.d[3] = (uint32_t)-3;
-    cpu.macsr |= (1 << 6); /* SU = signed */
+    /* MACSR[S/U] = 0 selects signed integer mode, which reset already gives */
     cpu.pc = pc;
     cf_run(&cpu, 10);
     EXPECT_EQ((uint32_t)(cpu.acc[0] & 0xFFFFFFFF), (uint32_t)-15, "mac.l signed neg");
@@ -730,7 +730,7 @@ test_emac_scale(void)
     cf_reset(&cpu);
     cpu.d[2] = 10;
     cpu.d[3] = 4;
-    cpu.macsr |= (1 << 6); /* SU = signed */
+    /* MACSR[S/U] = 0 selects signed integer mode, which reset already gives */
     cpu.pc = pc;
     cf_run(&cpu, 10);
     EXPECT_EQ((uint32_t)(cpu.acc[0] & 0xFFFFFFFF), 80u, "mac.l scale<<1");
@@ -746,7 +746,7 @@ test_emac_scale(void)
     cf_reset(&cpu);
     cpu.d[2] = 10;
     cpu.d[3] = 4;
-    cpu.macsr |= (1 << 6);
+    /* signed integer mode: MACSR[S/U] clear */
     cpu.pc = pc;
     cf_run(&cpu, 10);
     EXPECT_EQ((uint32_t)(cpu.acc[1] & 0xFFFFFFFF), 20u, "mac.l scale>>1 ACC1");
@@ -764,7 +764,7 @@ test_emac_saturation(void)
     mem_write16(NULL, pc + 2, 0x0800);
     mem_write16(NULL, pc + 4, 0x4AC8);
     cf_reset(&cpu);
-    cpu.macsr = (1 << 6) | (1 << 7); /* SU + OMC */
+    cpu.macsr = (1 << 7);   /* OMC, signed (S/U clear) */
     /* Set ACC0 near 48-bit max, then multiply to overflow */
     cpu.acc[0] = ((int64_t)1 << 47) - 10;
     cpu.d[2] = 100;

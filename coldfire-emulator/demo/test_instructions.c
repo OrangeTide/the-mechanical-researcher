@@ -1721,10 +1721,11 @@ test_emac(void)
 
     GROUP_BEGIN("emac");
 
-    /* MOVE D0 → MACSR: set signed mode (SU=1) */
+    /* MOVE D0 → MACSR. S/U is written set here only so the read-back
+     * below has a non-zero bit to find; set means unsigned, not signed. */
     /* Encoding: 1010 100 1 0 0 000 000 = 0xA900 (MACSR, dir=0, Dn=D0) */
     __asm__ volatile(
-        "move.l #0x40, %%d0\n\t"    /* SU bit = 0x40 */
+        "move.l #0x40, %%d0\n\t"    /* S/U bit = 0x40 */
         ".short 0xA900\n\t"         /* move d0, macsr */
         : : : "d0");
 
@@ -1866,7 +1867,7 @@ test_emac(void)
     __asm__ volatile(
         "move.l #0, %%d0\n\t"
         ".short 0xA100\n\t"         /* move d0, acc0 — clear acc0 */
-        "move.l #0x40, %%d0\n\t"    /* SU=1 */
+        "move.l #0, %%d0\n\t"       /* S/U clear selects signed integer */
         ".short 0xA900\n\t"         /* move d0, macsr */
         "move.l #-5, %%d2\n\t"
         "move.l #3, %%d3\n\t"
@@ -1885,8 +1886,8 @@ test_emac(void)
     __asm__ volatile(
         "move.l #0, %%d0\n\t"
         ".short 0xA100\n\t"         /* clear acc0 */
-        "move.l #0x40, %%d0\n\t"
-        ".short 0xA900\n\t"         /* macsr = SU */
+        "move.l #0, %%d0\n\t"
+        ".short 0xA900\n\t"         /* macsr: signed integer */
         "move.l #0, %%d2\n\t"
         "move.l #99, %%d3\n\t"
         ".short 0xA403\n\t"         /* mac.l d2, d3, acc0 */
