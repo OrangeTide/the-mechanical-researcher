@@ -1,6 +1,7 @@
 ---
 title: "A Compact RV32 Engine, Verified Against QEMU"
 date: 2026-08-01
+revised: 2026-08-03
 abstract: "Building a 32-bit RISC-V interpreter for embedding in games, and proving it correct by comparing every instruction against QEMU"
 category: systems
 ---
@@ -532,6 +533,11 @@ array inside the module's own linear memory, reached through the same
 callbacks a native embedding uses. The rounding work described earlier is
 what makes this possible: an implementation that depended on `<fenv.h>`
 could not be built this way at all.
+
+[Run the demonstration page](wasm/). It is a single file. The build
+base64-embeds both the module and the guest image into the HTML, so the page
+carries no separate fetches, needs no server, and opens just as well from a
+local filesystem as from this site.
 
 The demonstration page runs a particle simulation written in C and compiled
 for RV32. The physics, the collisions and the square roots that size each
