@@ -1,6 +1,6 @@
 # ColdFire V4e Emulator Demo
 
-A standalone ColdFire V4e CPU emulator in 2,544 lines of C, validated against
+A standalone ColdFire V4e CPU emulator in 2,550 lines of C, validated against
 GCC-compiled bare-metal programs and QEMU.
 
 ## Quick Start (Smoke Test)
@@ -140,36 +140,46 @@ make smoke
 | `make smoke` | No | No | Runs embedded binary through emulator, 72 checks |
 | `make test` | Yes | No | Cross-compiles test program, runs through emulator |
 | `make validate` | Yes | Yes | Runs same tests under QEMU for comparison |
-| `make instrtest` | Yes | No | Instruction-level suite, 162 checks (see below) |
+| `make instrtest` | Yes | No | Instruction-level suite, 162 checks |
 | `make instrtest-qemu` | Yes | Yes | The same suite under QEMU, 138 checks |
 | `make coverage` | Yes | No | gcov line coverage of the emulator |
 | `make valgrind` | Yes | No | Memory-checks the emulator with valgrind |
 | `make disasm` | Yes | No | Disassembles the test program ELF |
 | `make sections` | Yes | No | Shows ELF section headers |
 
-### Known failure: `make instrtest`
+### A note on the EMAC MASK register
 
-`make instrtest` currently reports **155/162**. All seven failures are in the
-EMAC group, and all of them are checks that read an accumulator back after a
-`mac.l`: the accumulator reads as zero where the test expects a product. The
-MACSR and MASK registers read and write correctly, so the register interface
-works and the multiply-accumulate itself does not.
+`make instrtest` used to report 155/162, with every failure in the EMAC group:
+any check that read an accumulator back after a `mac.l` found zero instead of a
+product. The cause was worth recording.
 
-This is not covered by `make instrtest-qemu`. That target builds the same
-source with `-DQEMU_USERMODE`, which compiles out the EMAC, ISA_C and legacy
-groups because they are hand-assembled opcodes QEMU may reject. The EMAC tests
-have therefore never been checked against an independent implementation, and
-whether the emulator or the test is wrong is still open. Settling it needs the
-CFPRM's MAC.L encoding rather than another test run.
+The emulator was ANDing the MASK register into both register operands of a
+multiply-accumulate. MASK does not do that. It is ANDed with an operand
+*address*, to keep a pointer inside a circular buffer addressed with `(Ay)+`,
+and the memory-referencing MAC forms that would use it are not implemented
+here. So a program that wrote a restrictive MASK — as the test does, two checks
+earlier, and never restores — made every subsequent multiply return zero.
 
-The other targets are unaffected: the five compute tests, the 72-check smoke
-suite and the QEMU validation all pass.
+It stayed hidden because `cf_reset` leaves MASK all-ones, so compiled code never
+tripped it, and because `make instrtest-qemu` cannot see the EMAC group at all:
+that target builds the same source with `-DQEMU_USERMODE`, which compiles out
+the EMAC, ISA_C and legacy tests as hand-assembled opcodes QEMU may reject. The
+EMAC path had never been compared against an independent implementation.
+
+Three things settled it. `m68k-linux-gnu-as -mcpu=5475` assembles `mac.l` and
+encodes it as `a602 0800`, so the canonical encoding is available rather than
+guessed. Running that encoding on the emulator returns the correct product.
+And `qemu-m68k -cpu cfv4e` computes the full product with MASK set to
+`0xFFFF0000`, confirming MASK must not reach a register operand.
+
+A smoke test had asserted the old behaviour, so it was locking the bug in place;
+it now checks that a `mac.l` result does not depend on MASK.
 
 ## Files
 
 | File | Description |
 |---|---|
-| `coldfire.c` | ColdFire V4e emulator (2,544 lines) |
+| `coldfire.c` | ColdFire V4e emulator (2,550 lines) |
 | `coldfire.h` | Public API (250 lines) |
 | `test_coldfire.c` | Self-contained test with embedded binary, 72 checks |
 | `test_instructions.c` | Instruction-level suite, cross-compiled |

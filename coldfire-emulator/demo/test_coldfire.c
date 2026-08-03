@@ -1066,7 +1066,12 @@ test_emac_mask(void)
     /* MAC.L D1,D2,ACC0
      * Rx=D2(010), rx_is_addr=0, ACC[0]=0, ry_is_addr=0, Ry=D1(001)
      * opword = 1010 010 0 0 0 000 001 = 0xA401, ext = 0x0800
-     * with MASK = 0x00FF, D1=0x100, D2=0x200 → masked to 0,0 → ACC0=0 */
+     *
+     * MASK must not affect a register operand. It is ANDed with an
+     * operand address, to keep a pointer inside a circular buffer
+     * addressed with (Ay)+, so a restrictive MASK leaves the product of
+     * two data registers alone. Checked against qemu-m68k -cpu cfv4e,
+     * which computes the full product with MASK set. */
     setup_cpu(&cpu, pc);
     mem_write16(NULL, pc,     0xA401);
     mem_write16(NULL, pc + 2, 0x0800);
@@ -1079,9 +1084,9 @@ test_emac_mask(void)
     cpu.acc[0] = 0;
     cf_step(&cpu);
 
-    EXPECT_EQ(cpu.acc[0], 0, "MAC with mask zeroes high bits");
+    EXPECT_EQ(cpu.acc[0], 0x20000, "MAC ignores MASK on register operands");
 
-    /* Same but with MASK = 0xFFFFFFFF → unmasked product */
+    /* The same multiply with MASK wide open gives the same answer */
     setup_cpu(&cpu, pc);
     mem_write16(NULL, pc,     0xA401);
     mem_write16(NULL, pc + 2, 0x0800);
@@ -1094,7 +1099,7 @@ test_emac_mask(void)
     cpu.acc[0] = 0;
     cf_step(&cpu);
 
-    EXPECT_EQ(cpu.acc[0] != 0, 1, "MAC without mask produces nonzero");
+    EXPECT_EQ(cpu.acc[0], 0x20000, "MAC result does not depend on MASK");
 }
 
 /* Fix 3: TAS reads byte, sets flags, writes back with bit 7 set */
