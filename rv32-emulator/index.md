@@ -10,7 +10,7 @@ category: systems
 The [ColdFire V4e emulator](/coldfire-emulator/) built in an earlier article
 answered a specific question: which real CPU architecture is cheapest to
 emulate while still having a working GCC behind it. The answer was
-Motorola's ColdFire, at 2,550 lines of C.
+Motorola's ColdFire, at 2,641 lines of C.
 
 That emulator has a problem it cannot fix. It is big-endian, and the place
 this kind of engine is most useful now is inside a browser, where
@@ -40,7 +40,7 @@ with deliberately awkward operands; the RISC-V International compliance
 suite, 228 tests passing with signatures compared against
 `qemu-system-riscv32`; and 108 hand-derived IEEE-754 conformance tests. The
 fuzzer found two bugs the compiled tests missed. Against the ColdFire V4e
-emulator running the same C source, the RV32 engine is 21% smaller, executes
+emulator running the same C source, the RV32 engine is 24% smaller, executes
 19% fewer instructions, and runs 1.6 times faster in wall-clock terms. It
 builds unchanged to a 19 KB freestanding WebAssembly module with no
 imports.
@@ -293,11 +293,11 @@ check on the whole stack.
 
 | | rv32 | coldfire |
 |---|---|---|
-| Implementation | 1,998 lines | 2,550 lines |
+| Implementation | 1,998 lines | 2,641 lines |
 | Header | 318 lines | 250 lines |
 | Architectural state | 432 bytes | 320 bytes |
 
-The RV32 interpreter is 21% smaller while implementing four extensions plus
+The RV32 interpreter is 24% smaller while implementing four extensions plus
 Zicsr, Zifencei and Zcmp. The state is slightly larger because RISC-V has 32
 integer and 32 floating-point registers where ColdFire has eight of each,
 which is also why it needs fewer instructions to do the same work.
@@ -549,7 +549,7 @@ given.
 
 An RV32 engine is a better fit than a ColdFire engine for embedding in a
 browser-hosted game, and the margin is larger than the endianness argument
-alone suggests: 21% less code to maintain, 19% fewer instructions for the
+alone suggests: 24% less code to maintain, 19% fewer instructions for the
 same work, 1.6 times faster on the same workload, and denser guest binaries
 once the compressed extension is included. Two claims from the design notes
 that argued against the compressed extension and for a free mapping onto
