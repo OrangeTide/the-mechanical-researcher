@@ -545,6 +545,13 @@ dot all execute inside the interpreter. The page never computes a position;
 it only draws what the guest asks it to draw through `ecall`, one call per
 particle and one per frame to yield.
 
+Gravity eventually wins, and a demonstration that has gone still is not
+showing anything, so once three quarters of the particles have come to rest
+on the floor the simulation scatters them again. That decision is the
+guest's, not the page's. It counts its own particles and calls its own
+initialiser, and the page learns about it only by being handed a different
+set of coordinates to draw.
+
 A per-frame instruction budget is what makes this safe for untrusted
 scripts. A guest that loops forever is simply cut off at the end of its
 slice and the frame is drawn anyway. Combined with the access-check callback,

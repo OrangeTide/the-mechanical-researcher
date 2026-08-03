@@ -143,6 +143,31 @@ step(void)
     }
 }
 
+/* A particle counts as at rest once it is sitting on the floor with
+ * almost no speed left. Gravity keeps nudging it every frame, so the
+ * bounce never converges to a true zero: it falls into a small limit
+ * cycle around the floor instead. The thresholds allow for that rather
+ * than looking for exact stillness, which would never arrive. */
+static int
+at_rest(int i)
+{
+    float ax = vx[i] < 0.0f ? -vx[i] : vx[i];
+    float ay = vy[i] < 0.0f ? -vy[i] : vy[i];
+
+    return py[i] >= HEIGHT - 1.0f && ax < 0.5f && ay < 0.5f;
+}
+
+static int
+count_at_rest(void)
+{
+    int i, n = 0;
+
+    for (i = 0; i < COUNT; i++)
+        if (at_rest(i))
+            n++;
+    return n;
+}
+
 static void
 draw(void)
 {
@@ -159,15 +184,43 @@ draw(void)
     }
 }
 
+/* Once most of the particles have come to rest the picture stops moving,
+ * and a demonstration that has gone still is not showing anything. So the
+ * simulation scatters them again.
+ *
+ * The count has to hold for a while before that happens. Checking a
+ * single frame would respawn the moment enough particles happened to be
+ * slow together, cutting off the last few bounces that are the most
+ * interesting part to watch. Waiting lets the pile actually settle first.
+ *
+ * The generator is deliberately not reseeded. It runs on from wherever it
+ * had reached, so each scattering differs from the last while the whole
+ * sequence stays reproducible from page load, which is what makes the
+ * instruction counts comparable between runs. */
+#define REST_FRACTION  (COUNT * 3 / 4)
+#define REST_FRAMES    45
+
 int
 main(void)
 {
+    int calm = 0;
+
     put_str("rv32 guest running\n");
     init();
 
     for (;;) {
         step();
         draw();
+
+        if (count_at_rest() >= REST_FRACTION) {
+            if (++calm >= REST_FRAMES) {
+                init();
+                calm = 0;
+            }
+        } else {
+            calm = 0;
+        }
+
         sys_frame();
     }
     return 0;

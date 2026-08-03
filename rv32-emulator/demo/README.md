@@ -294,9 +294,11 @@ cross-compiles a guest particle simulation, and embeds both into a single
 self-contained page. It opens from the filesystem with no server.
 
 Every particle is moved by RISC-V machine code. The page never computes a
-position; it only draws what the guest asks it to through `ecall`. A
-per-frame instruction budget means a guest that loops forever is cut off at
-the end of its slice instead of freezing the page.
+position; it only draws what the guest asks it to through `ecall`. Once
+three quarters of the particles have settled on the floor the guest
+scatters them again, so the picture never stops moving. A per-frame
+instruction budget means a guest that loops forever is cut off at the end
+of its slice instead of freezing the page.
 
 ## Coverage
 
