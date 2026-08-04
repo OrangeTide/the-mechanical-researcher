@@ -26,6 +26,7 @@ A collection of research topics, primarily gathered through agentic AI sessions,
 - [netchan-v3: Encrypting the Datagram](netchan-crypto/)
 - [netchan-v4: Authenticating the Peer](netchan-auth/)
 - [A Compact RV32 Engine, Verified Against QEMU](rv32-emulator/)
+- [What Bit Manipulation Buys an RV32 Interpreter](rv32-bitmanip/)
 
 ## Build & Deploy
 

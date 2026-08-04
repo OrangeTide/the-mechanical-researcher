@@ -18,3 +18,4 @@ netchan-v2
 netchan-crypto
 netchan-auth
 rv32-emulator
+rv32-bitmanip
