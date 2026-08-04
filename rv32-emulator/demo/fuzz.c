@@ -169,6 +169,66 @@ gen_op_reg(void)
            (rd << 7) | 0x33;
 }
 
+/** Generate a Zba, Zbb or Zbs register-register encoding.
+ *
+ * These are worth fuzzing rather than only unit testing because the
+ * generator reaches shift amounts and bit indices a compiler never emits:
+ * a rotate by zero, which in a careless implementation shifts by 32 and is
+ * undefined in C, and a bit index above 31, which has to wrap.
+ */
+static uint32_t
+gen_zb_reg(void)
+{
+    static const struct { uint32_t f7, f3; } forms[] = {
+        { 0x10, 2 }, { 0x10, 4 }, { 0x10, 6 },  /* sh1add, sh2add, sh3add */
+        { 0x20, 7 }, { 0x20, 6 }, { 0x20, 4 },  /* andn, orn, xnor */
+        { 0x05, 4 }, { 0x05, 5 },               /* min, minu */
+        { 0x05, 6 }, { 0x05, 7 },               /* max, maxu */
+        { 0x30, 1 }, { 0x30, 5 },               /* rol, ror */
+        { 0x14, 1 }, { 0x24, 1 },               /* bset, bclr */
+        { 0x34, 1 }, { 0x24, 5 },               /* binv, bext */
+    };
+    uint32_t rd = rnd_below(32), rs1 = rnd_below(32), rs2 = rnd_below(32);
+    uint32_t i;
+
+    /* zext.h is the one register-register form that fixes its rs2 field */
+    if (rnd_below(16) == 0)
+        return (0x04u << 25) | (rs1 << 15) | (4u << 12) | (rd << 7) | 0x33;
+
+    i = rnd_below(sizeof(forms) / sizeof(forms[0]));
+    return (forms[i].f7 << 25) | (rs2 << 20) | (rs1 << 15) |
+           (forms[i].f3 << 12) | (rd << 7) | 0x33;
+}
+
+/** Generate a Zbb or Zbs register-immediate encoding. The unary Zbb
+ * instructions reuse the shift-amount field as a selector, so the shift
+ * amount is only free for the forms that really take one. */
+static uint32_t
+gen_zb_imm(void)
+{
+    static const uint32_t unary[] = { 0, 1, 2, 4, 5 };
+    uint32_t rd = rnd_below(32), rs1 = rnd_below(32);
+    uint32_t f7, f3, shamt = rnd_below(32);
+
+    switch (rnd_below(9)) {
+    case 0: f7 = 0x14; f3 = 1; break;                   /* bseti */
+    case 1: f7 = 0x24; f3 = 1; break;                   /* bclri */
+    case 2: f7 = 0x34; f3 = 1; break;                   /* binvi */
+    case 3: f7 = 0x24; f3 = 5; break;                   /* bexti */
+    case 4: case 5: f7 = 0x30; f3 = 5; break;           /* rori */
+    case 6: f7 = 0x14; f3 = 5; shamt = 0x07; break;     /* orc.b */
+    case 7: f7 = 0x34; f3 = 5; shamt = 0x18; break;     /* rev8 */
+    default:                                            /* clz, ctz, cpop,
+                                                           sext.b, sext.h */
+        f7 = 0x30;
+        f3 = 1;
+        shamt = unary[rnd_below(sizeof(unary) / sizeof(unary[0]))];
+        break;
+    }
+    return (f7 << 25) | (shamt << 20) | (rs1 << 15) | (f3 << 12) |
+           (rd << 7) | 0x13;
+}
+
 static uint32_t
 gen_upper(void)
 {
@@ -269,6 +329,40 @@ gen_compressed(void)
 }
 
 /****************************************************************
+ * The reference process
+ ****************************************************************/
+
+/* qemu's default rv32 model happens to include Zba, Zbb and Zbs, but that
+ * is a default and not a promise. Spelling the model out pins the
+ * reference to the ISA this emulator implements, so a later qemu that
+ * changes its default cannot quietly turn the bit-manipulation comparison
+ * into an illegal-instruction signal. Pass -cpu to override: running with
+ * zba=false,zbb=false,zbs=false is a quick check that the generator really
+ * is producing these encodings. */
+static const char *cpu_model = "rv32,zba=true,zbb=true,zbs=true";
+
+static int
+launch_reference(gdb_client *g, const char *elf, int port)
+{
+    char *argv_qemu[8];
+    char portbuf[16];
+    int n = 0;
+
+    snprintf(portbuf, sizeof(portbuf), "%d", port);
+    argv_qemu[n++] = (char *)"qemu-riscv32";
+    if (cpu_model && *cpu_model) {
+        argv_qemu[n++] = (char *)"-cpu";
+        argv_qemu[n++] = (char *)cpu_model;
+    }
+    argv_qemu[n++] = (char *)"-g";
+    argv_qemu[n++] = portbuf;
+    argv_qemu[n++] = (char *)elf;
+    argv_qemu[n] = NULL;
+
+    return gdb_launch_argv(g, argv_qemu, port);
+}
+
+/****************************************************************
  * Reporting
  ****************************************************************/
 
@@ -328,7 +422,7 @@ main(int argc, char **argv)
 
     if (argc < 2) {
         fprintf(stderr, "usage: %s <fuzz_target.elf> [-n rounds] "
-                        "[-s seed] [-p port] [-q]\n", argv[0]);
+                        "[-s seed] [-p port] [-cpu model] [-q]\n", argv[0]);
         return 2;
     }
     elf = argv[1];
@@ -339,6 +433,8 @@ main(int argc, char **argv)
             rng_state = strtoull(argv[++i], NULL, 0) | 1;
         else if (strcmp(argv[i], "-p") == 0 && i + 1 < argc)
             port = atoi(argv[++i]);
+        else if (strcmp(argv[i], "-cpu") == 0 && i + 1 < argc)
+            cpu_model = argv[++i];
         else if (strcmp(argv[i], "-q") == 0)
             quiet = 1;
     }
@@ -360,7 +456,7 @@ main(int argc, char **argv)
     }
     rv_reset(&cpu, entry);
 
-    if (gdb_launch(&g, "qemu-riscv32", elf, port)) {
+    if (launch_reference(&g, elf, port)) {
         machine_free(&m);
         return 1;
     }
@@ -390,12 +486,14 @@ main(int argc, char **argv)
             } else {
                 uint32_t w;
 
-                switch (rnd_below(10)) {
+                switch (rnd_below(12)) {
                 case 0: case 1: w = gen_op_imm(); break;
                 case 2: case 3: w = gen_op_reg(); break;
                 case 4: w = gen_upper(); break;
                 case 5: case 6: case 7: w = gen_op_fp(); break;
-                default: w = gen_fma(); break;
+                case 8: case 9: w = gen_fma(); break;
+                case 10: w = gen_zb_reg(); break;
+                default: w = gen_zb_imm(); break;
                 }
                 block[len++] = (uint8_t)w;
                 block[len++] = (uint8_t)(w >> 8);
@@ -409,7 +507,7 @@ main(int argc, char **argv)
          * code buffer is used up. */
         if (cursor + 4096 > CODE_BUF_SIZE) {
             gdb_close(&g);
-            if (gdb_launch(&g, "qemu-riscv32", elf, port)) {
+            if (launch_reference(&g, elf, port)) {
                 fprintf(stderr, "fuzz: cannot relaunch the reference\n");
                 rc = 1;
                 break;

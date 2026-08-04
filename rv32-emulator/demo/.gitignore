@@ -22,3 +22,7 @@ bench_coldfire
 
 # Generated page
 wasm/index.html
+test_atomic
+test_bitmanip
+bench_rv32_orig
+ee_printf_port.c

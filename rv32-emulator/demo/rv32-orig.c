@@ -1,4 +1,4 @@
-/* rv32.c : RV32IMAFC_Zicsr_Zifencei_Zba_Zbb_Zbs CPU emulator */
+/* rv32.c : RV32IMFC_Zicsr_Zifencei CPU emulator */
 /* Copyright (c) 2026 Jon Mayo - MIT-0 OR Public Domain */
 
 #include "rv32.h"
@@ -895,14 +895,11 @@ csr_read(rv_cpu *cpu, uint32_t csr, uint32_t *out)
     case RV_CSR_INSTRETH:
     case RV_CSR_MINSTRETH:*out = (uint32_t)(cpu->minstret >> 32); return 0;
     case RV_CSR_MSTATUS:  *out = cpu->mstatus; return 0;
-    /* RV32 with I, M, A, F, C and B. Machine mode is the only privilege
-     * mode implemented, so neither S nor U is advertised. The B bit means
-     * Zba, Zbb and Zbs all present, which is the only combination this
-     * emulator offers. */
+    /* RV32 with I, M, A, F and C. Machine mode is the only privilege
+     * mode implemented, so neither S nor U is advertised. */
     case RV_CSR_MISA:     *out = (1u << 30) | (1u << 8) | (1u << 12) |
                                  (1u << 5) | (1u << 2) |
-                                 (cpu->atomics ? (1u << 0) : 0) |
-                                 (cpu->bitmanip ? (1u << 1) : 0);
+                                 (cpu->atomics ? (1u << 0) : 0);
                           return 0;
     case RV_CSR_MIE:      *out = cpu->mie; return 0;
     case RV_CSR_MTVEC:    *out = cpu->mtvec; return 0;
@@ -1299,249 +1296,6 @@ is_zcmp(uint16_t insn)
 }
 
 /****************************************************************
- * Zba, Zbb and Zbs
- ****************************************************************/
-
-/* The three ratified bit-manipulation extensions, which together are the B
- * extension. Every one of these is a pure function of one or two registers.
- * There is no new architectural state, no memory access and no trap that
- * they can raise, which is what makes them cheap to add to an interpreter
- * that already decodes the base integer set.
- */
-
-static uint32_t
-rotr32(uint32_t v, uint32_t n)
-{
-    n &= 31;
-    return n ? (v >> n) | (v << (32 - n)) : v;
-}
-
-static uint32_t
-rotl32(uint32_t v, uint32_t n)
-{
-    n &= 31;
-    return n ? (v << n) | (v >> (32 - n)) : v;
-}
-
-/* GCC and clang turn these three builtins into one host instruction, and in
- * WebAssembly they are the single opcodes i32.clz, i32.ctz and i32.popcnt.
- * The portable versions are kept so the emulator still builds on a compiler
- * that offers neither. */
-
-static uint32_t
-clz32(uint32_t v)
-{
-#if defined(__GNUC__) || defined(__clang__)
-    return v ? (uint32_t)__builtin_clz(v) : 32;
-#else
-    uint32_t n = 0;
-
-    if (v == 0)
-        return 32;
-    while (!(v & 0x80000000u)) {
-        v <<= 1;
-        n++;
-    }
-    return n;
-#endif
-}
-
-static uint32_t
-ctz32(uint32_t v)
-{
-#if defined(__GNUC__) || defined(__clang__)
-    return v ? (uint32_t)__builtin_ctz(v) : 32;
-#else
-    uint32_t n = 0;
-
-    if (v == 0)
-        return 32;
-    while (!(v & 1)) {
-        v >>= 1;
-        n++;
-    }
-    return n;
-#endif
-}
-
-static uint32_t
-cpop32(uint32_t v)
-{
-#if defined(__GNUC__) || defined(__clang__)
-    return (uint32_t)__builtin_popcount(v);
-#else
-    uint32_t n = 0;
-
-    while (v) {
-        v &= v - 1;
-        n++;
-    }
-    return n;
-#endif
-}
-
-/* orc.b sets every bit of a byte if any bit of that byte was set. It is
- * what makes a word-at-a-time strlen or memchr cheap. */
-static uint32_t
-orcb32(uint32_t v)
-{
-    uint32_t i, out = 0;
-
-    for (i = 0; i < 32; i += 8)
-        if ((v >> i) & 0xffu)
-            out |= 0xffu << i;
-    return out;
-}
-
-static uint32_t
-rev8_32(uint32_t v)
-{
-    return (v >> 24) | ((v >> 8) & 0xff00u) |
-           ((v << 8) & 0xff0000u) | (v << 24);
-}
-
-/** Evaluate a register-register Zba, Zbb or Zbs encoding.
- *
- * Returns 1 with the result in *out when the encoding is one of them, and 0
- * when it is not, leaving the caller to reject it. Every funct7 value tested
- * here is one the base integer set leaves illegal, so the order in which the
- * caller tries the two decoders does not matter.
- */
-static int
-bitmanip_reg(uint32_t insn, uint32_t f3, uint32_t f7,
-             uint32_t a, uint32_t b, uint32_t *out)
-{
-    uint32_t shamt = b & 31;
-    int32_t sa = (int32_t)a, sb = (int32_t)b;
-
-    switch (f7) {
-    case 0x04:                                      /* Zbb */
-        if (f3 == 4 && RS2(insn) == 0) {
-            *out = a & 0xffffu;                     /* zext.h */
-            return 1;
-        }
-        break;
-    case 0x05:                                      /* Zbb */
-        switch (f3) {
-        case 4: *out = sa < sb ? a : b; return 1;   /* min */
-        case 5: *out = a < b ? a : b; return 1;     /* minu */
-        case 6: *out = sa > sb ? a : b; return 1;   /* max */
-        case 7: *out = a > b ? a : b; return 1;     /* maxu */
-        }
-        break;
-    case 0x10:                                      /* Zba */
-        switch (f3) {
-        case 2: *out = (a << 1) + b; return 1;      /* sh1add */
-        case 4: *out = (a << 2) + b; return 1;      /* sh2add */
-        case 6: *out = (a << 3) + b; return 1;      /* sh3add */
-        }
-        break;
-    case 0x14:                                      /* Zbs */
-        if (f3 == 1) {
-            *out = a | (1u << shamt);               /* bset */
-            return 1;
-        }
-        break;
-    case 0x20:                                      /* Zbb */
-        switch (f3) {
-        case 4: *out = ~(a ^ b); return 1;          /* xnor */
-        case 6: *out = a | ~b; return 1;            /* orn */
-        case 7: *out = a & ~b; return 1;            /* andn */
-        }
-        break;
-    case 0x24:                                      /* Zbs */
-        if (f3 == 1) {
-            *out = a & ~(1u << shamt);              /* bclr */
-            return 1;
-        }
-        if (f3 == 5) {
-            *out = (a >> shamt) & 1;                /* bext */
-            return 1;
-        }
-        break;
-    case 0x30:                                      /* Zbb */
-        if (f3 == 1) {
-            *out = rotl32(a, shamt);                /* rol */
-            return 1;
-        }
-        if (f3 == 5) {
-            *out = rotr32(a, shamt);                /* ror */
-            return 1;
-        }
-        break;
-    case 0x34:                                      /* Zbs */
-        if (f3 == 1) {
-            *out = a ^ (1u << shamt);               /* binv */
-            return 1;
-        }
-        break;
-    }
-    return 0;
-}
-
-/** Evaluate a register-immediate Zbb or Zbs encoding.
- *
- * The shift amount is five bits on RV32, so the immediate splits into a
- * seven-bit selector in funct7 and the amount in the rs2 field. The unary
- * Zbb instructions reuse that amount field as a second selector.
- */
-static int
-bitmanip_imm(uint32_t insn, uint32_t f3, uint32_t f7,
-             uint32_t a, uint32_t *out)
-{
-    uint32_t shamt = RS2(insn);
-
-    switch (f7) {
-    case 0x14:
-        if (f3 == 1) {
-            *out = a | (1u << shamt);               /* bseti */
-            return 1;
-        }
-        if (f3 == 5 && shamt == 0x07) {
-            *out = orcb32(a);                       /* orc.b */
-            return 1;
-        }
-        break;
-    case 0x24:
-        if (f3 == 1) {
-            *out = a & ~(1u << shamt);              /* bclri */
-            return 1;
-        }
-        if (f3 == 5) {
-            *out = (a >> shamt) & 1;                /* bexti */
-            return 1;
-        }
-        break;
-    case 0x30:
-        if (f3 == 5) {
-            *out = rotr32(a, shamt);                /* rori */
-            return 1;
-        }
-        if (f3 == 1) {
-            switch (shamt) {
-            case 0x00: *out = clz32(a); return 1;
-            case 0x01: *out = ctz32(a); return 1;
-            case 0x02: *out = cpop32(a); return 1;
-            case 0x04: *out = (uint32_t)(int32_t)(int8_t)a; return 1;
-            case 0x05: *out = (uint32_t)(int32_t)(int16_t)a; return 1;
-            }
-        }
-        break;
-    case 0x34:
-        if (f3 == 1) {
-            *out = a ^ (1u << shamt);               /* binvi */
-            return 1;
-        }
-        if (f3 == 5 && shamt == 0x18) {
-            *out = rev8_32(a);                      /* rev8 */
-            return 1;
-        }
-        break;
-    }
-    return 0;
-}
-
-/****************************************************************
  * Instruction execution
  ****************************************************************/
 
@@ -1658,7 +1412,7 @@ exec(rv_cpu *cpu, uint32_t insn, uint32_t next)
         case 6: cpu->x[rd] = a | (uint32_t)imm; break;      /* ori */
         case 7: cpu->x[rd] = a & (uint32_t)imm; break;      /* andi */
         case 1:
-            if (f7 != 0) goto zb_imm;
+            if (f7 != 0) { illegal(cpu, insn); return next; }
             cpu->x[rd] = a << shamt;                        /* slli */
             break;
         case 5:
@@ -1666,7 +1420,7 @@ exec(rv_cpu *cpu, uint32_t insn, uint32_t next)
                 cpu->x[rd] = a >> shamt;                    /* srli */
             else if (f7 == 0x20)
                 cpu->x[rd] = (uint32_t)(sa >> shamt);       /* srai */
-            else goto zb_imm;
+            else { illegal(cpu, insn); return next; }
             break;
         }
         break;
@@ -1709,26 +1463,28 @@ exec(rv_cpu *cpu, uint32_t insn, uint32_t next)
             }
             break;
         }
-        if (f7 != 0 && f7 != 0x20)
-            goto zb_reg;
+        if (f7 != 0 && f7 != 0x20) {
+            illegal(cpu, insn);
+            return next;
+        }
         switch (f3) {
         case 0:
             cpu->x[rd] = f7 == 0x20 ? a - b : a + b;        /* add / sub */
             break;
         case 1:
-            if (f7 != 0) goto zb_reg;
+            if (f7 != 0) { illegal(cpu, insn); return next; }
             cpu->x[rd] = a << (b & 0x1f);                   /* sll */
             break;
         case 2:
-            if (f7 != 0) goto zb_reg;
+            if (f7 != 0) { illegal(cpu, insn); return next; }
             cpu->x[rd] = sa < sb;                           /* slt */
             break;
         case 3:
-            if (f7 != 0) goto zb_reg;
+            if (f7 != 0) { illegal(cpu, insn); return next; }
             cpu->x[rd] = a < b;                             /* sltu */
             break;
         case 4:
-            if (f7 != 0) goto zb_reg;
+            if (f7 != 0) { illegal(cpu, insn); return next; }
             cpu->x[rd] = a ^ b;                             /* xor */
             break;
         case 5:
@@ -1738,11 +1494,11 @@ exec(rv_cpu *cpu, uint32_t insn, uint32_t next)
                 cpu->x[rd] = (uint32_t)(sa >> (b & 0x1f));  /* sra */
             break;
         case 6:
-            if (f7 != 0) goto zb_reg;
+            if (f7 != 0) { illegal(cpu, insn); return next; }
             cpu->x[rd] = a | b;                             /* or */
             break;
         default:
-            if (f7 != 0) goto zb_reg;
+            if (f7 != 0) { illegal(cpu, insn); return next; }
             cpu->x[rd] = a & b;                             /* and */
             break;
         }
@@ -2052,30 +1808,6 @@ exec(rv_cpu *cpu, uint32_t insn, uint32_t next)
 
     cpu->x[0] = 0;
     return next;
-
-    /* Zba, Zbb and Zbs are reached only once the base decoder has
-     * rejected an encoding, which is why these live at the end of the
-     * function rather than at the head of the two arithmetic cases.
-     * Testing for them first is the obvious arrangement and costs about
-     * 7% of interpreter throughput on code that uses none of them,
-     * because it puts a call in front of every add and every shift. */
-zb_reg:
-    if (cpu->bitmanip && bitmanip_reg(insn, f3, f7, a, b, &val)) {
-        cpu->x[rd] = val;
-        cpu->x[0] = 0;
-        return next;
-    }
-    illegal(cpu, insn);
-    return next;
-
-zb_imm:
-    if (cpu->bitmanip && bitmanip_imm(insn, f3, f7, a, &val)) {
-        cpu->x[rd] = val;
-        cpu->x[0] = 0;
-        return next;
-    }
-    illegal(cpu, insn);
-    return next;
 }
 
 /****************************************************************
@@ -2098,7 +1830,6 @@ rv_init(rv_cpu *cpu,
     cpu->bus_ctx = bus_ctx;
     cpu->zcmp = 1;          /* part of the machine, not of its reset state */
     cpu->atomics = 1;
-    cpu->bitmanip = 1;
     rv_trace_init(&cpu->trace);
 }
 

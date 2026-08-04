@@ -1,5 +1,5 @@
 #!/bin/sh
-# run-archtest.sh : build and run the riscv-arch-test suites for RV32IMFC
+# run-archtest.sh : build and run the riscv-arch-test suites for RV32IMAFC
 # Copyright (c) 2026 Jon Mayo - MIT-0 OR Public Domain
 #
 # Each test is assembled against the target port in archtest/, executed on
@@ -24,13 +24,14 @@ fi
 shift
 
 SUITES="$*"
-[ -n "$SUITES" ] || SUITES="I M A C F F_Zcf Zifencei"
+[ -n "$SUITES" ] || SUITES="I M A C F F_Zcf B Zifencei"
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 PORT=${PORT:-31339}
 WORK=${WORK:-./archtest-work}
 CC=${CC:-riscv64-linux-gnu-gcc}
-CFLAGS="-march=rv32imafc_zicsr_zifencei -mabi=ilp32f -nostdlib -static"
+CFLAGS="-march=rv32imafc_zicsr_zifencei_zba_zbb_zbs -mabi=ilp32f"
+CFLAGS="$CFLAGS -nostdlib -static"
 CFLAGS="$CFLAGS -fno-pic -no-pie -mcmodel=medany"
 CFLAGS="$CFLAGS -Wl,--build-id=none -DXLEN=32 -DFLEN=32"
 
@@ -66,6 +67,19 @@ for suite in $SUITES; do
             skipped=$((skipped + 1))
             continue
         fi
+
+        # The B suite is named after the B extension but also carries the
+        # three carry-less multiply tests from Zbc, which is a separate
+        # extension that neither the RP2350's Hazard3 nor this emulator
+        # implements. The assembler refuses them at this -march, so they
+        # are skipped rather than counted as build failures.
+        case "$suite/$name" in
+        B/clmul-01 | B/clmulh-01 | B/clmulr-01)
+            echo "skip  $suite/$name (Zbc carry-less multiply, not part of B)"
+            skipped=$((skipped + 1))
+            continue
+            ;;
+        esac
 
         # Each test declares the macros it needs inside its RVTEST_CASE
         # string, in the form "def NAME=True". Turning those into -D flags

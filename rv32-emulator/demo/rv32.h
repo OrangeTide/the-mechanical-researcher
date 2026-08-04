@@ -1,4 +1,4 @@
-/* rv32.h : embeddable RV32IMFC_Zicsr_Zifencei CPU emulator */
+/* rv32.h : embeddable RV32IMAFC_Zicsr_Zifencei_Zba_Zbb_Zbs CPU emulator */
 /* Copyright (c) 2026 Jon Mayo - MIT-0 OR Public Domain */
 
 #ifndef RV32_H
@@ -182,6 +182,14 @@ typedef struct rv_cpu {
     int      atomics;
     uint32_t res_addr;      /* address reserved by the last lr.w */
     int      res_valid;     /* a reservation is outstanding */
+
+    /* Zba, Zbb and Zbs: the address-generation, basic bit-manipulation and
+     * single-bit extensions, which together are the ratified B extension.
+     * They are treated as one switch because a compiler given any of them
+     * is normally given all three, and because riscv-arch-test tests them
+     * as a single suite. Clear this for a machine without them. */
+    int      bitmanip;
+
     uint64_t cycles;        /* retired instruction counter */
     rv_trace_t trace;       /* diagnostic event ring buffer */
 

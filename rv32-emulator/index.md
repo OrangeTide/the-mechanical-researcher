@@ -46,6 +46,20 @@ emulator running the same C source, the RV32 engine is 24% smaller, executes
 builds unchanged to a 19 KB freestanding WebAssembly module with no
 imports.
 
+### The Interpreter Has Moved On Since This Was Written
+
+Everything below describes the interpreter as it stood when this article was
+published, and every measurement in it was taken against that version. That
+version is kept unchanged in the download as
+[`rv32-orig.c`](demo/rv32-orig.c), so the line counts, sizes and throughput
+figures here can still be reproduced.
+
+The interpreter the rest of the project builds against is
+[`rv32.c`](demo/rv32.c), which is the same code with later work folded in.
+The first addition was the Zba, Zbb and Zbs bit-manipulation extensions,
+which are measured in [What Bit Manipulation Buys an RV32
+Interpreter](/rv32-bitmanip/).
+
 ## Choosing the Target
 
 The starting point was a set of notes arguing for RISC-V over the
@@ -595,7 +609,10 @@ final state rather than instruction by instruction.
 
 The complete emulator, the verification tools, the benchmark, the board
 ports for CoreMark and Lua, and the WebAssembly demonstration are in the
-companion download.
+companion download. It carries both versions of the interpreter:
+[`rv32-orig.c`](demo/rv32-orig.c) as this article describes it, and
+[`rv32.c`](demo/rv32.c) as it stands now. The `make` targets below build the
+current one.
 
 The demo README has a step-by-step setup guide, covering the packages
 needed, what each `make` target does, and how to point the differential

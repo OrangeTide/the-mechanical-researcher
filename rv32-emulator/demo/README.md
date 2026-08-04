@@ -1,10 +1,14 @@
-# RV32IMAFC_Zicsr_Zifencei_Zcmp Emulator
+# RV32IMAFC_Zicsr_Zifencei_Zba_Zbb_Zbs_Zcmp Emulator
 
 An embeddable 32-bit RISC-V interpreter in C, with the differential test
 tools used to establish that it is correct.
 
 The interpreter is `rv32.c` and `rv32.h`. Everything else in this
 directory either tests it, measures it, or demonstrates embedding it.
+
+`rv32-orig.c` is the interpreter as the first article described it, kept
+unchanged so that the two versions can be built and measured side by side.
+Nothing links it except the `bench_rv32_orig` comparison binary.
 
 ## What It Implements
 
@@ -17,7 +21,14 @@ directory either tests it, measures it, or demonstrates embedding it.
 | C | 30 encodings | compressed, expanded to their 32-bit forms |
 | Zicsr | 6 | control and status registers |
 | Zifencei | 1 | instruction fence |
+| Zba | 3 | shifted add, for array indexing |
+| Zbb | 18 | counting, rotates, min and max, sign extension |
+| Zbs | 8 | single-bit set, clear, invert and extract |
 | Zcmp | 6 | whole-frame push and pop |
+
+Zba, Zbb and Zbs together are the ratified B extension, and `misa`
+advertises the B bit when all three are enabled. They are the set the
+RP2350's Hazard3 core implements, minus Zbkb and Zbc.
 
 Machine mode only. There is no supervisor mode and no MMU, so this runs
 bare-metal programs rather than an operating system.
@@ -88,12 +99,13 @@ make            # build the interpreter, the tools and the guest programs
 make check      # everything that needs no reference model
 ```
 
-`make check` runs five suites and should report no failures:
+`make check` runs six suites and should report no failures:
 
 ```
 108 tests, 0 failures                      IEEE-754 conformance
 30 tests, 0 failures                       memory access and sandboxing
 73 tests, 0 failures                       whole-frame push and pop
+80 tests, 0 failures                       Zba, Zbb and Zbs
 51 tests, 0 failures                       atomics
 3432 instructions retired, exit code 0     a compiled guest program
 all harness checks passed
@@ -109,6 +121,7 @@ qemu, not on the tests above. Three tools do that.
 ```sh
 make lockstep-run       # plain RV32IMFC
 make lockstep-zcmp      # a guest built with whole-frame push and pop
+make lockstep-bitmanip  # a guest the compiler filled with Zba, Zbb and Zbs
 ```
 
 Both models load the same ELF and start from the same architectural state,
@@ -161,14 +174,15 @@ the interpreter, and its signature region compared against the same binary
 running on `qemu-system-riscv32`.
 
 ```
-riscv-arch-test: 228 passed, 0 failed, 1 skipped, 11 did not build
+riscv-arch-test: 257 passed, 0 failed, 4 skipped, 11 did not build
 ```
 
 The 11 that do not build are Zcb instructions, which this interpreter does
-not implement. The one skipped test stores `mstatus`, whose readable bits
-depend on which privilege modes exist; qemu's board has supervisor and user
-mode where this has machine mode only, so the two read back different legal
-values.
+not implement. Three of the four skipped tests are the carry-less
+multiplies, which live in the `B` directory but belong to Zbc rather than to
+B. The fourth stores `mstatus`, whose readable bits depend on which
+privilege modes exist; qemu's board has supervisor and user mode where this
+has machine mode only, so the two read back different legal values.
 
 Use the `old-framework-3.x` branch. The current framework needs an
 assembler that pads `.p2align` with nops while relaxation is disabled;
@@ -282,6 +296,32 @@ make bench-compare      # against the ColdFire V4e emulator
 emulators run the same algorithms. Both print their results, which should
 be identical.
 
+### What the Bit-Manipulation Extensions Are Worth
+
+```sh
+make bitmanip-compare   # the same guests built with and without them
+make bitmanip-overhead  # what the wider decoder costs every guest
+```
+
+`bitmanip-compare` builds four guests twice, differing only in `-march`, and
+reports retired instructions and `.text` size for each pair. Any guest named
+`foo_zb.elf` is `foo.elf` built for `rv32imafc_zba_zbb_zbs`; the recipe is
+shared between the two, so the builds cannot drift apart. The last two rows
+need `CM` and `LUA` pointing at checkouts.
+
+```
+guest                    base    Zba+Zbb+Zbs    change       text
+test_program             3432           3432     0.00%      0.00%
+bench                  612030         552029    -9.80%     -0.73%
+coremark             31362052       30414094    -3.02%     -1.14%
+lua                  15252142       14974101    -1.82%     -0.22%
+```
+
+`bitmanip-overhead` runs the same base-ISA guest on `bench_rv32_orig`, which
+links the published `rv32-orig.c`, and on `bench_rv32`, which links the
+current `rv32.c`. The difference is what a guest pays for a decoder that
+knows about instructions it never executes.
+
 ## The WebAssembly Demo
 
 ```sh
@@ -317,6 +357,7 @@ in the math helpers that single-precision operands cannot reach.
 | File | |
 |---|---|
 | `rv32.c`, `rv32.h` | the interpreter |
+| `rv32-orig.c` | the interpreter as first published, for comparison |
 | `machine.c` | flat memory and a small syscall layer |
 | `elf_loader.c` | ELF32 loader and symbol lookup |
 | `gdbclient.c` | remote debugging protocol client |
@@ -327,6 +368,8 @@ in the math helpers that single-precision operands cannot reach.
 | `test_mem.c` | memory access, alignment and sandboxing |
 | `test_zcmp.c` | whole-frame push and pop |
 | `test_atomic.c` | atomics, reservations and alignment |
+| `test_bitmanip.c` | Zba, Zbb and Zbs, and the switch that disables them |
+| `bitmanip_guest.c` | a compiled guest full of them, for lockstep |
 | `coremark-port/` | board port for the CoreMark benchmark |
 | `lua-port/` | board port and script for running Lua |
 | `test_harness.c` | runs a compiled guest and checks its results |
