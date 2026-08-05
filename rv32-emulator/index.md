@@ -51,15 +51,15 @@ imports.
 The first of five on one small RV32 interpreter, built to be embedded in
 another program.
 
-1. **A Compact RV32 Engine, Verified Against QEMU** — the interpreter, and
+1. **A Compact RV32 Engine, Verified Against QEMU**: the interpreter, and
    four independent ways of establishing it is correct
-2. [What Bit Manipulation Buys an RV32 Interpreter](/rv32-bitmanip/) — Zba,
+2. [What Bit Manipulation Buys an RV32 Interpreter](/rv32-bitmanip/): Zba,
    Zbb and Zbs, measured in retired instructions
-3. [Zcb: The Same Instructions in Less Space](/rv32-zcb/) — compressed byte
+3. [Zcb: The Same Instructions in Less Space](/rv32-zcb/): compressed byte
    and halfword forms, measured in code size
-4. [Interrupts, and the Bug Three Test Methods Missed](/rv32-interrupts/) —
+4. [Interrupts, and the Bug Three Test Methods Missed](/rv32-interrupts/):
    interrupt delivery, and a defect no reference model could catch
-5. [Coverage Told Us About the Bug and We Did Not Listen](/rv32-coverage/) —
+5. [Coverage Told Us About the Bug and We Did Not Listen](/rv32-coverage/):
    auditing the rig with coverage and mutation testing
 
 Everything below describes the interpreter as it stood when this article was
@@ -194,7 +194,7 @@ guest memory identical over [00010000,00014690)
 exit code 0 on both models
 ```
 
-The value is not the pass. It is that a failure names the instruction that
+The value is in what a failure looks like: it names the instruction that
 caused it, rather than a wrong number printed thousands of instructions
 later.
 
@@ -413,7 +413,7 @@ Measured within one compiler, since GNU `as` cannot yet assemble these:
 | Full benchmark | 711,029 | 551,626 | -22.4% |
 | `.text` | 372 B | 346 B | -7.0% |
 
-There is a constraint worth knowing. Zcmp occupies the encoding space of the
+There is a constraint. Zcmp occupies the encoding space of the
 compressed double-precision loads and stores, so an implementation may have
 Zcmp or Zcd but never both. That is free here, because this engine has no
 double precision at all. An engine that needed double precision would have
@@ -542,7 +542,7 @@ The syscall layer is the remaining limit. It provides `write` and `exit`
 and answers everything else with `-ENOSYS`, which is enough for a program
 that computes and prints, and not enough for one that wants real files.
 
-One detail is worth recording because the emulator hid it. The first
+One detail the emulator hid. The first
 linker script placed the heap and stack past the end of the image by
 moving the location counter, which left them outside any loadable segment.
 The flat memory model here did not care and Lua ran. qemu maps only what

@@ -71,15 +71,15 @@ The last of five on one small RV32 interpreter, built to be embedded in
 another program. The first four added things to it; this one audits the way
 all four of them were checked.
 
-1. [A Compact RV32 Engine, Verified Against QEMU](/rv32-emulator/) — the
+1. [A Compact RV32 Engine, Verified Against QEMU](/rv32-emulator/): the
    interpreter, and four independent ways of establishing it is correct
-2. [What Bit Manipulation Buys an RV32 Interpreter](/rv32-bitmanip/) — Zba,
+2. [What Bit Manipulation Buys an RV32 Interpreter](/rv32-bitmanip/): Zba,
    Zbb and Zbs, measured in retired instructions
-3. [Zcb: The Same Instructions in Less Space](/rv32-zcb/) — compressed byte
+3. [Zcb: The Same Instructions in Less Space](/rv32-zcb/): compressed byte
    and halfword forms, measured in code size
-4. [Interrupts, and the Bug Three Test Methods Missed](/rv32-interrupts/) —
+4. [Interrupts, and the Bug Three Test Methods Missed](/rv32-interrupts/):
    interrupt delivery, and a defect no reference model could catch
-5. **Coverage Told Us About the Bug and We Did Not Listen** — auditing the
+5. **Coverage Told Us About the Bug and We Did Not Listen**: auditing the
    rig with coverage and mutation testing
 
 Every article measures the same interpreter at a different point in its
@@ -302,9 +302,10 @@ interrupt delivery, in a method that has run millions of instructions
 against an independent implementation, with a coverage count of zero. The
 vectoring bug lived in the first row.
 
-A differential testing strategy inherits the reference model's scope as its
-ceiling. Everything above that ceiling is not lightly tested, it is
-untested, and the failure is silent because there is no test to fail.
+Those zeros are where the reference model's scope runs out, drawn as a
+boundary through a specific file at specific line numbers. The previous
+article argued that such a boundary exists. This is where it falls, and
+nothing above it has ever been compared against anything.
 
 ## What This Changed
 

@@ -52,15 +52,15 @@ counts stay identical to within one in a hundred thousand. CoreMark runs
 Part three of five on one small RV32 interpreter, built to be embedded in
 another program.
 
-1. [A Compact RV32 Engine, Verified Against QEMU](/rv32-emulator/) — the
+1. [A Compact RV32 Engine, Verified Against QEMU](/rv32-emulator/): the
    interpreter, and four independent ways of establishing it is correct
-2. [What Bit Manipulation Buys an RV32 Interpreter](/rv32-bitmanip/) — Zba,
+2. [What Bit Manipulation Buys an RV32 Interpreter](/rv32-bitmanip/): Zba,
    Zbb and Zbs, measured in retired instructions
-3. **Zcb: The Same Instructions in Less Space** — compressed byte and
+3. **Zcb: The Same Instructions in Less Space**: compressed byte and
    halfword forms, measured in code size
-4. [Interrupts, and the Bug Three Test Methods Missed](/rv32-interrupts/) —
+4. [Interrupts, and the Bug Three Test Methods Missed](/rv32-interrupts/):
    interrupt delivery, and a defect no reference model could catch
-5. [Coverage Told Us About the Bug and We Did Not Listen](/rv32-coverage/) —
+5. [Coverage Told Us About the Bug and We Did Not Listen](/rv32-coverage/):
    auditing the rig with coverage and mutation testing
 
 Every article measures the same interpreter at a different point in its
@@ -114,8 +114,8 @@ new trap, and no new architectural state, because after expansion these are
 `lbu`, `sh`, `andi`, `mul` and the Zbb instructions that were already
 there.
 
-This is worth contrasting with Zcmp, the other compressed extension this
-emulator implements. `cm.push` and `cm.pop` build and tear down a whole
+Zcmp is the contrast, the other compressed extension this emulator
+implements. `cm.push` and `cm.pop` build and tear down a whole
 stack frame, which no single 32-bit instruction does, so they needed their
 own execution function and their own place in `rv_step`. Zcb needed neither.
 

@@ -13,8 +13,8 @@ the whole vocabulary for taking one and had no way for one to arrive.
 
 The gap was filled somewhere else. A separate project vendored this
 interpreter, needed a timer, and added the seam it was missing. This
-article takes that work back, which is worth saying plainly because the
-port is the strongest evidence the emulator's shape is right: the changes
+article takes that work back. The port is the strongest evidence so far that
+the emulator's shape is right: the changes
 were written against the version published in the first article, applied
 cleanly to a core that had since grown by 353 lines and two extensions, and
 touched nothing that either set of work owned.
@@ -50,15 +50,15 @@ naively and 3.0 behind a two-word guard, against a baseline of 201.
 Part four of five on one small RV32 interpreter, built to be embedded in
 another program.
 
-1. [A Compact RV32 Engine, Verified Against QEMU](/rv32-emulator/) — the
+1. [A Compact RV32 Engine, Verified Against QEMU](/rv32-emulator/): the
    interpreter, and four independent ways of establishing it is correct
-2. [What Bit Manipulation Buys an RV32 Interpreter](/rv32-bitmanip/) — Zba,
+2. [What Bit Manipulation Buys an RV32 Interpreter](/rv32-bitmanip/): Zba,
    Zbb and Zbs, measured in retired instructions
-3. [Zcb: The Same Instructions in Less Space](/rv32-zcb/) — compressed byte
+3. [Zcb: The Same Instructions in Less Space](/rv32-zcb/): compressed byte
    and halfword forms, measured in code size
-4. **Interrupts, and the Bug Three Test Methods Missed** — interrupt
+4. **Interrupts, and the Bug Three Test Methods Missed**: interrupt
    delivery, and a defect no reference model could catch
-5. [Coverage Told Us About the Bug and We Did Not Listen](/rv32-coverage/) —
+5. [Coverage Told Us About the Bug and We Did Not Listen](/rv32-coverage/):
    auditing the rig with coverage and mutation testing
 
 Every article measures the same interpreter at a different point in its
@@ -245,11 +245,11 @@ So the bug was not missed through carelessness. It sat in a region all
 three methods are structurally blind to, and the only reason it surfaced
 now is that someone wrote a test for the feature next door to it.
 
-The general form is worth stating: a verification strategy built on
-differential testing inherits the reference model's scope as its own
-ceiling. Everything the reference does not implement is unverified, and it
-is unverified silently, because there is no failing test to notice. Knowing
-where that boundary falls is part of knowing what your tests are worth.
+The general form: a verification strategy built on differential testing
+inherits the reference model's scope as its own ceiling. Everything the
+reference does not implement is unverified, and it is unverified silently,
+because there is no failing test to notice. Knowing where that boundary
+falls is part of knowing what your tests are worth.
 
 ## Verification Without a Reference
 
@@ -326,7 +326,7 @@ applies, because an interrupt check genuinely does have to happen on every
 instruction. What was available instead was making the common case cheap
 enough not to matter.
 
-It is also worth noting what the table says about the two previous
+The table also says something about the two previous
 articles. They reported the extension work costing about 2.4% of
 throughput, measured in wall clock. Counted in host instructions it costs
 0.62%. Both numbers are real and they measure different things: the
@@ -339,7 +339,7 @@ the code actually does.
 
 The interrupt code in this article was not written for it. A separate
 project adopted this interpreter, wanted a guest that could be interrupted
-by a timer, and wrote the seam. Three things about that are worth recording.
+by a timer, and wrote the seam.
 
 The core was adopted unmodified. The version it started from is byte for
 byte the `rv32-orig.c` kept in this project's download for exactly this
@@ -373,9 +373,9 @@ exceptions for as long as this emulator has existed, and the three
 verification methods this project has been proud of were all structurally
 incapable of finding it: the compliance suite never selects vectored mode,
 the fuzzer never traps, and the reference model is a user-mode process with
-no machine mode at all. Differential testing gives you the reference's
-scope and not one instruction more, and the parts of your machine outside
-that scope are not lightly tested, they are untested.
+no machine mode at all. A differential strategy can only reach as far as its
+reference does, and this project had been standing on that limit for a month
+without ever measuring where it fell.
 
 Where no reference exists, the substitute is a specification for expected
 values and mutation for confidence. Five deliberate defects, five caught.

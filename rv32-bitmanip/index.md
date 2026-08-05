@@ -52,15 +52,15 @@ moving the test into the rejection path brought that down to 2.3%.
 Part two of five on one small RV32 interpreter, built to be embedded in
 another program.
 
-1. [A Compact RV32 Engine, Verified Against QEMU](/rv32-emulator/) — the
+1. [A Compact RV32 Engine, Verified Against QEMU](/rv32-emulator/): the
    interpreter, and four independent ways of establishing it is correct
-2. **What Bit Manipulation Buys an RV32 Interpreter** — Zba, Zbb and Zbs,
+2. **What Bit Manipulation Buys an RV32 Interpreter**: Zba, Zbb and Zbs,
    measured in retired instructions
-3. [Zcb: The Same Instructions in Less Space](/rv32-zcb/) — compressed byte
+3. [Zcb: The Same Instructions in Less Space](/rv32-zcb/): compressed byte
    and halfword forms, measured in code size
-4. [Interrupts, and the Bug Three Test Methods Missed](/rv32-interrupts/) —
+4. [Interrupts, and the Bug Three Test Methods Missed](/rv32-interrupts/):
    interrupt delivery, and a defect no reference model could catch
-5. [Coverage Told Us About the Bug and We Did Not Listen](/rv32-coverage/) —
+5. [Coverage Told Us About the Bug and We Did Not Listen](/rv32-coverage/):
    auditing the rig with coverage and mutation testing
 
 Every article measures the same interpreter at a different point in its
@@ -130,8 +130,7 @@ and the order in which they are tried is a free choice.
 That free choice turned out to cost 7.8% of interpreter throughput, which is
 the first result of this article and is discussed below.
 
-Three instructions are worth showing, because they are where a
-straightforward implementation goes wrong.
+Three instructions are where a straightforward implementation goes wrong.
 
 ```c
 static uint32_t
@@ -263,8 +262,8 @@ riscv-arch-test: 257 passed, 0 failed, 4 skipped, 11 did not build
 The count was 228 before this work. Every one of the 29 new tests passes with
 its signature region compared byte for byte against `qemu-system-riscv32`.
 
-Assembling them needed nothing unusual, which is worth saying because the
-last extension added to this emulator did. Zcmp could not be assembled by
+Assembling them needed nothing unusual. The last extension added to this
+emulator did. Zcmp could not be assembled by
 GNU as at all, had to be built with clang and linked with GNU ld, and needed
 a qemu CPU model spelled out instruction by instruction because `zcd=false`
 is ignored while `c=true`. Zba, Zbb and Zbs assemble with binutils 2.42,
@@ -384,7 +383,7 @@ unusual `zext.h` count follows from its list workload, which stores its data
 in 16-bit fields, so every load of one is a zero extension. Lua's single-bit
 instructions track the bit-field flags in its object headers.
 
-One limitation is worth stating rather than hiding. Lua is linked against a
+One limitation, stated rather than hidden. Lua is linked against a
 prebuilt picolibc, and the multilib that is selected is `rv32imafc/ilp32f`,
 which was compiled without these extensions. Every `strlen`, `memcpy` and
 `memchr` Lua calls is therefore the ordinary version, and none of them get
@@ -413,9 +412,9 @@ Measured on the benchmark, the base build ran 612,030 instructions at 32.2
 MIPS and the bit-manipulation build ran 552,029 at 29.8 MIPS. Nine point
 eight percent fewer instructions, each about 8% more expensive, leaving 2.6%.
 
-This is not an argument against the extensions. It is an argument about which
-number to quote, and it points at the case where the instruction count is the
-number that matters: the browser demonstration runs the guest in slices with
+Which of the two numbers to quote depends on what is scarce, and that
+points at the case where the instruction count is the number that matters:
+the browser demonstration runs the guest in slices with
 an instruction budget so that a runaway program cannot freeze the page. A
 guest that needs 9.8% fewer instructions to finish its work gets 9.8% more
 work done per slice, whatever the wall clock says.
