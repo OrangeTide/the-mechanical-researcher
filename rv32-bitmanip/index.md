@@ -444,7 +444,10 @@ before the new decoder was moved out of the path that every `add` takes.
 The next candidate from the RP2350's list is Zcb, which adds eleven
 compressed encodings and would shrink guest images rather than shorten
 instruction streams. That is a different measurement with a different unit,
-and this emulator already has the harness to make it.
+and this emulator already has the harness to make it. It was made in
+[Zcb: The Same Instructions in Less Space](/rv32-zcb/), which found 2.31% of
+CoreMark's image, no change at all in what it executes, and the same
+decoder-placement mistake waiting one layer further down.
 
 ## Source
 
