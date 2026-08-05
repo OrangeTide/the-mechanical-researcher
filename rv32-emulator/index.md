@@ -58,7 +58,15 @@ The interpreter the rest of the project builds against is
 [`rv32.c`](demo/rv32.c), which is the same code with later work folded in.
 The first addition was the Zba, Zbb and Zbs bit-manipulation extensions,
 which are measured in [What Bit Manipulation Buys an RV32
-Interpreter](/rv32-bitmanip/).
+Interpreter](/rv32-bitmanip/), then Zcb in [The Same Instructions in Less
+Space](/rv32-zcb/), then interrupt delivery in [Interrupts, and the Bug
+Three Test Methods Missed](/rv32-interrupts/).
+
+That last one corrects a defect described here by implication rather than
+by name: the trap delivery this article verifies against QEMU sent
+exceptions to a vectored handler entry when `mtvec` selected vectored
+mode. Every test in this article passed with that bug present, for reasons
+the later article goes into.
 
 ## Choosing the Target
 

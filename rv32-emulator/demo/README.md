@@ -47,6 +47,29 @@ its own.
 Machine mode only. There is no supervisor mode and no MMU, so this runs
 bare-metal programs rather than an operating system.
 
+### Interrupts
+
+Three level-sensitive lines, driven by the host:
+
+```c
+rv_set_irq(&cpu, RV_IRQ_TIMER, 1);      /* raise the timer line */
+uint32_t cause = rv_irq_pending(&cpu);  /* what would be taken next */
+```
+
+A timer or an interrupt controller lives in the embedding, not in here. An
+interrupt is taken between instructions, so `mepc` names the instruction
+that has not run and nothing retires on that step. Both gates apply,
+`mstatus.MIE` and the bit in `mie`, and priority is external, then
+software, then timer.
+
+The lines are levels rather than edges. A handler that returns without
+lowering the line or clearing `mip` is re-entered, so a guest that forgets
+to acknowledge livelocks in its handler exactly as it would on hardware.
+
+`wfi` is a nop, which the specification allows, and sets `cpu.waiting` so a
+host driving the machine can jump its clock to the next interrupt instead
+of stepping the wait out.
+
 Two properties are worth knowing before embedding it:
 
 - **No math library and no `<fenv.h>`.** Every floating-point result is
@@ -66,9 +89,9 @@ here is concurrent. Without them a guest using C11 `_Atomic`, the
 `undefined reference to __atomic_fetch_add_4`, because no runtime library
 for that is built for this target.
 
-This is a single hart with no interrupts, so nothing can interleave with a
-read-modify-write, and the acquire and release bits order accesses that no
-other agent can observe. Treat them as a way to run software that expects
+This is a single hart, and an interrupt is only ever taken between
+instructions, so nothing can interleave with a read-modify-write, and the
+acquire and release bits order accesses that no other agent can observe. Treat them as a way to run software that expects
 atomics, not as a concurrency guarantee. What is genuinely enforced:
 
 - Each operation's arithmetic, and the value it returns.
@@ -76,7 +99,10 @@ atomics, not as a concurrency guarantee. What is genuinely enforced:
   conditional fails without a matching reservation, fails against a
   different address, and fails on a second use.
 - The reservation is dropped on any trap, so a handler cannot complete a
-  store conditional begun by the code it interrupted.
+  store conditional begun by the code it interrupted. Now that interrupts
+  exist this rule is reachable in the ordinary way rather than only through
+  an exception, and `test_irq.c` covers it: a timer between `lr.w` and
+  `sc.w` makes the store conditional fail and the guest retry.
 - Natural alignment, enforced regardless of the misaligned-access setting,
   because the guarantee cannot be offered on an operand split across two
   words.
@@ -113,7 +139,7 @@ make            # build the interpreter, the tools and the guest programs
 make check      # everything that needs no reference model
 ```
 
-`make check` runs seven suites and should report no failures:
+`make check` runs eight suites and should report no failures:
 
 ```
 108 tests, 0 failures                      IEEE-754 conformance
@@ -121,6 +147,7 @@ make check      # everything that needs no reference model
 73 tests, 0 failures                       whole-frame push and pop
 80 tests, 0 failures                       Zba, Zbb and Zbs
 69 tests, 0 failures                       Zcb
+28 tests, 0 failures                       interrupt delivery
 51 tests, 0 failures                       atomics
 3432 instructions retired, exit code 0     a compiled guest program
 all harness checks passed
@@ -415,6 +442,7 @@ in the math helpers that single-precision operands cannot reach.
 | `bitmanip_guest.c` | a compiled guest full of them, for lockstep |
 | `test_zcb.c` | the Zcb expansion table, offsets and dependencies |
 | `zcb_guest.c` | a compiled guest full of byte and halfword traffic |
+| `test_irq.c` | interrupt delivery, checked by mutation |
 | `coremark-port/` | board port for the CoreMark benchmark |
 | `lua-port/` | board port and script for running Lua |
 | `test_harness.c` | runs a compiled guest and checks its results |

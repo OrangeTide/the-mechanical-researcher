@@ -27,3 +27,4 @@ test_bitmanip
 bench_rv32_orig
 ee_printf_port.c
 test_zcb
+test_irq

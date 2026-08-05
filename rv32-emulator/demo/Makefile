@@ -1,4 +1,4 @@
-# Makefile for the RV32IMAFC_Zicsr_Zifencei_Zba_Zbb_Zbs_Zcmp emulator demo
+# Makefile for the RV32IMAFC_Zicsr_Zifencei_Zba_Zbb_Zbs_Zcb_Zcmp emulator demo
 # Copyright (c) 2026 Jon Mayo - MIT-0 OR Public Domain
 
 # Host compiler.
@@ -41,7 +41,7 @@ QEMU_CPU_ZB   = rv32,zba=true,zbb=true,zbs=true,zcb=true
 
 CORE        = rv32.c
 TOOLS       = test_harness test_fp test_mem test_zcmp test_atomic \
-              test_bitmanip \
+              test_bitmanip test_zcb test_irq \
               lockstep fuzz \
               archtest-run bench_rv32
 GUESTS      = test_program.elf fuzz_target.elf bench.elf bitmanip_guest.elf \
@@ -64,6 +64,9 @@ test_atomic: test_atomic.c $(CORE) machine.c
 	$(CC) $(CFLAGS) -o $@ $^
 
 test_bitmanip: test_bitmanip.c $(CORE) machine.c
+	$(CC) $(CFLAGS) -o $@ $^
+
+test_irq: test_irq.c $(CORE) machine.c
 	$(CC) $(CFLAGS) -o $@ $^
 
 test_zcb: test_zcb.c $(CORE) machine.c
@@ -127,19 +130,23 @@ bitmanip_guest.elf: bitmanip_guest.c start.S link.ld
 # ---------------------------------------------------------------- tests
 
 # Everything that needs no reference model
-check: test_fp test_mem test_zcmp test_atomic test_bitmanip test_harness \
-       test_program.elf
+check: test_fp test_mem test_zcmp test_zcb test_irq test_atomic \
+       test_bitmanip test_harness test_program.elf
 	./test_fp
 	./test_mem
 	./test_zcmp
 	./test_bitmanip
 	./test_zcb
+	./test_irq
 	./test_atomic
 	./test_harness test_program.elf
 
 # Instruction-by-instruction comparison against qemu-riscv32
 lockstep-run: lockstep test_program.elf
 	./lockstep test_program.elf
+
+test-irq: test_irq
+	./test_irq
 
 lockstep-zcb: lockstep zcb_guest.elf
 	./lockstep zcb_guest.elf -cpu $(QEMU_CPU_ZB)
@@ -277,8 +284,9 @@ clean:
 	rm -f coremark.elf ee_printf_port.c lua.elf
 	rm -f bench_rv32_orig *_zb.elf *_zcb.elf
 
-.PHONY: all check lockstep-run lockstep-zcmp lockstep-bitmanip fuzz-run \
-        archtest bench bitmanip-compare bitmanip-overhead \
+.PHONY: all check test-irq lockstep-run lockstep-zcmp lockstep-bitmanip \
+        lockstep-zcb fuzz-run \
+        archtest bench bitmanip-compare bitmanip-overhead zcb-compare \
         coremark lua \
         bench-compare wasm coverage clean
 

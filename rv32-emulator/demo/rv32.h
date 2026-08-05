@@ -24,6 +24,7 @@ enum rv_trace_type {
     RV_TR_CSR,
     RV_TR_TRAP,
     RV_TR_DOUBLE_FAULT,
+    RV_TR_INTERRUPT,
 };
 
 /****************************************************************
@@ -164,6 +165,12 @@ typedef struct rv_cpu {
     int      in_trap;       /* a trap was taken by the current instruction */
     int      trap_misaligned;   /* 1: misaligned accesses trap, 0: emulate */
 
+    /* Set by wfi, cleared when an interrupt is taken. Nothing in the
+     * interpreter waits: a host that steps the machine itself can read
+     * this to skip ahead to whatever raises the next interrupt instead
+     * of spinning through the loop the guest is parked in. */
+    int      waiting;
+
     /* Zcmp adds the push and pop instructions that build and tear down a
      * stack frame in one encoding. It occupies the encoding space of the
      * compressed double-precision loads and stores, so an implementation
@@ -254,6 +261,31 @@ typedef struct rv_cpu {
 #define RV_CAUSE_ECALL_M            11
 
 /****************************************************************
+ * Interrupts
+ *
+ * An mcause with the top bit set names an interrupt rather than an
+ * exception, and the rest of it is the bit position in mip and mie. A
+ * single hart in machine mode has three: software, timer and external,
+ * taken in the priority the specification fixes, external first.
+ *
+ * The lines are level-sensitive, which is what the hardware they model
+ * is: rv_set_irq raises or lowers one, and it stays raised until the
+ * host lowers it or the guest clears the bit in mip. A handler that
+ * returns without doing either is re-entered, exactly as it would be on
+ * a real machine.
+ ****************************************************************/
+
+#define RV_CAUSE_INTERRUPT  0x80000000u     /* the mcause interrupt bit */
+
+#define RV_IRQ_SOFT     3
+#define RV_IRQ_TIMER    7
+#define RV_IRQ_EXT      11
+
+#define RV_MIP_MSIP     (1u << RV_IRQ_SOFT)
+#define RV_MIP_MTIP     (1u << RV_IRQ_TIMER)
+#define RV_MIP_MEIP     (1u << RV_IRQ_EXT)
+
+/****************************************************************
  * CSR numbers
  ****************************************************************/
 
@@ -322,6 +354,15 @@ void rv_set_f(rv_cpu *cpu, int n, uint32_t bits);
 
 /* Raise a trap from host code (software or external) */
 void rv_trap(rv_cpu *cpu, uint32_t cause, uint32_t tval);
+
+/* Raise (level != 0) or lower an interrupt line; cause is RV_IRQ_SOFT,
+ * RV_IRQ_TIMER or RV_IRQ_EXT. This is the seam a timer or an interrupt
+ * controller in the host plugs into. */
+void rv_set_irq(rv_cpu *cpu, int cause, int level);
+
+/* The interrupt that would be taken before the next instruction, as an
+ * mcause value, or 0 when none is. */
+uint32_t rv_irq_pending(const rv_cpu *cpu);
 
 /* Expand a 16-bit compressed encoding to its 32-bit equivalent.
  * Returns 0 for an illegal or reserved encoding. Exposed for testing. */
