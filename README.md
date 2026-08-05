@@ -29,6 +29,7 @@ A collection of research topics, primarily gathered through agentic AI sessions,
 - [What Bit Manipulation Buys an RV32 Interpreter](rv32-bitmanip/)
 - [Zcb: The Same Instructions in Less Space](rv32-zcb/)
 - [Interrupts, and the Bug Three Test Methods Missed](rv32-interrupts/)
+- [Component Pascal](notes/component-pascal.md)
 
 ## Build & Deploy
 

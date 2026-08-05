@@ -19,6 +19,7 @@ variables and procedures.
 - Influenced Compact Pascal's design philosophy (already cited in the white paper)
 
 **Reference:** https://en.wikipedia.org/wiki/Component_Pascal
+**Detailed notes:** `component-pascal.md`
 
 ## Active Oberon
 
