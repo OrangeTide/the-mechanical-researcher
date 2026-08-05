@@ -45,6 +45,31 @@ Measured with callgrind rather than wall clock, the per-instruction
 interrupt check costs 4.3 host instructions per guest instruction placed
 naively and 3.0 behind a two-word guard, against a baseline of 201.
 
+## The Series
+
+Part four of five on one small RV32 interpreter, built to be embedded in
+another program.
+
+1. [A Compact RV32 Engine, Verified Against QEMU](/rv32-emulator/) — the
+   interpreter, and four independent ways of establishing it is correct
+2. [What Bit Manipulation Buys an RV32 Interpreter](/rv32-bitmanip/) — Zba,
+   Zbb and Zbs, measured in retired instructions
+3. [Zcb: The Same Instructions in Less Space](/rv32-zcb/) — compressed byte
+   and halfword forms, measured in code size
+4. **Interrupts, and the Bug Three Test Methods Missed** — interrupt
+   delivery, and a defect no reference model could catch
+5. [Coverage Told Us About the Bug and We Did Not Listen](/rv32-coverage/) —
+   auditing the rig with coverage and mutation testing
+
+Every article measures the same interpreter at a different point in its
+life. `rv32.c` is that interpreter, the single evolving copy the whole
+project builds against, and
+[`rv32-orig.c`](/rv32-emulator/demo/rv32-orig.c) beside it is the version
+the first article described, kept unchanged so that its measurements stay
+reproducible. That frozen copy matters more here than anywhere else in the
+series: the defect below is in it, and comparing the two files is how the
+extent of the bug was established.
+
 ## The Seam
 
 The whole interface is two functions.
