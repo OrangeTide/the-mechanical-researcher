@@ -256,6 +256,21 @@ bitmanip-compare: test_harness
 
 # ------------------------------------------------------------- coverage
 
+# What each verification method covers on its own, and what it alone
+# contributes. An aggregate percentage cannot answer either question.
+coverage-methods:
+	./coverage-by-method.sh
+
+# The same question in the unit that suits an emulator: which guest
+# instructions each method executed, rather than which lines of C.
+icov:
+	./icov-by-method.sh
+
+# Whether the rig would notice if the interpreter were wrong. Coverage
+# cannot say; this introduces one defect at a time and counts.
+mutants:
+	./mutate.sh -n 150 -m all
+
 COV = coverage-build
 
 coverage: $(GUESTS)
@@ -287,6 +302,7 @@ clean:
 .PHONY: all check test-irq lockstep-run lockstep-zcmp lockstep-bitmanip \
         lockstep-zcb fuzz-run \
         archtest bench bitmanip-compare bitmanip-overhead zcb-compare \
+        coverage-methods icov mutants \
         coremark lua \
         bench-compare wasm coverage clean
 

@@ -410,17 +410,36 @@ scatters them again, so the picture never stops moving. A per-frame
 instruction budget means a guest that loops forever is cut off at the end
 of its slice instead of freezing the page.
 
-## Coverage
+## Coverage, and What It Is Worth
 
 ```sh
-make coverage
+make coverage           # the aggregate line count
+make coverage-methods   # what each method covers, and what it alone covers
+make icov               # the same question in guest instructions
+make mutants            # whether the rig notices when the code is wrong
 ```
 
-Reports about 75% of lines in `rv32.c` on its own, and about 86% when the
-compliance binaries are run through the instrumented build as well. The
-remainder is defensive:
-double-fault handling, vectored trap vectors, and range-extension branches
-in the math helpers that single-precision operands cannot reach.
+`make coverage` reports the aggregate, about 89% of lines across the whole
+rig. Treat that number with suspicion. An earlier version of this file
+described the uncovered remainder as "defensive: double-fault handling,
+vectored trap vectors, and range-extension branches", and one of those
+vectored trap vectors was a real bug that had been shipping since the first
+commit. It was uncovered, it was listed as uncovered, and the list was
+summarised instead of read. `coverage-by-method.sh` writes the uncovered
+lines to a file so there is something to read.
+
+The other three targets exist because the aggregate answers so little:
+
+- `coverage-methods` runs each verification method alone and reports what it
+  covers that nothing else does. Lockstep and the compiled guest cover no
+  line no other method reaches, which is a fact about the metric rather than
+  about lockstep.
+- `icov` asks which of the 171 guest instructions each method executed,
+  which is the unit that suits an emulator. The union is 97.1%, and the
+  handful that no method reaches is a list short enough to act on.
+- `mutants` introduces one deliberate defect at a time and counts what the
+  rig notices. The score is 70.7%, and 19 of the survivors sit on lines
+  coverage calls covered.
 
 ## Files
 

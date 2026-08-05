@@ -4,6 +4,18 @@
 #include "rv32.h"
 #include <string.h>
 
+/* Guest-instruction coverage. Which lines of this file a test executed is
+ * not the same question as which instructions it ran, and for an emulator
+ * the second one is the useful one. icov.c answers it; this build option
+ * is the only thing in here that knows about it, and an ordinary build
+ * contains nothing of either. */
+#ifdef RV_ICOV
+#include "icov.h"
+#define ICOV_NOTE(insn, len)    rv_icov_note((insn), (len))
+#else
+#define ICOV_NOTE(insn, len)    ((void)0)
+#endif
+
 /****************************************************************
  * Register names
  ****************************************************************/
@@ -2326,6 +2338,7 @@ rv_step(rv_cpu *cpu)
     lo = cpu->read16(cpu->bus_ctx, cpu->pc) & 0xffff;
     if ((lo & 3) != 3) {
         next = cpu->pc + 2;
+        ICOV_NOTE(lo, 2);
 
         /* The Zcmp forms do too much to be rewritten as a single 32-bit
          * instruction, so they run here rather than through the expander */
@@ -2365,6 +2378,7 @@ rv_step(rv_cpu *cpu)
         }
         insn = lo | ((cpu->read16(cpu->bus_ctx, cpu->pc + 2) & 0xffff) << 16);
         next = cpu->pc + 4;
+        ICOV_NOTE(insn, 4);
     }
 
     next = exec(cpu, insn, next);

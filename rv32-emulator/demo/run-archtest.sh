@@ -30,6 +30,9 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 PORT=${PORT:-31339}
 WORK=${WORK:-./archtest-work}
 CC=${CC:-riscv64-linux-gnu-gcc}
+# The runner under test; overridden by coverage-by-method.sh to point at an
+# instrumented build without disturbing the one in this directory.
+RUN=${RUN:-$HERE/archtest-run}
 CFLAGS="-march=rv32imafc_zicsr_zifencei_zba_zbb_zbs_zcb -mabi=ilp32f"
 CFLAGS="$CFLAGS -nostdlib -static"
 CFLAGS="$CFLAGS -fno-pic -no-pie -mcmodel=medany"
@@ -98,7 +101,7 @@ for suite in $SUITES; do
 
         # Capture first, then test: piping into sed would report sed's
         # exit status instead of the runner's and hide every failure.
-        if out=$("$HERE/archtest-run" "$elf" -p "$PORT" 2>/dev/null); then
+        if out=$("$RUN" "$elf" -p "$PORT" 2>/dev/null); then
             pass=$((pass + 1))
         else
             fail=$((fail + 1))
