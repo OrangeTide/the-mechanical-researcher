@@ -1,4 +1,4 @@
-/* rv32.c : RV32IMAFC_Zicsr_Zifencei_Zba_Zbb_Zbs CPU emulator */
+/* rv32.c : RV32IMAFC_Zicsr_Zifencei_Zba_Zbb_Zbs_Zcb CPU emulator */
 /* Copyright (c) 2026 Jon Mayo - MIT-0 OR Public Domain */
 
 #include "rv32.h"
@@ -997,6 +997,81 @@ enc_r(uint32_t f7, uint32_t rs2, uint32_t rs1, uint32_t f3, uint32_t rd,
 #define CRS2P(c)    (((c) >> 2 & 7) + 8)
 #define CRD(c)      ((c) >> 7 & 0x1f)
 #define CRS2(c)     ((c) >> 2 & 0x1f)
+
+/** Expand a Zcb encoding, or return 0 if it is not one.
+ *
+ * Zcb fills two holes the base compressed set left empty: the byte and
+ * halfword loads and stores, which C never had, and six one-operand
+ * arithmetic forms. Every one of them stands for exactly one 32-bit
+ * instruction, so unlike Zcmp they need nothing but the expander that is
+ * already here.
+ *
+ * Three of them expand into Zbb, which is the specification's own
+ * dependency rather than a shortcut taken here: c.sext.b, c.zext.h and
+ * c.sext.h require Zbb, and c.mul requires M. If those extensions are off,
+ * the expanded instruction raises the illegal-instruction trap on its own
+ * and no separate check is needed.
+ */
+uint32_t
+rv_expand_zcb(uint16_t c)
+{
+    uint32_t imm;
+
+    if (((c >> 13) & 7) != 4)           /* every Zcb encoding is funct3 100 */
+        return 0;
+
+    if ((c & 3) == 0) {
+        /* Quadrant 0: the loads and stores. The byte offset is two bits in
+         * the opposite order to every other compressed immediate, and the
+         * halfword offset is the upper of those two alone. */
+        if (c & 0x1000)
+            return 0;                   /* reserved */
+        switch ((c >> 10) & 3) {
+        case 0:                         /* c.lbu */
+            imm = ((c >> 6) & 1) | (((c >> 5) & 1) << 1);
+            return enc_i(imm, CRS1P(c), 4, CRS2P(c), OP_LOAD);
+        case 1:                         /* c.lhu and c.lh */
+            imm = ((c >> 5) & 1) << 1;
+            return enc_i(imm, CRS1P(c), (c >> 6) & 1 ? 1 : 5, CRS2P(c),
+                         OP_LOAD);
+        case 2:                         /* c.sb */
+            imm = ((c >> 6) & 1) | (((c >> 5) & 1) << 1);
+            return enc_s(imm, CRS2P(c), CRS1P(c), 0, OP_STORE);
+        default:                        /* c.sh */
+            if (c & 0x40)
+                return 0;               /* reserved */
+            imm = ((c >> 5) & 1) << 1;
+            return enc_s(imm, CRS2P(c), CRS1P(c), 1, OP_STORE);
+        }
+    }
+
+    if ((c & 3) != 1 || ((c >> 10) & 7) != 7)
+        return 0;
+
+    /* Quadrant 1, in the space the base set reserves for the RV64-only
+     * c.subw and c.addw. Both operands are the same register except for
+     * c.mul, which takes a second. */
+    if (((c >> 5) & 3) == 2)            /* c.mul */
+        return enc_r(0x01, CRS2P(c), CRS1P(c), 0, CRS1P(c), OP_REG);
+    if (((c >> 5) & 3) != 3)
+        return 0;                       /* reserved */
+
+    switch ((c >> 2) & 7) {
+    case 0:                             /* c.zext.b */
+        return enc_i(0xff, CRS1P(c), 7, CRS1P(c), OP_IMM);
+    case 1:                             /* c.sext.b, a Zbb instruction */
+        return enc_i((0x30 << 5) | 4, CRS1P(c), 1, CRS1P(c), OP_IMM);
+    case 2:                             /* c.zext.h, a Zbb instruction */
+        return enc_r(0x04, 0, CRS1P(c), 4, CRS1P(c), OP_REG);
+    case 3:                             /* c.sext.h, a Zbb instruction */
+        return enc_i((0x30 << 5) | 5, CRS1P(c), 1, CRS1P(c), OP_IMM);
+    case 5:                             /* c.not */
+        return enc_i(0xfff, CRS1P(c), 4, CRS1P(c), OP_IMM);
+    default:
+        /* 4 is c.zext.w, which is RV64 only; 6 and 7 are reserved */
+        return 0;
+    }
+}
 
 uint32_t
 rv_expand_c(uint16_t c)
@@ -2099,6 +2174,7 @@ rv_init(rv_cpu *cpu,
     cpu->zcmp = 1;          /* part of the machine, not of its reset state */
     cpu->atomics = 1;
     cpu->bitmanip = 1;
+    cpu->zcb = 1;
     rv_trace_init(&cpu->trace);
 }
 
@@ -2190,7 +2266,15 @@ rv_step(rv_cpu *cpu)
             return cpu->halted ? -1 : 0;
         }
 
+        /* Zcb occupies encodings the base compressed set leaves illegal,
+         * so the two expanders can be tried in either order and only the
+         * cost differs. The base set is tried first because it is what
+         * almost every compressed instruction in a program belongs to:
+         * asking Zcb first costs about 6% of interpreter throughput on
+         * ordinary compressed code, for a call that returns nothing. */
         insn = rv_expand_c((uint16_t)lo);
+        if (insn == 0 && cpu->zcb)
+            insn = rv_expand_zcb((uint16_t)lo);
         if (insn == 0) {
             illegal(cpu, lo);
             return cpu->halted ? -1 : 0;

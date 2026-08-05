@@ -1,4 +1,4 @@
-/* rv32.h : embeddable RV32IMAFC_Zicsr_Zifencei_Zba_Zbb_Zbs CPU emulator */
+/* rv32.h : embeddable RV32IMAFC_Zicsr_Zifencei_Zba_Zbb_Zbs_Zcb CPU emulator */
 /* Copyright (c) 2026 Jon Mayo - MIT-0 OR Public Domain */
 
 #ifndef RV32_H
@@ -190,6 +190,14 @@ typedef struct rv_cpu {
      * as a single suite. Clear this for a machine without them. */
     int      bitmanip;
 
+    /* Zcb adds the compressed byte and halfword loads and stores that the
+     * base compressed set never had, plus six one-operand forms. It sits
+     * in encodings C leaves illegal, so it conflicts with nothing. Three
+     * of its forms expand into Zbb instructions and one into M, which is
+     * the specification's dependency: with those extensions off, those
+     * forms raise the illegal-instruction trap after expansion. */
+    int      zcb;
+
     uint64_t cycles;        /* retired instruction counter */
     rv_trace_t trace;       /* diagnostic event ring buffer */
 
@@ -318,6 +326,11 @@ void rv_trap(rv_cpu *cpu, uint32_t cause, uint32_t tval);
 /* Expand a 16-bit compressed encoding to its 32-bit equivalent.
  * Returns 0 for an illegal or reserved encoding. Exposed for testing. */
 uint32_t rv_expand_c(uint16_t c);
+
+/* Expand a Zcb encoding, or return 0 if it is not one. These live in
+ * encodings rv_expand_c() rejects, so a decoder tries this one first and
+ * falls back. Exposed for testing. */
+uint32_t rv_expand_zcb(uint16_t c);
 
 /* ABI register names, indexed by register number ("zero", "ra", "sp", ...) */
 extern const char *const rv_x_names[32];

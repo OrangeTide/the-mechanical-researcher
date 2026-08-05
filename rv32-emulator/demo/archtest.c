@@ -232,7 +232,7 @@ reference_output(const char *elf, char *out)
     snprintf(cmd, sizeof(cmd),
              "timeout 60 qemu-system-riscv32 -machine virt -bios none "
              "-nographic -serial mon:stdio "
-             "-cpu rv32,zba=true,zbb=true,zbs=true "
+             "-cpu rv32,zba=true,zbb=true,zbs=true,zcb=true "
              "-kernel '%s' 2>/dev/null", elf);
     f = popen(cmd, "r");
     if (!f) {

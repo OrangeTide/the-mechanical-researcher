@@ -1,4 +1,4 @@
-# RV32IMAFC_Zicsr_Zifencei_Zba_Zbb_Zbs_Zcmp Emulator
+# RV32IMAFC_Zicsr_Zifencei_Zba_Zbb_Zbs_Zcb_Zcmp Emulator
 
 An embeddable 32-bit RISC-V interpreter in C, with the differential test
 tools used to establish that it is correct.
@@ -24,11 +24,25 @@ Nothing links it except the `bench_rv32_orig` comparison binary.
 | Zba | 3 | shifted add, for array indexing |
 | Zbb | 18 | counting, rotates, min and max, sign extension |
 | Zbs | 8 | single-bit set, clear, invert and extract |
+| Zcb | 11 encodings | compressed byte and halfword forms |
 | Zcmp | 6 | whole-frame push and pop |
 
 Zba, Zbb and Zbs together are the ratified B extension, and `misa`
-advertises the B bit when all three are enabled. They are the set the
-RP2350's Hazard3 core implements, minus Zbkb and Zbc.
+advertises the B bit when all three are enabled.
+
+Extensions are taken here when a compiler emits them from ordinary C, which
+is the only thing that matters to an engine whose job is to run compiler
+output. The RP2350's Hazard3 cores supplied the shortlist to test that
+against, and the overlap is deliberate so that code can be prototyped here
+and then moved to real silicon. It is not a target to match: nothing
+requires an RP2350 binary to run on this emulator. Zbkb is on the chip and
+not here, because no compiler emits its five new instructions.
+
+Zcb expands into instructions the rest of the emulator already has, so
+three of its forms need Zbb and one needs M. That is the specification's
+dependency, and it is enforced by the expansion rather than by a check:
+turn `bitmanip` off and `c.sext.b` raises the illegal-instruction trap on
+its own.
 
 Machine mode only. There is no supervisor mode and no MMU, so this runs
 bare-metal programs rather than an operating system.
@@ -99,13 +113,14 @@ make            # build the interpreter, the tools and the guest programs
 make check      # everything that needs no reference model
 ```
 
-`make check` runs six suites and should report no failures:
+`make check` runs seven suites and should report no failures:
 
 ```
 108 tests, 0 failures                      IEEE-754 conformance
 30 tests, 0 failures                       memory access and sandboxing
 73 tests, 0 failures                       whole-frame push and pop
 80 tests, 0 failures                       Zba, Zbb and Zbs
+69 tests, 0 failures                       Zcb
 51 tests, 0 failures                       atomics
 3432 instructions retired, exit code 0     a compiled guest program
 all harness checks passed
@@ -122,6 +137,7 @@ qemu, not on the tests above. Three tools do that.
 make lockstep-run       # plain RV32IMFC
 make lockstep-zcmp      # a guest built with whole-frame push and pop
 make lockstep-bitmanip  # a guest the compiler filled with Zba, Zbb and Zbs
+make lockstep-zcb       # a guest full of compressed byte and halfword work
 ```
 
 Both models load the same ELF and start from the same architectural state,
@@ -174,15 +190,17 @@ the interpreter, and its signature region compared against the same binary
 running on `qemu-system-riscv32`.
 
 ```
-riscv-arch-test: 257 passed, 0 failed, 4 skipped, 11 did not build
+riscv-arch-test: 268 passed, 0 failed, 4 skipped, 0 did not build
 ```
 
-The 11 that do not build are Zcb instructions, which this interpreter does
-not implement. Three of the four skipped tests are the carry-less
-multiplies, which live in the `B` directory but belong to Zbc rather than to
-B. The fourth stores `mstatus`, whose readable bits depend on which
-privilege modes exist; qemu's board has supervisor and user mode where this
-has machine mode only, so the two read back different legal values.
+Three of the four skipped tests are the carry-less multiplies, which live
+in the `B` directory but belong to Zbc rather than to B. The fourth stores
+`mstatus`, whose readable bits depend on which privilege modes exist;
+qemu's board has supervisor and user mode where this has machine mode only,
+so the two read back different legal values.
+
+The 11 tests that did not build before Zcb was implemented were the Zcb
+ones. They live in the `C` directory rather than in a suite of their own.
 
 Use the `old-framework-3.x` branch. The current framework needs an
 assembler that pads `.p2align` with nops while relaxation is disabled;
@@ -322,6 +340,31 @@ links the published `rv32-orig.c`, and on `bench_rv32`, which links the
 current `rv32.c`. The difference is what a guest pays for a decoder that
 knows about instructions it never executes.
 
+### What Zcb Is Worth
+
+```sh
+make zcb-compare        # the same guests, with and without Zcb
+```
+
+Zcb is a code-size extension rather than an instruction-count one. Every
+encoding stands for exactly one 32-bit instruction, so the same program
+retires the same instructions from a smaller image. Both columns already
+have Zba, Zbb and Zbs, so this isolates Zcb.
+
+```
+guest             +B text  +Zcb text    change        insns
+test_program         1650       1646    -0.24%      +0.0000%
+bench                1086       1086     0.00%      +0.0000%
+coremark            11956      11680    -2.31%      +0.0003%
+lua                205832     204776    -0.51%      +0.0010%
+```
+
+The instruction column is not quite zero for two reasons, neither of them
+the extension. CoreMark prints its own `-march` string, which is four
+characters longer, so it makes four more write syscalls. Lua's output is
+identical, and its smaller image moves every heap address, which changes
+what the allocator does by a hair.
+
 ## The WebAssembly Demo
 
 ```sh
@@ -370,6 +413,8 @@ in the math helpers that single-precision operands cannot reach.
 | `test_atomic.c` | atomics, reservations and alignment |
 | `test_bitmanip.c` | Zba, Zbb and Zbs, and the switch that disables them |
 | `bitmanip_guest.c` | a compiled guest full of them, for lockstep |
+| `test_zcb.c` | the Zcb expansion table, offsets and dependencies |
+| `zcb_guest.c` | a compiled guest full of byte and halfword traffic |
 | `coremark-port/` | board port for the CoreMark benchmark |
 | `lua-port/` | board port and script for running Lua |
 | `test_harness.c` | runs a compiled guest and checks its results |

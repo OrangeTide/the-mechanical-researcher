@@ -30,7 +30,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 PORT=${PORT:-31339}
 WORK=${WORK:-./archtest-work}
 CC=${CC:-riscv64-linux-gnu-gcc}
-CFLAGS="-march=rv32imafc_zicsr_zifencei_zba_zbb_zbs -mabi=ilp32f"
+CFLAGS="-march=rv32imafc_zicsr_zifencei_zba_zbb_zbs_zcb -mabi=ilp32f"
 CFLAGS="$CFLAGS -nostdlib -static"
 CFLAGS="$CFLAGS -fno-pic -no-pie -mcmodel=medany"
 CFLAGS="$CFLAGS -Wl,--build-id=none -DXLEN=32 -DFLEN=32"

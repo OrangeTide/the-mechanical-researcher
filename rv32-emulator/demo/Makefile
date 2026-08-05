@@ -27,6 +27,7 @@ RVLDBIN     = riscv64-linux-gnu-ld
 # named foo_zb.elf is the same source as foo.elf built for it, which is
 # what makes the two instruction counts comparable.
 RVARCH_ZB  := $(RVARCH)_zba_zbb_zbs
+RVARCH_ZCB := $(RVARCH_ZB)_zcb
 
 # qemu CPU models. Zcmp shares its encoding space with the compressed
 # double-precision loads and stores, so the compressed set has to be
@@ -36,14 +37,15 @@ QEMU_CPU_ZCMP = rv32,c=false,zca=true,zcf=true,zcmp=true
 # The reference for the bit-manipulation work. qemu's default rv32 model
 # already has these, but naming them keeps the reference pinned to the
 # emulator's ISA rather than to a default that may change.
-QEMU_CPU_ZB   = rv32,zba=true,zbb=true,zbs=true
+QEMU_CPU_ZB   = rv32,zba=true,zbb=true,zbs=true,zcb=true
 
 CORE        = rv32.c
 TOOLS       = test_harness test_fp test_mem test_zcmp test_atomic \
               test_bitmanip \
               lockstep fuzz \
               archtest-run bench_rv32
-GUESTS      = test_program.elf fuzz_target.elf bench.elf bitmanip_guest.elf
+GUESTS      = test_program.elf fuzz_target.elf bench.elf bitmanip_guest.elf \
+              zcb_guest.elf
 
 all: $(TOOLS) $(GUESTS)
 
@@ -62,6 +64,9 @@ test_atomic: test_atomic.c $(CORE) machine.c
 	$(CC) $(CFLAGS) -o $@ $^
 
 test_bitmanip: test_bitmanip.c $(CORE) machine.c
+	$(CC) $(CFLAGS) -o $@ $^
+
+test_zcb: test_zcb.c $(CORE) machine.c
 	$(CC) $(CFLAGS) -o $@ $^
 
 test_zcmp: test_zcmp.c $(CORE) machine.c
@@ -87,15 +92,19 @@ test_program.elf: test_program.c start.S link.ld
 fuzz_target.elf: fuzz_target.S link.ld
 	$(RVCC) $(RVCFLAGS) $(RVLD) -o $@ fuzz_target.S
 
-bench.elf bench_zb.elf: bench.c start.S link.ld
+bench.elf bench_zb.elf bench_zcb.elf: bench.c start.S link.ld
 	$(RVCC) $(RVCFLAGS) $(RVLD) -o $@ start.S bench.c
 
-test_program_zb.elf: test_program.c start.S link.ld
+test_program_zb.elf test_program_zcb.elf: test_program.c start.S link.ld
 	$(RVCC) $(RVCFLAGS) $(RVLD) -o $@ start.S test_program.c
 
 # A guest written so that a compiler emits the bit-manipulation
 # instructions itself, for the lockstep comparison against qemu.
 bitmanip_guest.elf: RVARCH = $(RVARCH_ZB)
+zcb_guest.elf: RVARCH = $(RVARCH_ZCB)
+zcb_guest.elf: zcb_guest.c start.S link.ld
+	$(RVCC) $(RVCFLAGS) $(RVLD) -o $@ start.S zcb_guest.c
+
 bitmanip_guest.elf: bitmanip_guest.c start.S link.ld
 	$(RVCC) $(RVCFLAGS) $(RVLD) -o $@ start.S bitmanip_guest.c
 
@@ -103,6 +112,7 @@ bitmanip_guest.elf: bitmanip_guest.c start.S link.ld
 # and Zbs. Target-specific variables do the work, so the recipes above are
 # shared between the two builds and cannot drift apart.
 %_zb.elf: RVARCH = $(RVARCH_ZB)
+%_zcb.elf: RVARCH = $(RVARCH_ZCB)
 
 # Guests built with whole-frame push and pop. GNU as cannot assemble Zcmp,
 # so clang produces the objects and GNU ld places them.
@@ -123,12 +133,16 @@ check: test_fp test_mem test_zcmp test_atomic test_bitmanip test_harness \
 	./test_mem
 	./test_zcmp
 	./test_bitmanip
+	./test_zcb
 	./test_atomic
 	./test_harness test_program.elf
 
 # Instruction-by-instruction comparison against qemu-riscv32
 lockstep-run: lockstep test_program.elf
 	./lockstep test_program.elf
+
+lockstep-zcb: lockstep zcb_guest.elf
+	./lockstep zcb_guest.elf -cpu $(QEMU_CPU_ZB)
 
 lockstep-bitmanip: lockstep bitmanip_guest.elf
 	./lockstep bitmanip_guest.elf -cpu $(QEMU_CPU_ZB)
@@ -197,6 +211,26 @@ bitmanip-overhead: bench_rv32 bench_rv32_orig bench.elf
 	@echo "with Zba, Zbb and Zbs decoded, same guest:"
 	@./bench_rv32 bench.elf 20 | tail -1
 
+# Zcb is a code-size extension, not an instruction-count one: every
+# encoding stands for exactly one 32-bit instruction, so the same program
+# retires the same instructions from a smaller image. The column that
+# matters here is .text.
+zcb-compare: test_harness
+	@printf '%-14s %10s %10s %9s %12s\n' guest "+B text" "+Zcb text" change insns
+	@for g in $(BM_GUESTS); do \
+	    $(MAKE) -s $${g}_zb.elf $${g}_zcb.elf >/dev/null 2>&1 || \
+	        { printf '%-14s %10s\n' $$g "not built"; continue; }; \
+	    ta=$$(riscv64-linux-gnu-size $${g}_zb.elf | awk 'NR==2{print $$1}'); \
+	    tb=$$(riscv64-linux-gnu-size $${g}_zcb.elf | awk 'NR==2{print $$1}'); \
+	    a=$$(./test_harness $${g}_zb.elf 2>/dev/null | \
+	         sed -n 's/^\([0-9]*\) instructions retired.*/\1/p'); \
+	    b=$$(./test_harness $${g}_zcb.elf 2>/dev/null | \
+	         sed -n 's/^\([0-9]*\) instructions retired.*/\1/p'); \
+	    awk -v n=$$g -v ta=$$ta -v tb=$$tb -v a=$$a -v b=$$b 'BEGIN{ \
+	        printf "%-14s %10d %10d %8.2f%% %+12.4f%%\n", \
+	               n, ta, tb, (tb-ta)*100.0/ta, (b-a)*100.0/a }'; \
+	done
+
 bitmanip-compare: test_harness
 	@printf '%-14s %14s %14s %9s %10s\n' guest base "Zba+Zbb+Zbs" change text
 	@for g in $(BM_GUESTS); do \
@@ -241,7 +275,7 @@ clean:
 	rm -rf $(COV) archtest-work
 	rm -f wasm/rv32.wasm wasm/guest.elf wasm/guest.bin wasm/index.html
 	rm -f coremark.elf ee_printf_port.c lua.elf
-	rm -f bench_rv32_orig *_zb.elf
+	rm -f bench_rv32_orig *_zb.elf *_zcb.elf
 
 .PHONY: all check lockstep-run lockstep-zcmp lockstep-bitmanip fuzz-run \
         archtest bench bitmanip-compare bitmanip-overhead \
@@ -261,7 +295,7 @@ clean:
 CM ?= ../../coremark
 CM_ITERATIONS ?= 100
 
-coremark.elf coremark_zb.elf: coremark-port/core_portme.c \
+coremark.elf coremark_zb.elf coremark_zcb.elf: coremark-port/core_portme.c \
                              coremark-port/core_portme.h start.S
 	@test -d $(CM) || { echo "set CM to a coremark checkout" >&2; exit 1; }
 	perl -0pe 's{void\nuart_send_char\(char c\)\n\{.*?\n\}\n}{/* uart_send_char is supplied by the port */\n}s' \
@@ -301,12 +335,14 @@ LUAFLAGS  = -march=$(LUAARCH) -mabi=ilp32f -O2 --specs=picolibc.specs \
 # Everything except lua.c and onelua.c, which carry their own main
 LUA_SRCS = $(filter-out $(LUA)/lua.c $(LUA)/onelua.c, $(wildcard $(LUA)/*.c))
 
-lua.elf lua_zb.elf: lua-port/lua_port.c lua-port/lua_start.S lua-port/lua.ld
+lua.elf lua_zb.elf lua_zcb.elf: lua-port/lua_port.c lua-port/lua_start.S \
+                    lua-port/lua.ld
 	@test -d $(LUA) || { echo "set LUA to a lua checkout" >&2; exit 1; }
 	$(LUACC) $(LUAFLAGS) -I $(LUA) -o $@ \
 	    lua-port/lua_start.S lua-port/lua_port.c $(LUA_SRCS) -lm
 
 lua_zb.elf: LUAARCH = $(LUAARCH_ZB)
+lua_zcb.elf: LUAARCH = $(LUAARCH_ZB)_zcb
 LUAARCH_ZB := rv32imafc_zba_zbb_zbs
 
 lua: test_harness lua.elf

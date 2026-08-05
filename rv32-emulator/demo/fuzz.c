@@ -284,7 +284,7 @@ gen_compressed(void)
 {
     uint32_t rd, rs1p, rs2p, imm;
 
-    switch (rnd_below(9)) {
+    switch (rnd_below(11)) {
     case 0:     /* c.addi */
         rd = 1 + rnd_below(31);
         imm = rnd_below(64);
@@ -322,9 +322,23 @@ gen_compressed(void)
     case 7:     /* c.mv */
         rd = 1 + rnd_below(31);
         return (uint16_t)(0x8002 | ((1 + rnd_below(31)) << 2) | (rd << 7));
-    default:    /* c.add */
+    case 8:     /* c.add */
         rd = 1 + rnd_below(31);
         return (uint16_t)(0x9002 | ((1 + rnd_below(31)) << 2) | (rd << 7));
+    case 9: {   /* Zcb: the one-operand forms */
+        /* Selector 4 is c.zext.w, which is RV64 only, and 6 and 7 are
+         * reserved. Generating those would stop the reference process
+         * rather than test anything. */
+        static const uint32_t sel[] = { 0, 1, 2, 3, 5 };
+
+        rs1p = rnd_below(8);
+        return (uint16_t)(0x9c01 | (rs1p << 7) | (3u << 5) |
+                          (sel[rnd_below(5)] << 2));
+    }
+    default:    /* Zcb: c.mul */
+        rs1p = rnd_below(8);
+        rs2p = rnd_below(8);
+        return (uint16_t)(0x9c01 | (rs1p << 7) | (2u << 5) | (rs2p << 2));
     }
 }
 
@@ -339,7 +353,7 @@ gen_compressed(void)
  * into an illegal-instruction signal. Pass -cpu to override: running with
  * zba=false,zbb=false,zbs=false is a quick check that the generator really
  * is producing these encodings. */
-static const char *cpu_model = "rv32,zba=true,zbb=true,zbs=true";
+static const char *cpu_model = "rv32,zba=true,zbb=true,zbs=true,zcb=true";
 
 static int
 launch_reference(gdb_client *g, const char *elf, int port)
@@ -369,9 +383,14 @@ launch_reference(gdb_client *g, const char *elf, int port)
 static void
 describe(uint32_t insn, int len)
 {
-    if (len == 2)
+    if (len == 2) {
+        uint32_t full = rv_expand_zcb((uint16_t)insn);
+
+        if (full == 0)
+            full = rv_expand_c((uint16_t)insn);
         printf("  encoding %04x (compressed, expands to %08x)\n",
-               insn & 0xffff, rv_expand_c((uint16_t)insn));
+               insn & 0xffff, full);
+    }
     else
         printf("  encoding %08x  opcode=%02x rd=%u rs1=%u rs2=%u "
                "funct3=%u funct7=%02x\n",
