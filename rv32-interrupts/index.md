@@ -358,6 +358,12 @@ That is a weaker guarantee than a hundred thousand instructions compared
 against QEMU, and it is the strongest one available in a region QEMU cannot
 enter.
 
+The obvious next question is whether anything in the rig was pointing at
+this bug and being ignored. Something was, and
+[Coverage Told Us About the Bug and We Did Not Listen](/rv32-coverage/)
+audits all four verification methods to find out what else they are not
+seeing.
+
 ## Source
 
 The interpreter, the interrupt tests and the mutation list are in the
