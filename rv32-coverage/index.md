@@ -33,14 +33,18 @@ was never executed at all. `gcov` had been reporting that line as uncovered
 for as long as the bug existed, in a list of 436 uncovered lines that nobody
 read.
 
-It is worse than that. The project's own documentation had already looked at
-that line and excused it by name:
+It is worse than that. The [first article in this
+series](/rv32-emulator/) had already looked at that line and excused it by
+name, in a sentence that has been published since the day the emulator was:
 
-> The remainder is defensive: double-fault handling, **vectored trap
-> vectors**, and range-extension branches in the math helpers that
-> single-precision operands cannot reach.
+> Line coverage of the interpreter is 86.3%. The remainder is defensive:
+> double-fault handling, **vectored trap vectors**, and range-extension
+> branches in the math helpers that single-precision operands cannot reach.
 
-We wrote down the excuse, and the bug was inside the excuse.
+Every word of that is true except the one doing the work. "Defensive" is a
+claim about code that cannot be reached, and it was applied to code that
+simply had not been. We wrote down the excuse, and the bug was inside the
+excuse.
 
 ## Abstract
 
@@ -60,6 +64,32 @@ conclusion is that coverage identifies what was never tried, mutation
 identifies what was tried without being checked, and the two disagree about
 which methods earn their place strongly enough that acting on either alone
 would remove a method the project cannot do without.
+
+## The Series
+
+The last of five on one small RV32 interpreter, built to be embedded in
+another program. The first four added things to it; this one audits the way
+all four of them were checked.
+
+1. [A Compact RV32 Engine, Verified Against QEMU](/rv32-emulator/) — the
+   interpreter, and four independent ways of establishing it is correct
+2. [What Bit Manipulation Buys an RV32 Interpreter](/rv32-bitmanip/) — Zba,
+   Zbb and Zbs, measured in retired instructions
+3. [Zcb: The Same Instructions in Less Space](/rv32-zcb/) — compressed byte
+   and halfword forms, measured in code size
+4. [Interrupts, and the Bug Three Test Methods Missed](/rv32-interrupts/) —
+   interrupt delivery, and a defect no reference model could catch
+5. **Coverage Told Us About the Bug and We Did Not Listen** — auditing the
+   rig with coverage and mutation testing
+
+Every article measures the same interpreter at a different point in its
+life. `rv32.c` is that interpreter, the single evolving copy the whole
+project builds against, and
+[`rv32-orig.c`](/rv32-emulator/demo/rv32-orig.c) beside it is the version
+the first article described, kept unchanged so that its measurements stay
+reproducible. Keeping that copy is what made the opening of this article
+possible: the coverage below was reconstructed by instrumenting the frozen
+file and running the suite that existed alongside it.
 
 ## The Four Measurements
 
