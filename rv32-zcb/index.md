@@ -47,6 +47,31 @@ a benchmark with no byte or halfword traffic, while retired instruction
 counts stay identical to within one in a hundred thousand. CoreMark runs
 1.85% faster in wall-clock terms while executing the same instructions.
 
+## The Series
+
+Part three of five on one small RV32 interpreter, built to be embedded in
+another program.
+
+1. [A Compact RV32 Engine, Verified Against QEMU](/rv32-emulator/) — the
+   interpreter, and four independent ways of establishing it is correct
+2. [What Bit Manipulation Buys an RV32 Interpreter](/rv32-bitmanip/) — Zba,
+   Zbb and Zbs, measured in retired instructions
+3. **Zcb: The Same Instructions in Less Space** — compressed byte and
+   halfword forms, measured in code size
+4. [Interrupts, and the Bug Three Test Methods Missed](/rv32-interrupts/) —
+   interrupt delivery, and a defect no reference model could catch
+5. [Coverage Told Us About the Bug and We Did Not Listen](/rv32-coverage/) —
+   auditing the rig with coverage and mutation testing
+
+Every article measures the same interpreter at a different point in its
+life. `rv32.c` is that interpreter, the single evolving copy the whole
+project builds against, and
+[`rv32-orig.c`](/rv32-emulator/demo/rv32-orig.c) beside it is the version
+the first article described, kept unchanged so that its measurements stay
+reproducible. Every figure below is against the core as it stood when this
+article was written, which is `rv32-orig.c` plus the bit-manipulation
+extensions plus the work described here.
+
 ## What Zcb Is
 
 Eleven encodings on RV32, in two groups.
@@ -412,6 +437,13 @@ a single allocation and giving each instance a base and a limit through the
 access-check callback the emulator already has. That is the same job done
 by the host, where a guest cannot reach the configuration registers and try
 to widen its own sandbox.
+
+That leaves the extension work finished and one obvious gap in the machine
+itself. Every control register an interrupt needs has been present since the
+first article, and nothing has ever raised one.
+[Interrupts, and the Bug Three Test Methods Missed](/rv32-interrupts/) fills
+that in, and finds that the trap delivery all three of these articles have
+been relying on was wrong.
 
 ## Source
 
