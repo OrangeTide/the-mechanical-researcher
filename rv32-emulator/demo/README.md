@@ -10,6 +10,19 @@ directory either tests it, measures it, or demonstrates embedding it.
 unchanged so that the two versions can be built and measured side by side.
 Nothing links it except the `bench_rv32_orig` comparison binary.
 
+This directory is the single copy of the code that a series of five
+articles builds against:
+
+1. A Compact RV32 Engine, Verified Against QEMU
+2. What Bit Manipulation Buys an RV32 Interpreter (Zba, Zbb, Zbs)
+3. Zcb: The Same Instructions in Less Space
+4. Interrupts, and the Bug Three Test Methods Missed
+5. Coverage Told Us About the Bug and We Did Not Listen
+
+Each measured the interpreter at a different point in its life, so a figure
+quoted in one of them is against the core as it stood then. `rv32-orig.c`
+is what makes the first article's numbers still reproducible.
+
 ## What It Implements
 
 | Extension | Instructions | Notes |

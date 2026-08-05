@@ -46,27 +46,36 @@ emulator running the same C source, the RV32 engine is 24% smaller, executes
 builds unchanged to a 19 KB freestanding WebAssembly module with no
 imports.
 
-### The Interpreter Has Moved On Since This Was Written
+## The Series
+
+The first of five on one small RV32 interpreter, built to be embedded in
+another program.
+
+1. **A Compact RV32 Engine, Verified Against QEMU** — the interpreter, and
+   four independent ways of establishing it is correct
+2. [What Bit Manipulation Buys an RV32 Interpreter](/rv32-bitmanip/) — Zba,
+   Zbb and Zbs, measured in retired instructions
+3. [Zcb: The Same Instructions in Less Space](/rv32-zcb/) — compressed byte
+   and halfword forms, measured in code size
+4. [Interrupts, and the Bug Three Test Methods Missed](/rv32-interrupts/) —
+   interrupt delivery, and a defect no reference model could catch
+5. [Coverage Told Us About the Bug and We Did Not Listen](/rv32-coverage/) —
+   auditing the rig with coverage and mutation testing
 
 Everything below describes the interpreter as it stood when this article was
 published, and every measurement in it was taken against that version. That
 version is kept unchanged in the download as
 [`rv32-orig.c`](demo/rv32-orig.c), so the line counts, sizes and throughput
-figures here can still be reproduced.
+figures here can still be reproduced. The copy the rest of the project
+builds against is [`rv32.c`](demo/rv32.c), the same code with the later work
+folded in.
 
-The interpreter the rest of the project builds against is
-[`rv32.c`](demo/rv32.c), which is the same code with later work folded in.
-The first addition was the Zba, Zbb and Zbs bit-manipulation extensions,
-which are measured in [What Bit Manipulation Buys an RV32
-Interpreter](/rv32-bitmanip/), then Zcb in [The Same Instructions in Less
-Space](/rv32-zcb/), then interrupt delivery in [Interrupts, and the Bug
-Three Test Methods Missed](/rv32-interrupts/).
-
-That last one corrects a defect described here by implication rather than
-by name: the trap delivery this article verifies against QEMU sent
-exceptions to a vectored handler entry when `mtvec` selected vectored
-mode. Every test in this article passed with that bug present, for reasons
-the later article goes into.
+Two claims made here did not survive the rest of the series. The trap
+delivery this article verifies against QEMU sent exceptions to a vectored
+handler entry when `mtvec` selected vectored mode, which is a bug every test
+below passed with; part four finds it and part five explains how four
+verification methods missed it. And the coverage figure quoted near the end
+was reported honestly and read carelessly, which is part five's subject.
 
 ## Choosing the Target
 
