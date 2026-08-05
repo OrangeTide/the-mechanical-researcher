@@ -19,3 +19,4 @@ netchan-crypto
 netchan-auth
 rv32-emulator
 rv32-bitmanip
+rv32-zcb
