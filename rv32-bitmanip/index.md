@@ -47,6 +47,30 @@ was extended also mattered: testing for the new encodings before the base
 integer set cost 7.8% of throughput on code that uses none of them, and
 moving the test into the rejection path brought that down to 2.3%.
 
+## The Series
+
+Part two of five on one small RV32 interpreter, built to be embedded in
+another program.
+
+1. [A Compact RV32 Engine, Verified Against QEMU](/rv32-emulator/) — the
+   interpreter, and four independent ways of establishing it is correct
+2. **What Bit Manipulation Buys an RV32 Interpreter** — Zba, Zbb and Zbs,
+   measured in retired instructions
+3. [Zcb: The Same Instructions in Less Space](/rv32-zcb/) — compressed byte
+   and halfword forms, measured in code size
+4. [Interrupts, and the Bug Three Test Methods Missed](/rv32-interrupts/) —
+   interrupt delivery, and a defect no reference model could catch
+5. [Coverage Told Us About the Bug and We Did Not Listen](/rv32-coverage/) —
+   auditing the rig with coverage and mutation testing
+
+Every article measures the same interpreter at a different point in its
+life. `rv32.c` is that interpreter, the single evolving copy the whole
+project builds against, and
+[`rv32-orig.c`](/rv32-emulator/demo/rv32-orig.c) beside it is the version
+the first article described, kept unchanged so that its measurements stay
+reproducible. Every figure below is against the core as it stood when this
+article was written, which is `rv32-orig.c` plus the work described here.
+
 ## What the Three Extensions Are
 
 Twenty-nine instructions on RV32, all of them pure functions of one or two
