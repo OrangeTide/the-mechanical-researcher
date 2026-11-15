@@ -1,7 +1,7 @@
 ---
 title: Reliable UDP for Games — QuakeWorld, ENet, QUIC, and Netchan Compared
 date: 2026-05-09
-revised: 2026-07-20
+revised: 2026-11-15
 abstract: "A comparison of four UDP multiplexing approaches for game networking, from the 1996 QuakeWorld NetChannel to a near-minimal modern implementation in 1,500 lines of C"
 category: networking
 ---
@@ -436,6 +436,44 @@ Netchan's stats API already covers the detection side: `netchan_conn_stats()` re
 **Use QUIC** if the game runs in a browser (via WebTransport), requires encryption for compliance or anti-cheat, or connects through corporate firewalls that block non-HTTPS UDP traffic. Accept the complexity and CPU cost as the price of those requirements.
 
 **Use netchan** (or something like it) if the game needs multiplexed channels with per-channel reliability, the codebase must remain small enough to audit and modify, no external dependencies are acceptable, and the application wants full control over socket I/O and event loops. Netchan is a protocol you understand, not a dependency you install.
+
+## Updates Since Publication
+
+The companion download is the snapshot this article describes, and the API and
+handshake above still match it. The [upstream
+repository](https://github.com/OrangeTide/netchan) has since fixed three
+correctness bugs in the core, each of which hides inside a description above
+that reads as settled.
+
+**A lost `CONNECT_ACCEPT` stranded the client (0.9.3).** The two-frame handshake
+retries `CONNECT_INIT` five times, which sounds like enough. But a server that
+has already reached CONNECTED used to ignore a repeated `INIT`, so if the single
+`CONNECT_ACCEPT` was the packet that dropped, the client retransmitted `INIT`
+forever and the server never answered again. A connected server now re-sends
+`CONNECT_ACCEPT` when its established peer retransmits `INIT`. Two smaller
+hardening fixes came with it: processing `CONNECT_ACCEPT` is now idempotent, so
+a client that receives it twice no longer raises a second
+`NETCHAN_EV_CONNECTED`, and a stray or spoofed `INIT` whose connection id does
+not match the established peer can no longer overwrite the server's `remote_id`
+and redirect outgoing packets to the wrong id.
+
+**A just-connected peer could be closed by its own idle timeout (0.9.4 and
+0.10.0).** The API above has `netchan_feed` stamp receive and send times while
+`netchan_service` is handed a `now_ms` the caller sampled a moment earlier.
+Those were two reads of the monotonic clock, and when it advanced a millisecond
+between them the unsigned `now_ms - last_recv_ms` underflowed to a huge idle and
+tripped the 30-second idle timeout the instant the connection came up. It
+surfaced as an intermittent handshake failure on a loopback socket, where the
+two clock reads fall on opposite sides of a millisecond boundary. 0.9.4 routed
+every elapsed-time check through a helper that treats a stamp in the near future
+as zero elapsed. 0.10.0 removed the cause rather than guarding it: `netchan_feed`
+and `netchan_send_next` now take the same `now_ms` that `netchan_service`
+already did, so a single caller-owned clock stamps and compares everything. That
+changes the two signatures printed in the API listing above, which is why it is
+a major-version bump and not a drop-in replacement for a vendored copy.
+
+The wire format is unchanged across all three, so these are corrections to the
+implementation, not to the protocol the rest of this article describes.
 
 ## Conclusion
 
