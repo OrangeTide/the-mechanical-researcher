@@ -1,0 +1,35 @@
+unit GameProto;
+
+{ A small example schema in the Lantern IDL. The number in brackets after each
+  field is its wire tag, not its position: a reader skips a tag it does not
+  know and reads a message that ends early as defaults, so a client and a
+  server built from different revisions interoperate within a minor version. }
+
+type
+  MsgKind = (Join = 1, Snapshot = 2, Chat = 3, Bye = 4);
+
+  { A plain message: three tagged fields. }
+  JoinReq = message
+    name     : string [1];
+    version  : uint16 [2];
+    wantTeam : uint8  [3];
+  end;
+
+  { A variant message selected by a discriminant, like a Pascal variant
+    record. The reader learns the present arm from kind. }
+  ServerMsg = message
+    tick : uint32 [1];
+    case kind: MsgKind [2] of
+      Snapshot: ( players : uint8  [3];
+                  state   : bytes  [4] );
+      Chat:     ( fromId  : uint16 [5];
+                  text    : string [6] );
+      Bye:      ( reason  : uint16 [7] );
+    end;
+  end;
+
+  { A dispatch table multiplexes messages on a leading tag byte. }
+  dispatch Protocol
+    1: JoinReq;
+    2: ServerMsg;
+  end;

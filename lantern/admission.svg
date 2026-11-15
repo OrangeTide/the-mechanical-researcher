@@ -1,0 +1,85 @@
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+ "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1"
+ width="960px" height="224px"
+ viewBox="0 0 960 224"
+ xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges"
+ stroke-width="1" text-rendering="geometricPrecision">
+<polygon fill="white" points="223,7 255,7 255,16 223,16"/>
+<text x="240" y="16" textLength="31" font-family="Helvetica" font-size="12" fill="black" text-anchor="middle">
+
+Client
+</text>
+<polygon fill="white" points="603,7 835,7 835,16 603,16"/>
+<text x="720" y="16" textLength="231" font-family="Helvetica" font-size="12" fill="black" text-anchor="middle">
+
+Server (no per-attempt state until ACCEPT)
+</text>
+<line x1="240" y1="22" x2="240" y2="50" stroke="black"/>
+<line x1="720" y1="22" x2="720" y2="50" stroke="black"/>
+<line x1="240" y1="33" x2="720" y2="33" stroke="black"/>
+<polygon fill="black" points="720,33 710,39 710,27"/>
+<polygon fill="white" points="328,23 631,23 631,32 328,32"/>
+<text x="329" y="32" textLength="301" font-family="Helvetica" font-size="12" fill="black">
+INIT  { client epk, nonce, padding so |INIT| &gt;= any reply }
+</text>
+<line x1="240" y1="50" x2="240" y2="78" stroke="black"/>
+<line x1="720" y1="50" x2="720" y2="78" stroke="black"/>
+<line x1="720" y1="61" x2="240" y2="61" stroke="black"/>
+<polygon fill="black" points="240,61 250,67 250,55"/>
+<polygon fill="white" points="265,51 693,51 693,60 265,60"/>
+<text x="266" y="60" textLength="426" font-family="Helvetica" font-size="12" fill="black">
+CHALLENGE  { cookie = MAC(secret, addr | nonce | epoch) }  -- only when busy
+</text>
+<line x1="240" y1="78" x2="240" y2="106" stroke="black"/>
+<line x1="720" y1="78" x2="720" y2="106" stroke="black"/>
+<line x1="240" y1="89" x2="720" y2="89" stroke="black"/>
+<polygon fill="black" points="720,89 710,95 710,83"/>
+<polygon fill="white" points="387,79 571,79 571,88 387,88"/>
+<text x="388" y="88" textLength="182" font-family="Helvetica" font-size="12" fill="black">
+INIT2  { client epk, nonce, cookie }
+</text>
+<line x1="240" y1="106" x2="240" y2="134" stroke="black"/>
+<line x1="720" y1="106" x2="720" y2="134" stroke="black"/>
+<polygon fill="white" points="494,106 946,106 946,128 494,128"/>
+<polygon fill="white" points="488,112 952,112 952,122 488,122"/>
+<circle fill="white" cx="494" cy="112" r="6"/>
+<circle fill="white" cx="946" cy="112" r="6"/>
+<circle fill="white" cx="494" cy="122" r="6"/>
+<circle fill="white" cx="946" cy="122" r="6"/>
+<line x1="494" y1="106" x2="946" y2="106" stroke="black"/>
+<line x1="494" y1="128" x2="946" y2="128" stroke="black"/>
+<line x1="488" y1="112" x2="488" y2="122" stroke="black"/>
+<line x1="952" y1="112" x2="952" y2="122" stroke="black"/>
+<path d="M 488 112 A6,6 0 0,1 494,106" stroke="black" fill="none"/><path d="M 946 106 A6,6 0 0,1 952,112" stroke="black" fill="none"/><path d="M 952 122 A6,6 0 0,1 946,128" stroke="black" fill="none"/><path d="M 494 128 A6,6 0 0,1 488,122" stroke="black" fill="none"/><polygon fill="white" points="507,113 931,113 931,122 507,122"/>
+<text x="508" y="122" textLength="422" font-family="Helvetica" font-size="12" fill="black">
+recompute MAC: proves client owns addr (return-routable), then take a free slot
+</text>
+<line x1="240" y1="134" x2="240" y2="162" stroke="black"/>
+<line x1="720" y1="134" x2="720" y2="162" stroke="black"/>
+<line x1="720" y1="145" x2="240" y2="145" stroke="black"/>
+<polygon fill="black" points="240,145 250,151 250,139"/>
+<polygon fill="white" points="292,135 666,135 666,144 292,144"/>
+<text x="293" y="144" textLength="372" font-family="Helvetica" font-size="12" fill="black">
+ACCEPT  { server epk, server static id, conn_id }  -- slot now allocated
+</text>
+<line x1="240" y1="162" x2="240" y2="179" stroke="black"/>
+<line x1="720" y1="162" x2="720" y2="179" stroke="black"/>
+<line x1="240" y1="179" x2="240" y2="196" stroke="black"/>
+<line x1="720" y1="179" x2="720" y2="196" stroke="black"/>
+<line x1="120" y1="184" x2="840" y2="184" stroke="black" stroke-dasharray="2,2"/>
+<polygon fill="white" points="378,180 581,180 581,189 378,189"/>
+<text x="379" y="189" textLength="201" font-family="Helvetica" font-size="12" fill="black">
+if the arena is full, instead of ACCEPT
+</text>
+<line x1="240" y1="196" x2="240" y2="224" stroke="black"/>
+<line x1="720" y1="196" x2="720" y2="224" stroke="black"/>
+<line x1="720" y1="207" x2="240" y2="207" stroke="black"/>
+<polygon fill="black" points="240,207 250,213 250,201"/>
+<polygon fill="white" points="294,197 664,197 664,206 294,206"/>
+<text x="295" y="206" textLength="368" font-family="Helvetica" font-size="12" fill="black">
+REFUSE  { reason }  -- fixed-size, only ever sent to a verified address
+</text>
+<line x1="240" y1="218" x2="240" y2="224" stroke="black"/>
+<line x1="720" y1="218" x2="720" y2="224" stroke="black"/>
+</svg>

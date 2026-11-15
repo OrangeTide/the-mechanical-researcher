@@ -1,0 +1,4 @@
+build/
+examples/GameProto.pas
+*.ppu
+*.o

@@ -30,6 +30,7 @@ A collection of research topics, primarily gathered through agentic AI sessions,
 - [Zcb: The Same Instructions in Less Space](rv32-zcb/)
 - [Interrupts, and the Bug Three Test Methods Missed](rv32-interrupts/)
 - [Coverage Told Us About the Bug and We Did Not Listen](rv32-coverage/)
+- [Lantern: A Static Reliable-Channel Library for FreePascal](lantern/)
 - [Component Pascal](notes/component-pascal.md)
 
 ## Build & Deploy
