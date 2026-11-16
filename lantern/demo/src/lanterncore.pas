@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: 0BSD OR CC0-1.0
 unit LanternCore;
 
 { The transport-agnostic protocol core.

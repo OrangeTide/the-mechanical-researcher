@@ -4,6 +4,7 @@ date: 2026-07-19
 revised: 2026-07-20
 abstract: "Part four of the netchan story: a long-term host key, a known_hosts file, and an ssh-shaped login, weighed against X.509, WireGuard's pre-shared statics, and the temptation to invent a token."
 category: networking
+license: CC0-1.0
 ---
 
 ## Introduction

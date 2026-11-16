@@ -154,11 +154,23 @@ for index_md in */index.md; do
     revised="$(meta revised "$index_md")"
     abstract="$(meta abstract "$index_md")"
     category="$(meta category "$index_md")"
+    license="$(meta license "$index_md")"
 
     [ -z "$title" ] && title="$slug"
     [ -z "$date" ] && date="1970-01-01"
     [ -z "$abstract" ] && abstract=""
     [ -z "$category" ] && category="research"
+    [ -z "$license" ] && license="CC0-1.0"
+
+    # License notice shown in the article footer
+    case "$license" in
+        CC0-1.0|CC0)
+            license_html="<span class=\"article-license\">Licensed <a href=\"https://creativecommons.org/publicdomain/zero/1.0/\" rel=\"license\">CC0 1.0</a></span>" ;;
+        none|"")
+            license_html="" ;;
+        *)
+            license_html="<span class=\"article-license\">Licensed ${license}</span>" ;;
+    esac
 
     date_display="$(format_date "$date")"
     if [ -n "$revised" ]; then
@@ -201,6 +213,7 @@ for index_md in */index.md; do
                 "CATEGORY" "$category" \
                 "SOURCE_ZIP" "" \
                 "WASM_DEMO" "" \
+                "LICENSE" "$license_html" \
                 "ROOT" "$(printf '%s' "$rel" | sed 's|[^/]||g; s|/|../|g').." \
             | _AWK_BODY="$suppl_body" awk 'BEGIN{body=ENVIRON["_AWK_BODY"]} {
                 idx = index($0, "{{BODY}}")
@@ -261,6 +274,7 @@ for index_md in */index.md; do
             "CATEGORY" "$category" \
             "SOURCE_ZIP" "$source_zip_html" \
             "WASM_DEMO" "$wasm_demo_html" \
+            "LICENSE" "$license_html" \
             "ROOT" ".." \
         | _AWK_BODY="$article_body" awk 'BEGIN{body=ENVIRON["_AWK_BODY"]} {
             idx = index($0, "{{BODY}}")

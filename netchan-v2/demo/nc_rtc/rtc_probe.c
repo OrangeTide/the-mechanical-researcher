@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: 0BSD OR CC0-1.0 */
 /* rtc_probe.c : browser-equivalent WebRTC client for testing rtc_gateway
  * without a browser. It is the libpeer offerer: POSTs an SDP offer to the
  * gateway, opens a data channel, sends one datagram, and checks that the

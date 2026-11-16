@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: 0BSD OR CC0-1.0
 # Generate a C header from a flat binary file.
 # Usage: gen_rom.sh input.bin array_name output.h
 set -e

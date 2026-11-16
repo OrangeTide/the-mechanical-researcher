@@ -4,6 +4,7 @@ date: 2026-05-09
 revised: 2026-11-15
 abstract: "A comparison of four UDP multiplexing approaches for game networking, from the 1996 QuakeWorld NetChannel to a near-minimal modern implementation in 1,500 lines of C"
 category: networking
+license: CC0-1.0
 ---
 
 ## Introduction

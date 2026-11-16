@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: 0BSD OR CC0-1.0
 # Triton system emulator + GPU rasterizer + audio mixer -- Makefile
 #
 # Default build requires only a host C compiler.

@@ -4,6 +4,7 @@ date: 2026-03-26
 revised: 2026-08-03
 abstract: "Wrapping a ColdFire V4e CPU in a complete system emulator — memory-mapped peripherals, a cross-compiled monitor ROM, and the console startup that built a company's dream"
 category: systems
+license: CC0-1.0
 ---
 
 ## Introduction

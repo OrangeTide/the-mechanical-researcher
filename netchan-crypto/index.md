@@ -4,6 +4,7 @@ date: 2026-07-16
 revised: 2026-07-20
 abstract: "Part three of the netchan story: a 200-line WireGuard-shaped encryption decorator, weighed honestly against IPsec, QUIC, DTLS, and the Noise framework, and where a fixed-suite, no-PKI design earns its keep."
 category: networking
+license: CC0-1.0
 ---
 
 ## Introduction

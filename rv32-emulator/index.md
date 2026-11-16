@@ -4,6 +4,7 @@ date: 2026-08-01
 revised: 2026-08-03
 abstract: "Building a 32-bit RISC-V interpreter for embedding in games, and proving it correct by comparing every instruction against QEMU"
 category: systems
+license: CC0-1.0
 ---
 
 ## Introduction

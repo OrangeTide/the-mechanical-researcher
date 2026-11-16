@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: 0BSD OR CC0-1.0 */
 /*
  * cube.c -- Textured spinning cube demo for the Triton console
  *

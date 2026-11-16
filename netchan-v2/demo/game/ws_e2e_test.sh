@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: 0BSD OR CC0-1.0
 # ws_e2e_test.sh : end-to-end proof that a WebSocket client and a native UDP
 #                  client share one unmodified game server.
 # Made by a machine. PUBLIC DOMAIN (CC0-1.0)

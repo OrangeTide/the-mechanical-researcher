@@ -3,6 +3,7 @@ title: "Serialization Formats: From Xerox Courier to Cap'n Proto"
 date: 2026-04-02
 abstract: A comparative survey of serialization and messaging formats across five decades — from Sun's XDR and ASN.1 to modern zero-copy systems — examining wire formats, type systems, and the trade-offs that shaped distributed computing.
 category: systems
+license: CC0-1.0
 ---
 
 ## Introduction

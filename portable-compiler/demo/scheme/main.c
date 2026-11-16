@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: 0BSD OR CC0-1.0 */
 /* main.c : TinScheme compiler driver */
 
 #include "scheme.h"

@@ -3,6 +3,7 @@ title: Anatomy of a Microkernel
 date: 2026-03-20
 abstract: A comparative survey of microkernel architectures — from QNX's forty-year production record to seL4's mathematical proof of correctness — distilling the design principles behind small, modular kernels into a practical blueprint for building a self-verifying kernel on RISC-V.
 category: systems
+license: CC0-1.0
 ---
 
 ## Introduction

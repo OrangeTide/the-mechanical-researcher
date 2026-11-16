@@ -3,6 +3,7 @@ title: "Windows Over the Game World: A Retained-Mode GUI for FreePascal"
 date: 2026-11-15
 abstract: A minimal retained-mode widget toolkit for FreePascal games, drawn in the System 7 and SimCity idiom — floating windows over a live game canvas. A small universal core, an extension seam for custom widgets, and two worked extensions: a Neverwinter Nights-style multi-page inventory and an Ultima-style equipment paperdoll.
 category: gamedev
+license: CC0-1.0
 ---
 
 ## Introduction

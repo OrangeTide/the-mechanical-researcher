@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: 0BSD OR CC0-1.0
 # Lantern: static reliable-channel library for FreePascal.
 # Builds the smoke test and the lanterngen IDL tool. Pure FreePascal, no
 # external dependencies; the same recipe works on Linux, macOS, and Windows

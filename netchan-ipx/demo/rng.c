@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: 0BSD OR CC0-1.0 */
 /* rng.c : tiny X-ABC 8-bit PRNG (see rng.h) */
 
 #include "rng.h"

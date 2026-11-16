@@ -4,6 +4,7 @@ date: 2026-06-03
 revised: 2026-07-20
 abstract: "Porting a reliable-channel game library to IPX on 16-bit MS-DOS: the INT 2Fh far-call API, a fully static no-fragmentation memory model, and the real-mode and DOSBox bugs found along the way, with a playable Caves-of-Thor-style demo."
 category: networking
+license: CC0-1.0
 ---
 
 ## Introduction

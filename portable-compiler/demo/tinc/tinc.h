@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: 0BSD OR CC0-1.0 */
 /* tinc.h : TinC front-end declarations */
 
 #ifndef TINC_H

@@ -3,6 +3,7 @@ title: "What Bit Manipulation Buys an RV32 Interpreter"
 date: 2026-08-03
 abstract: "Adding Zba, Zbb and Zbs to a small RISC-V emulator, and measuring what the RP2350's extension set is actually worth"
 category: systems
+license: CC0-1.0
 ---
 
 ## Introduction

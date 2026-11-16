@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: 0BSD OR CC0-1.0 */
 /* gc.c : mark-sweep garbage collector for TinScheme values */
 
 #include "gc.h"

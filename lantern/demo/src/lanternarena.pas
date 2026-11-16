@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: 0BSD OR CC0-1.0
 unit LanternArena;
 
 { One block, carved once.

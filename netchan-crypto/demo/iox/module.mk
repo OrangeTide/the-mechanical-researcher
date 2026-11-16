@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: 0BSD OR CC0-1.0
 # iox -- vendored event loop: poll-based fd watchers, one-shot timers,
 # and self-pipe signal delivery. Self-contained apart from the header-only
 # priority queue (pq.h) it bundles for the timer heap.

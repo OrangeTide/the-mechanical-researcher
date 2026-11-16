@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: 0BSD OR CC0-1.0
 program lanterngen;
 
 { The Lantern IDL compiler, written in FreePascal.

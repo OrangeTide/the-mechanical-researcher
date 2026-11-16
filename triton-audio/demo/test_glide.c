@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: 0BSD OR CC0-1.0 */
 /* test_glide.c — Host-side test suite for the Glide software rasterizer.
  *
  * Tests the rasterizer in isolation: no ColdFire CPU needed.

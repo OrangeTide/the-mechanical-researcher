@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: 0BSD OR CC0-1.0 */
 /* rng.h : tiny X-ABC 8-bit PRNG, shared by the engine and host tools */
 
 #ifndef RNG_H

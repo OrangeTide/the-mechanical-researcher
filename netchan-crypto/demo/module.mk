@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: 0BSD OR CC0-1.0
 # netchan-crypto -- modular-make build descriptor (native only).
 #
 # This demo is deliberately socket-bound: it shows the encrypted UDP

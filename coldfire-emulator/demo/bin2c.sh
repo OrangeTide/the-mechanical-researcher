@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: 0BSD OR CC0-1.0
 # bin2c.sh — convert a ColdFire ELF disassembly to a C byte array
 # Usage: ./bin2c.sh my_test.elf
 #

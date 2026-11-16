@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: 0BSD OR CC0-1.0
 # microser-gen.sh - microser IDL compiler
 # Usage: ./microser-gen.sh input.idl output_basename
 # Generates output_basename.h and output_basename.c

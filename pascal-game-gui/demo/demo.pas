@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: 0BSD OR CC0-1.0
 program demo;
 { A toy game loop: a scrolling city map as the live background, with a      }
 { multi-page inventory and an equipment paperdoll floating over it.         }

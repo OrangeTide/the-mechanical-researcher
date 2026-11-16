@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: 0BSD OR CC0-1.0
 unit sdl2min;
 { Minimal SDL2 binding: only the calls the GUI demo needs. }
 { Vendored so the demo depends on libsdl2-dev alone, not an external FPC binding. }

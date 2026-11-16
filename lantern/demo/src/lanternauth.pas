@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: 0BSD OR CC0-1.0
 unit LanternAuth;
 
 { Optional peer authentication, reused in shape from netchan-v4.

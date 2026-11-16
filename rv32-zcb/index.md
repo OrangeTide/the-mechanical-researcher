@@ -3,6 +3,7 @@ title: "Zcb: The Same Instructions in Less Space"
 date: 2026-08-04
 abstract: "Eleven compressed encodings that shrink a guest image without changing what it executes, and the eleven compliance tests that finally build"
 category: systems
+license: CC0-1.0
 ---
 
 ## Introduction

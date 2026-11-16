@@ -4,6 +4,7 @@ date: 2026-03-27
 revised: 2026-08-03
 abstract: "Building a 16-channel PCM audio mixer with IMA ADPCM support, stereo panning, and SDL3 output — the sound chip for a console that never shipped"
 category: systems
+license: CC0-1.0
 ---
 
 ## Introduction

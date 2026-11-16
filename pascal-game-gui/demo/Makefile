@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: 0BSD OR CC0-1.0
 FPC ?= fpc
 FPCFLAGS ?= -O2 -Mobjfpc
 

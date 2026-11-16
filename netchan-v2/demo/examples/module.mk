@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: 0BSD OR CC0-1.0
 # examples -- programs that use netchan (native only; both need sockets).
 
 ROOT := $(dir $(lastword $(MAKEFILE_LIST)))

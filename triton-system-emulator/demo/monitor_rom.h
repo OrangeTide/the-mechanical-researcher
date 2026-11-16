@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: 0BSD OR CC0-1.0 */
 /* Auto-generated from monitor.bin -- do not edit */
 
 static const unsigned int monitor_rom_size = 2327;

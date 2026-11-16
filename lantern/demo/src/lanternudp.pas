@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: 0BSD OR CC0-1.0
 unit LanternUDP;
 
 { A thin, optional UDP transport for Linux, macOS, and Windows.

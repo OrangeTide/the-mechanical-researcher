@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: 0BSD OR CC0-1.0 */
 /* test_gc.c : standalone tests for the TinScheme garbage collector */
 
 #include "gc.h"

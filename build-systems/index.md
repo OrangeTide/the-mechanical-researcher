@@ -3,6 +3,7 @@ title: Build Systems
 date: 2026-03-16
 abstract: A comparative analysis of build system design — make, tup, Plan 9 mk, Perforce Jam, Ninja, and CMake.
 category: software engineering
+license: CC0-1.0
 ---
 
 ## Introduction

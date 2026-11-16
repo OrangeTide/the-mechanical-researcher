@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: 0BSD OR CC0-1.0 */
 /* cf_emit.c : ColdFire / m68k back-end, emits GAS-syntax assembly */
 /*
  * Instruction selection is direct: one IR op -> a short burst of m68k

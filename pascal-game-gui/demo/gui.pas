@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: 0BSD OR CC0-1.0
 unit gui;
 { Retained-mode GUI toolkit core, backend-agnostic.                        }
 { Draws through an abstract TCanvas and an abstract TTheme, so it knows     }

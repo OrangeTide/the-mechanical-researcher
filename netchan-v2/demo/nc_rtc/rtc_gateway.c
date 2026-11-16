@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: 0BSD OR CC0-1.0 */
 /* rtc_gateway.c : relay browser WebRTC data-channel clients onto the UDP
  * game server, using libpeer for the WebRTC end. The nc_rtc counterpart of
  * ws_gateway: same idea (terminate a browser transport, relay each datagram

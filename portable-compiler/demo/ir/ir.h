@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: 0BSD OR CC0-1.0 */
 /* ir.h : portable compiler IR data structures, builder API, and shared declarations */
 
 #ifndef IR_H

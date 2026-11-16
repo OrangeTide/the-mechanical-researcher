@@ -4,6 +4,7 @@ date: 2026-03-17
 revised: 2026-03-18
 abstract: A survey of historical display protocols reveals recurring trade-offs between server intelligence and protocol simplicity, informing four candidate architectures for a modern programmable display protocol.
 category: systems design
+license: CC0-1.0
 ---
 
 ## Introduction

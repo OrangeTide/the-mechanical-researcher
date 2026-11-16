@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: 0BSD OR CC0-1.0
 unit guisdl;
 { The SDL2 backend: a concrete TCanvas, the System 7 theme, and a small     }
 { embedded bitmap font. This is the only part of the toolkit that knows SDL. }

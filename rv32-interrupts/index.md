@@ -3,6 +3,7 @@ title: "Interrupts, and the Bug Three Test Methods Missed"
 date: 2026-08-04
 abstract: "Adding interrupt delivery to an RV32 interpreter, and finding a trap-vectoring bug that no reference model was ever going to catch"
 category: systems
+license: CC0-1.0
 ---
 
 ## Introduction

@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: 0BSD OR CC0-1.0
 # Manage the IPX relay used for local testing. Only ever touches the relay
 # instance bound to our test port (matched by the exact -p argument), so it
 # never disturbs other relays the user may be running.

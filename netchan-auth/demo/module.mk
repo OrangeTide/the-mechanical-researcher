@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: 0BSD OR CC0-1.0
 # netchan-auth -- modular-make build descriptor (native only).
 #
 # The stack, bottom to top:

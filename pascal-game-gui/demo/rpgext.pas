@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: 0BSD OR CC0-1.0
 unit rpgext;
 { Game-side extensions built entirely on the core: a multi-page inventory   }
 { (Neverwinter Nights style) and an equipment paperdoll (Ultima style).     }

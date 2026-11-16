@@ -3,6 +3,7 @@ title: "Coverage Told Us About the Bug and We Did Not Listen"
 date: 2026-08-05
 abstract: "Auditing four verification methods with line coverage, instruction coverage and mutation testing, and finding that the metrics disagree about which of them to keep"
 category: systems
+license: CC0-1.0
 ---
 
 ## Introduction

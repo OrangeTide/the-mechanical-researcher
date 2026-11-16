@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: 0BSD OR CC0-1.0
 unit LanternTypes;
 
 { Shared constants and public value types for the Lantern channel library.

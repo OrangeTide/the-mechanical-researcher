@@ -3,6 +3,7 @@ title: "Lantern: Static Reliable Channels and LAN Discovery for FreePascal"
 date: 2026-11-15
 abstract: "Designing a small reliable/unreliable channel library and LAN discovery beacon for FreePascal from the lessons of netchan and microchan: one start-time-sized static arena, a stateless return-routability handshake that makes a full server cheap and unamplifiable, optional X25519 encryption and host-key auth, a Pascal-flavored IDL compiled by a tool written in Pascal, and an honest account of where it fits (game state, asset delivery by CDN pointer) and where it stops (voice and video belong on WebRTC)."
 category: networking
+license: CC0-1.0
 ---
 
 ## Introduction

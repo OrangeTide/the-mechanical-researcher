@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: 0BSD OR CC0-1.0
 # run-tests.sh - run each build/<name> under qemu-m68k and check the
 # exit status against the expected value encoded in tests/<name>.expect
 # (one integer per file). Tests without an .expect file are run for

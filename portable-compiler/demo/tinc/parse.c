@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: 0BSD OR CC0-1.0 */
 /* parse.c : recursive-descent parser for TinC */
 
 #include "tinc.h"

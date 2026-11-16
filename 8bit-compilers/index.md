@@ -3,6 +3,7 @@ title: Compilers and Languages for 8-Bit CPUs
 date: 2026-04-11
 abstract: How compiler writers tamed the Z80, 6502, and their kin — architectural constraints, historical toolchains, and the optimization techniques that made high-level languages viable on machines with one accumulator and 64 KB of address space.
 category: compilers
+license: CC0-1.0
 ---
 
 ## Introduction

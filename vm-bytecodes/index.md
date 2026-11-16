@@ -4,6 +4,7 @@ date: 2026-03-22
 revised: 2026-04-19
 abstract: A comparative survey of virtual machine bytecode architectures — from the JVM's thirty-year dominance to WebAssembly's sandboxed linear memory — evaluating the design trade-offs that determine performance, security, complexity, and portability for anyone choosing or building a bytecode VM.
 category: systems
+license: CC0-1.0
 ---
 
 ## Introduction

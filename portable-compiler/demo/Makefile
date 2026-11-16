@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: 0BSD OR CC0-1.0
 # Makefile : build the TinC compiler and its test programs.
 #
 # Host build:         make          -> build/tinc

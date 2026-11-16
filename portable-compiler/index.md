@@ -4,6 +4,7 @@ date: 2026-04-19
 revised: 2026-04-25
 abstract: How multi-target compilers split the frontend from the backend, and what a toy ColdFire compiler teaches about IR shape and linear-scan register allocation.
 category: compilers
+license: CC0-1.0
 ---
 
 ## Introduction

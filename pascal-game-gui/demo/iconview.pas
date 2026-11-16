@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: 0BSD OR CC0-1.0
 unit iconview;
 { A Finder-like extension: a surface of freely arranged icons. Each icon is  }
 { dragged to any position, and a right-click or control-click opens a context }

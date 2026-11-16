@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: 0BSD OR CC0-1.0 */
 /* test_audio.c -- Host-side test suite for the Triton audio mixer.
  *
  * Tests the audio mixer in isolation: no ColdFire CPU needed.

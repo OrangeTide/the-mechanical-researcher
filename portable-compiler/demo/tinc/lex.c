@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: 0BSD OR CC0-1.0 */
 /* lex.c : hand-written lexer for TinC */
 
 #include "tinc.h"

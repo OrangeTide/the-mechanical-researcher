@@ -4,6 +4,7 @@ date: 2026-03-26
 revised: 2026-08-03
 abstract: "Implementing a Glide 3.0 software rasterizer for a fantasy console — triangle setup, perspective-correct texturing, and the pixel pipeline that makes the Banshee sing"
 category: systems
+license: CC0-1.0
 ---
 
 ## Introduction

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: 0BSD OR CC0-1.0
 # test -- every test lives here, named test_<thing>.
 #
 # The socketless tests (protocol core, WebSocket codec, IDL round-trip, game

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: 0BSD OR CC0-1.0 */
 /* qemu_validate.c : QEMU validation for ColdFire V4e emulator results */
 /* Runs the same test functions under qemu-m68k for comparison.
  * Build:  m68k-linux-gnu-gcc -mcpu=5475 -O2 -nostdlib -static -o qemu_validate qemu_validate.c

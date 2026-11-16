@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: 0BSD OR CC0-1.0 */
 | start.S - minimal m68k/ColdFire runtime for Linux user-mode.
 |
 | Provides _start (the ELF entry point), and thin wrappers for the two

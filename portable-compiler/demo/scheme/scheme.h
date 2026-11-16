@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: 0BSD OR CC0-1.0 */
 /* scheme.h : TinScheme front-end header */
 
 #ifndef SCHEME_H

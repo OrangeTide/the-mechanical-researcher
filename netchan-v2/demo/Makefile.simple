@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: 0BSD OR CC0-1.0
 # Makefile.simple : a plain-cc build of netchan, no modular-make driver.
 #   make -f Makefile.simple
 # It builds the core, the UDP example, and (to show the third-party seam) the

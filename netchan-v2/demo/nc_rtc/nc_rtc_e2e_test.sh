@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: 0BSD OR CC0-1.0
 # nc_rtc_e2e_test.sh : prove the WebRTC gateway relays a datagram end to end,
 #                      without a browser.
 # Made by a machine. PUBLIC DOMAIN (CC0-1.0)

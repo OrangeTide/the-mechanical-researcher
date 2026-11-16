@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: 0BSD OR CC0-1.0 */
 /*
  * white.c -- Triton example program - draw some white boxes
  *

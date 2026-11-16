@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: 0BSD OR CC0-1.0 */
 /*
  * glide_raster.h -- Triton GPU: Glide 3.0 software rasterizer
  *

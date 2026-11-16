@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: 0BSD OR CC0-1.0
 # IPX test harness (development tool).
 #
 # Builds the DOS binaries, ensures an ipxrelay is running, launches tracked

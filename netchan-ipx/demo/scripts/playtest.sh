@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: 0BSD OR CC0-1.0
 # Networked thor playtest harness (development tool).
 #
 # Builds thor.exe, ensures an ipxrelay, launches a host and a client DOSBox

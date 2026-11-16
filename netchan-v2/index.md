@@ -4,6 +4,7 @@ date: 2026-07-06
 revised: 2026-07-20
 abstract: "Part two of the netchan story: cutting one clean seam through the protocol core so the same code can run over UDP on the desktop and, soon, over WebRTC or WebSockets in a browser."
 category: networking
+license: CC0-1.0
 ---
 
 ## Introduction

@@ -378,6 +378,18 @@ body {
   color: #8b7a68;
 }
 
+.bottom-bar .article-license {
+  display: block;
+  margin-top: 0.4rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7rem;
+  color: #8b7a68;
+}
+
+.bottom-bar .article-license a {
+  color: #8b7a68;
+}
+
 /* --- Mobile adjustments --- */
 
 @media (max-width: 600px) {

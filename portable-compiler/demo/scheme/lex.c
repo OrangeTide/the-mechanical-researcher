@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: 0BSD OR CC0-1.0 */
 /* lex.c : S-expression lexer for TinScheme */
 
 #include "scheme.h"

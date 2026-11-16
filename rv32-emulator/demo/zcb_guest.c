@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: 0BSD OR CC0-1.0 */
 /* zcb_guest.c : a guest that exercises the compressed byte and halfword
  * operations */
 /* Cross-compile: riscv64-linux-gnu-gcc -march=rv32imafc_zba_zbb_zbs_zcb

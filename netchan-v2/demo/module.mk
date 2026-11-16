@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: 0BSD OR CC0-1.0
 # netchan-v2 -- modular-make build descriptor (native + WebAssembly)
 #
 # The top level is the netchan library itself: the transport-agnostic core,

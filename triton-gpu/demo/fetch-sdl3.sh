@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: 0BSD OR CC0-1.0
 # fetch-sdl3.sh -- download and build SDL3 for the Triton emulator
 #
 # Fetches a specific SDL3 release, builds it as a static library, and

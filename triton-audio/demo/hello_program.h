@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: 0BSD OR CC0-1.0 */
 /* Auto-generated from hello.elf -- do not edit */
 
 static const unsigned int hello_program_size = 9164;

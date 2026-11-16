@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: 0BSD OR CC0-1.0 */
 #ifndef COMMON_H_
 #define COMMON_H_
 /* ---- Hardware addresses ------------------------------------------------ */

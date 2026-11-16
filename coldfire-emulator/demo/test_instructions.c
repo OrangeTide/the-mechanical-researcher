@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: 0BSD OR CC0-1.0 */
 /* test_instructions.c — comprehensive ColdFire V4e instruction test
  * Tests every instruction the assembler can generate for -mcpu=5475.
  *

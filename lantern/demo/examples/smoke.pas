@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: 0BSD OR CC0-1.0
 program smoke;
 
 { A build-and-sanity test for the parts of Lantern that are implemented: the

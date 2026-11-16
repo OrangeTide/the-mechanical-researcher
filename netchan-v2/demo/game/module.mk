@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: 0BSD OR CC0-1.0
 # netchan-v2 game demo -- Caves-of-Thor over netchan
 
 ROOT := $(dir $(lastword $(MAKEFILE_LIST)))

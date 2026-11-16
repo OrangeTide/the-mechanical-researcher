@@ -4,6 +4,7 @@ date: 2026-03-25
 revised: 2026-08-03
 abstract: "From ISA selection through implementation — a standalone ColdFire V4e CPU emulator in C, validated against GCC-compiled bare-metal programs"
 category: systems
+license: CC0-1.0
 ---
 
 ## Introduction
