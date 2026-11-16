@@ -35,42 +35,42 @@ type
   TLanternKey = array[0 .. 31] of Byte;
 
   TLanternSession = record
-    haveKeys : Boolean;
-    sendKey  : TLanternKey;
-    recvKey  : TLanternKey;
-    sendCtr  : QWord;
-    replayHi : QWord;              { high edge of the replay window         }
-    replayBits: QWord;            { RFC 6479 bitmap, widened later          }
+    HaveKeys : Boolean;
+    SendKey  : TLanternKey;
+    RecvKey  : TLanternKey;
+    SendCtr  : QWord;
+    ReplayHi : QWord;              { high edge of the replay window         }
+    ReplayBits: QWord;            { RFC 6479 bitmap, widened later          }
     { optional long-term identity, all zero when absent (netchan-v4) }
-    staticPub: TLanternKey;
-    staticSec: TLanternKey;
-    psk      : TLanternKey;
+    StaticPub: TLanternKey;
+    StaticSec: TLanternKey;
+    Psk      : TLanternKey;
   end;
 
 { Begin a handshake: write our HELLO (tag + ephemeral public key). }
-function CryptoHello(var s: TLanternSession; var buf; cap: PtrUInt): Longint;
+function CryptoHello(var s: TLanternSession; var buf; cap: PtrUInt): LongInt;
 
 { Consume the peer's HELLO and derive directional keys. }
-function CryptoOnHello(var s: TLanternSession; const buf; len: PtrUInt): Longint;
+function CryptoOnHello(var s: TLanternSession; const buf; len: PtrUInt): LongInt;
 
 { Seal one plaintext datagram in place-ish: writes tag+counter+ciphertext. }
 function CryptoSeal(var s: TLanternSession; const plain; plainLen: PtrUInt;
-                    var outBuf; cap: PtrUInt): Longint;
+                    var outBuf; cap: PtrUInt): LongInt;
 
 { Open one sealed datagram, rejecting replays. }
 function CryptoOpen(var s: TLanternSession; const sealed; len: PtrUInt;
-                    var outBuf; cap: PtrUInt): Longint;
+                    var outBuf; cap: PtrUInt): LongInt;
 
 implementation
 
-function CryptoHello(var s: TLanternSession; var buf; cap: PtrUInt): Longint;
+function CryptoHello(var s: TLanternSession; var buf; cap: PtrUInt): LongInt;
 begin
   { TODO: generate an X25519 ephemeral key pair, write tag $01 and the
     public key. Needs Monocypher crypto_x25519_public_key. }
   Result := LanternErr;
 end;
 
-function CryptoOnHello(var s: TLanternSession; const buf; len: PtrUInt): Longint;
+function CryptoOnHello(var s: TLanternSession; const buf; len: PtrUInt): LongInt;
 begin
   { TODO: X25519(shared, our_eph_secret, their_eph_public), then two
     BLAKE2b derivations for sendKey/recvKey with the public keys sorted. }
@@ -78,7 +78,7 @@ begin
 end;
 
 function CryptoSeal(var s: TLanternSession; const plain; plainLen: PtrUInt;
-                    var outBuf; cap: PtrUInt): Longint;
+                    var outBuf; cap: PtrUInt): LongInt;
 begin
   { TODO: XChaCha20-Poly1305 encrypt with nonce = sendCtr, write
     tag $02 + counter + mac + ciphertext, then Inc(sendCtr). }
@@ -86,7 +86,7 @@ begin
 end;
 
 function CryptoOpen(var s: TLanternSession; const sealed; len: PtrUInt;
-                    var outBuf; cap: PtrUInt): Longint;
+                    var outBuf; cap: PtrUInt): LongInt;
 begin
   { TODO: check the replay window against the counter, decrypt-and-verify,
     and only on success slide the window forward. }

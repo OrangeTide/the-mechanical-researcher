@@ -16,10 +16,10 @@ interface
 
 type
   TWireCursor = record
-    buf : PByte;      { base of the buffer                              }
-    cap : PtrUInt;    { bytes available from base                       }
-    pos : PtrUInt;    { next byte to read or write                      }
-    err : Boolean;    { sticky: set on overflow or underrun             }
+    Buf : PByte;      { base of the buffer                              }
+    Cap : PtrUInt;    { bytes available from base                       }
+    Pos : PtrUInt;    { next byte to read or write                      }
+    Err : Boolean;    { sticky: set on overflow or underrun             }
   end;
 
 procedure WireInit(out c: TWireCursor; buf: Pointer; cap: PtrUInt);
@@ -44,22 +44,22 @@ implementation
 
 procedure WireInit(out c: TWireCursor; buf: Pointer; cap: PtrUInt);
 begin
-  c.buf := PByte(buf);
-  c.cap := cap;
-  c.pos := 0;
-  c.err := False;
+  c.Buf := PByte(buf);
+  c.Cap := cap;
+  c.Pos := 0;
+  c.Err := False;
 end;
 
 { ---- Writers ---- }
 
 procedure WirePutU8(var c: TWireCursor; v: Byte);
 begin
-  if c.err or (c.pos + 1 > c.cap) then begin
-    c.err := True;
+  if c.Err or (c.Pos + 1 > c.Cap) then begin
+    c.Err := True;
     exit;
   end;
-  c.buf[c.pos] := v;
-  Inc(c.pos);
+  c.Buf[c.Pos] := v;
+  Inc(c.Pos);
 end;
 
 procedure WirePutU16(var c: TWireCursor; v: Word);
@@ -82,25 +82,25 @@ end;
 
 procedure WirePutBytes(var c: TWireCursor; src: Pointer; n: PtrUInt);
 begin
-  if c.err or (c.pos + n > c.cap) then begin
-    c.err := True;
+  if c.Err or (c.Pos + n > c.Cap) then begin
+    c.Err := True;
     exit;
   end;
   if n > 0 then
-    Move(src^, c.buf[c.pos], n);
-  Inc(c.pos, n);
+    Move(src^, c.Buf[c.Pos], n);
+  Inc(c.Pos, n);
 end;
 
 { ---- Readers ---- }
 
 function WireGetU8(var c: TWireCursor): Byte;
 begin
-  if c.err or (c.pos + 1 > c.cap) then begin
-    c.err := True;
+  if c.Err or (c.Pos + 1 > c.Cap) then begin
+    c.Err := True;
     exit(0);
   end;
-  Result := c.buf[c.pos];
-  Inc(c.pos);
+  Result := c.Buf[c.Pos];
+  Inc(c.Pos);
 end;
 
 function WireGetU16(var c: TWireCursor): Word;
@@ -132,12 +132,12 @@ end;
 
 function WireGetView(var c: TWireCursor; n: PtrUInt): Pointer;
 begin
-  if c.err or (c.pos + n > c.cap) then begin
-    c.err := True;
+  if c.Err or (c.Pos + n > c.Cap) then begin
+    c.Err := True;
     exit(nil);
   end;
-  Result := @c.buf[c.pos];
-  Inc(c.pos, n);
+  Result := @c.Buf[c.Pos];
+  Inc(c.Pos, n);
 end;
 
 end.

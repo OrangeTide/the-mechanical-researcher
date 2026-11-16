@@ -44,57 +44,57 @@ const
 
 type
   TTok = record
-    kind : LongInt;
-    text : string;      { lower-cased for idents, so keyword tests are easy }
-    raw  : string;      { original spelling, used for emitted identifiers   }
-    num  : LongInt;
-    line : LongInt;
+    Kind : LongInt;
+    Text : string;      { lower-cased for idents, so keyword tests are easy }
+    Raw  : string;      { original spelling, used for emitted identifiers   }
+    Num  : LongInt;
+    Line : LongInt;
   end;
 
   TField = record
-    name    : string;
-    typ     : string;   { idl type or an enum name                         }
-    tag     : LongInt;
+    Name    : string;
+    Typ     : string;   { idl type or an enum name                         }
+    Tag     : LongInt;
   end;
 
   TArm = record
-    lbl        : string;
-    fieldCount : LongInt;
-    fields     : array[0 .. MaxFields - 1] of TField;
+    Lbl        : string;
+    FieldCount : LongInt;
+    Fields     : array[0 .. MaxFields - 1] of TField;
   end;
 
   TMsg = record
-    name       : string;
-    fieldCount : LongInt;
-    fields     : array[0 .. MaxFields - 1] of TField;
-    hasVariant : Boolean;
-    discName   : string;
-    discType   : string;
-    discTag    : LongInt;
-    armCount   : LongInt;
-    arms       : array[0 .. MaxArms - 1] of TArm;
+    Name       : string;
+    FieldCount : LongInt;
+    Fields     : array[0 .. MaxFields - 1] of TField;
+    HasVariant : Boolean;
+    DiscName   : string;
+    DiscType   : string;
+    DiscTag    : LongInt;
+    ArmCount   : LongInt;
+    Arms       : array[0 .. MaxArms - 1] of TArm;
   end;
 
   TEnumVal = record
-    name : string;
-    val  : LongInt;
+    Name : string;
+    Val  : LongInt;
   end;
 
   TEnum = record
-    name     : string;
-    valCount : LongInt;
-    vals     : array[0 .. MaxVals - 1] of TEnumVal;
+    Name     : string;
+    ValCount : LongInt;
+    Vals     : array[0 .. MaxVals - 1] of TEnumVal;
   end;
 
   TEntry = record
-    tag  : LongInt;
-    msg  : string;
+    Tag  : LongInt;
+    Msg  : string;
   end;
 
   TDispatch = record
-    name       : string;
-    entryCount : LongInt;
-    entries    : array[0 .. MaxEntries - 1] of TEntry;
+    Name       : string;
+    EntryCount : LongInt;
+    Entries    : array[0 .. MaxEntries - 1] of TEntry;
   end;
 
 { ---- Global state ---- }
@@ -166,37 +166,37 @@ var
   s: string;
 begin
   SkipTrivia;
-  cur.line := srcLine;
+  cur.Line := srcLine;
   if srcPos > Length(src) then begin
-    cur.kind := ttEOF;
-    cur.text := '';
+    cur.Kind := ttEOF;
+    cur.Text := '';
     exit;
   end;
   case src[srcPos] of
-    ':': begin cur.kind := ttColon;  Inc(srcPos); end;
-    ';': begin cur.kind := ttSemi;   Inc(srcPos); end;
-    '[': begin cur.kind := ttLBrack; Inc(srcPos); end;
-    ']': begin cur.kind := ttRBrack; Inc(srcPos); end;
-    '(': begin cur.kind := ttLParen; Inc(srcPos); end;
-    ')': begin cur.kind := ttRParen; Inc(srcPos); end;
-    ',': begin cur.kind := ttComma;  Inc(srcPos); end;
-    '=': begin cur.kind := ttEq;     Inc(srcPos); end;
+    ':': begin cur.Kind := ttColon;  Inc(srcPos); end;
+    ';': begin cur.Kind := ttSemi;   Inc(srcPos); end;
+    '[': begin cur.Kind := ttLBrack; Inc(srcPos); end;
+    ']': begin cur.Kind := ttRBrack; Inc(srcPos); end;
+    '(': begin cur.Kind := ttLParen; Inc(srcPos); end;
+    ')': begin cur.Kind := ttRParen; Inc(srcPos); end;
+    ',': begin cur.Kind := ttComma;  Inc(srcPos); end;
+    '=': begin cur.Kind := ttEq;     Inc(srcPos); end;
   else
     if IsDigit(src[srcPos]) then begin
       start := srcPos;
       while (srcPos <= Length(src)) and IsDigit(src[srcPos]) do Inc(srcPos);
       s := Copy(src, start, srcPos - start);
-      cur.kind := ttNumber;
-      cur.num := StrToInt(s);
-      cur.text := s;
+      cur.Kind := ttNumber;
+      cur.Num := StrToInt(s);
+      cur.Text := s;
     end else if IsAlpha(src[srcPos]) then begin
       start := srcPos;
       while (srcPos <= Length(src)) and (IsAlpha(src[srcPos]) or IsDigit(src[srcPos])) do
         Inc(srcPos);
       s := Copy(src, start, srcPos - start);
-      cur.kind := ttIdent;
-      cur.raw := s;
-      cur.text := LowerCase(s);
+      cur.Kind := ttIdent;
+      cur.Raw := s;
+      cur.Text := LowerCase(s);
     end else
       Fail('unexpected character "' + src[srcPos] + '"');
   end;
@@ -204,12 +204,12 @@ end;
 
 function IsKw(const kw: string): Boolean;
 begin
-  Result := (cur.kind = ttIdent) and (cur.text = kw);
+  Result := (cur.Kind = ttIdent) and (cur.Text = kw);
 end;
 
 procedure Expect(kind: LongInt; const what: string);
 begin
-  if cur.kind <> kind then
+  if cur.Kind <> kind then
     Fail('expected ' + what);
   NextToken;
 end;
@@ -223,8 +223,8 @@ end;
 
 function ExpectIdent: string;
 begin
-  if cur.kind <> ttIdent then Fail('expected an identifier');
-  Result := cur.raw;
+  if cur.Kind <> ttIdent then Fail('expected an identifier');
+  Result := cur.Raw;
   NextToken;
 end;
 
@@ -232,8 +232,8 @@ function ExpectTag: LongInt;
 begin
   { "[" number "]" }
   Expect(ttLBrack, '"["');
-  if cur.kind <> ttNumber then Fail('expected a wire tag number');
-  Result := cur.num;
+  if cur.Kind <> ttNumber then Fail('expected a wire tag number');
+  Result := cur.Num;
   NextToken;
   Expect(ttRBrack, '"]"');
 end;
@@ -242,13 +242,13 @@ end;
 
 procedure ParseField(var f: TField);
 begin
-  f.name := ExpectIdent;
+  f.Name := ExpectIdent;
   Expect(ttColon, '":"');
-  f.typ := ExpectIdent;
-  f.tag := ExpectTag;
+  f.Typ := ExpectIdent;
+  f.Tag := ExpectTag;
   { The separating ";" is optional, so the last field before ")" or "end"
     may omit it, the way a Pascal variant record does. }
-  if cur.kind = ttSemi then NextToken;
+  if cur.Kind = ttSemi then NextToken;
 end;
 
 procedure ParseEnum(const nm: string);
@@ -257,18 +257,18 @@ var
 begin
   if numEnums >= MaxEnums then Fail('too many enums');
   e := @enums[numEnums];
-  e^.name := nm;
-  e^.valCount := 0;
+  e^.Name := nm;
+  e^.ValCount := 0;
   Expect(ttLParen, '"("');
   repeat
-    if e^.valCount >= MaxVals then Fail('too many enum values');
-    e^.vals[e^.valCount].name := ExpectIdent;
+    if e^.ValCount >= MaxVals then Fail('too many enum values');
+    e^.Vals[e^.ValCount].Name := ExpectIdent;
     Expect(ttEq, '"="');
-    if cur.kind <> ttNumber then Fail('expected an enum value number');
-    e^.vals[e^.valCount].val := cur.num;
+    if cur.Kind <> ttNumber then Fail('expected an enum value number');
+    e^.Vals[e^.ValCount].Val := cur.Num;
     NextToken;
-    Inc(e^.valCount);
-    if cur.kind = ttComma then NextToken
+    Inc(e^.ValCount);
+    if cur.Kind = ttComma then NextToken
     else Break;
   until False;
   Expect(ttRParen, '")"');
@@ -283,40 +283,40 @@ var
 begin
   if numMsgs >= MaxMsgs then Fail('too many messages');
   m := @msgs[numMsgs];
-  m^.name := nm;
-  m^.fieldCount := 0;
-  m^.hasVariant := False;
-  m^.armCount := 0;
+  m^.Name := nm;
+  m^.FieldCount := 0;
+  m^.HasVariant := False;
+  m^.ArmCount := 0;
   ExpectKw('message');
   { fixed fields until "case" or "end" }
-  while (cur.kind = ttIdent) and (not IsKw('case')) and (not IsKw('end')) do begin
-    if m^.fieldCount >= MaxFields then Fail('too many fields');
-    ParseField(m^.fields[m^.fieldCount]);
-    Inc(m^.fieldCount);
+  while (cur.Kind = ttIdent) and (not IsKw('case')) and (not IsKw('end')) do begin
+    if m^.FieldCount >= MaxFields then Fail('too many fields');
+    ParseField(m^.Fields[m^.FieldCount]);
+    Inc(m^.FieldCount);
   end;
   if IsKw('case') then begin
-    m^.hasVariant := True;
+    m^.HasVariant := True;
     NextToken;
-    m^.discName := ExpectIdent;
+    m^.DiscName := ExpectIdent;
     Expect(ttColon, '":"');
-    m^.discType := ExpectIdent;
-    m^.discTag := ExpectTag;
+    m^.DiscType := ExpectIdent;
+    m^.DiscTag := ExpectTag;
     ExpectKw('of');
     while not IsKw('end') do begin
-      if m^.armCount >= MaxArms then Fail('too many variant arms');
-      arm := @m^.arms[m^.armCount];
-      arm^.lbl := ExpectIdent;
-      arm^.fieldCount := 0;
+      if m^.ArmCount >= MaxArms then Fail('too many variant arms');
+      arm := @m^.Arms[m^.ArmCount];
+      arm^.Lbl := ExpectIdent;
+      arm^.FieldCount := 0;
       Expect(ttColon, '":"');
       Expect(ttLParen, '"("');
-      while cur.kind = ttIdent do begin
-        if arm^.fieldCount >= MaxFields then Fail('too many arm fields');
-        ParseField(arm^.fields[arm^.fieldCount]);
-        Inc(arm^.fieldCount);
+      while cur.Kind = ttIdent do begin
+        if arm^.FieldCount >= MaxFields then Fail('too many arm fields');
+        ParseField(arm^.Fields[arm^.FieldCount]);
+        Inc(arm^.FieldCount);
       end;
       Expect(ttRParen, '")"');
       Expect(ttSemi, '";"');
-      Inc(m^.armCount);
+      Inc(m^.ArmCount);
     end;
     ExpectKw('end');
     Expect(ttSemi, '";"');
@@ -333,19 +333,19 @@ begin
   if numDisps >= MaxDisp then Fail('too many dispatch tables');
   d := @disps[numDisps];
   ExpectKw('dispatch');
-  d^.name := ExpectIdent;
-  d^.entryCount := 0;
-  while cur.kind = ttNumber do begin
-    if d^.entryCount >= MaxEntries then Fail('too many dispatch entries');
-    d^.entries[d^.entryCount].tag := cur.num;
+  d^.Name := ExpectIdent;
+  d^.EntryCount := 0;
+  while cur.Kind = ttNumber do begin
+    if d^.EntryCount >= MaxEntries then Fail('too many dispatch entries');
+    d^.Entries[d^.EntryCount].Tag := cur.Num;
     NextToken;
     Expect(ttColon, '":"');
-    d^.entries[d^.entryCount].msg := ExpectIdent;
+    d^.Entries[d^.EntryCount].Msg := ExpectIdent;
     Expect(ttSemi, '";"');
-    Inc(d^.entryCount);
+    Inc(d^.EntryCount);
   end;
   ExpectKw('end');
-  if cur.kind = ttSemi then NextToken;   { a trailing ";" is allowed }
+  if cur.Kind = ttSemi then NextToken;   { a trailing ";" is allowed }
   Inc(numDisps);
 end;
 
@@ -360,13 +360,13 @@ begin
   unitName := ExpectIdent;
   Expect(ttSemi, '";"');
   ExpectKw('type');
-  while cur.kind <> ttEOF do begin
+  while cur.Kind <> ttEOF do begin
     if IsKw('dispatch') then
       ParseDispatch
     else begin
       nm := ExpectIdent;
       Expect(ttEq, '"="');
-      if cur.kind = ttLParen then
+      if cur.Kind = ttLParen then
         ParseEnum(nm)
       else if IsKw('message') then
         ParseMessage(nm)
@@ -404,28 +404,28 @@ var
 
 procedure EmitField(const f: TField; indent: string);
 begin
-  writeln(outF, indent, f.name, ' : ', PasType(f.typ),
-          '; { tag ', f.tag, ' }');
+  writeln(outF, indent, f.Name, ' : ', PasType(f.Typ),
+          '; { tag ', f.Tag, ' }');
 end;
 
 procedure EmitMsgType(const m: TMsg);
 var
   i, j: LongInt;
 begin
-  writeln(outF, '  ', m.name, ' = packed record');
-  for i := 0 to m.fieldCount - 1 do
-    EmitField(m.fields[i], '    ');
-  if m.hasVariant then begin
-    writeln(outF, '    case ', m.discName, ' : ', m.discType,
-            ' of   { tag ', m.discTag, ' }');
-    for i := 0 to m.armCount - 1 do begin
-      write(outF, '      ', m.arms[i].lbl, ': (');
-      if m.arms[i].fieldCount = 0 then
+  writeln(outF, '  ', m.Name, ' = packed record');
+  for i := 0 to m.FieldCount - 1 do
+    EmitField(m.Fields[i], '    ');
+  if m.HasVariant then begin
+    writeln(outF, '    case ', m.DiscName, ' : ', m.DiscType,
+            ' of   { tag ', m.DiscTag, ' }');
+    for i := 0 to m.ArmCount - 1 do begin
+      write(outF, '      ', m.Arms[i].Lbl, ': (');
+      if m.Arms[i].FieldCount = 0 then
         writeln(outF, ' );')
       else begin
         writeln(outF);
-        for j := 0 to m.arms[i].fieldCount - 1 do
-          EmitField(m.arms[i].fields[j], '        ');
+        for j := 0 to m.Arms[i].FieldCount - 1 do
+          EmitField(m.Arms[i].Fields[j], '        ');
         writeln(outF, '      );');
       end;
     end;
@@ -438,10 +438,10 @@ procedure EmitEnum(const e: TEnum);
 var
   i: LongInt;
 begin
-  write(outF, '  ', e.name, ' = (');
-  for i := 0 to e.valCount - 1 do begin
-    write(outF, e.vals[i].name, ' = ', e.vals[i].val);
-    if i < e.valCount - 1 then write(outF, ', ');
+  write(outF, '  ', e.Name, ' = (');
+  for i := 0 to e.ValCount - 1 do begin
+    write(outF, e.Vals[i].Name, ' = ', e.Vals[i].Val);
+    if i < e.ValCount - 1 then write(outF, ', ');
   end;
   writeln(outF, ');');
 end;
@@ -465,7 +465,7 @@ begin
   writeln(outF);
   writeln(outF, 'type');
   writeln(outF, '  { A zero-copy view into the decode buffer. }');
-  writeln(outF, '  TLanternView = record p: PByte; n: LongWord; end;');
+  writeln(outF, '  TLanternView = record P: PByte; N: LongWord; end;');
   writeln(outF);
   for i := 0 to numEnums - 1 do
     EmitEnum(enums[i]);
@@ -476,24 +476,24 @@ begin
   { Serializer signatures. Bodies are stubs: generating them from the parsed
     fields is the remaining work. }
   for i := 0 to numMsgs - 1 do begin
-    writeln(outF, 'function Encode', msgs[i].name,
-            '(var Buf; Cap: SizeInt; const M: ', msgs[i].name, '): SizeInt;');
-    writeln(outF, 'function Decode', msgs[i].name,
-            '(const Buf; Len: SizeInt; out M: ', msgs[i].name, '): Boolean;');
+    writeln(outF, 'function Encode', msgs[i].Name,
+            '(var Buf; Cap: SizeInt; const M: ', msgs[i].Name, '): SizeInt;');
+    writeln(outF, 'function Decode', msgs[i].Name,
+            '(const Buf; Len: SizeInt; out M: ', msgs[i].Name, '): Boolean;');
   end;
   writeln(outF);
   writeln(outF, 'implementation');
   writeln(outF);
   for i := 0 to numMsgs - 1 do begin
-    writeln(outF, 'function Encode', msgs[i].name,
-            '(var Buf; Cap: SizeInt; const M: ', msgs[i].name, '): SizeInt;');
+    writeln(outF, 'function Encode', msgs[i].Name,
+            '(var Buf; Cap: SizeInt; const M: ', msgs[i].Name, '): SizeInt;');
     writeln(outF, 'begin');
     writeln(outF, '  { TODO: generated body walks the fields in tag order. }');
     writeln(outF, '  Result := -1;');
     writeln(outF, 'end;');
     writeln(outF);
-    writeln(outF, 'function Decode', msgs[i].name,
-            '(const Buf; Len: SizeInt; out M: ', msgs[i].name, '): Boolean;');
+    writeln(outF, 'function Decode', msgs[i].Name,
+            '(const Buf; Len: SizeInt; out M: ', msgs[i].Name, '): Boolean;');
     writeln(outF, 'begin');
     writeln(outF, '  FillChar(M, SizeOf(M), 0);');
     writeln(outF, '  { TODO: generated body skips unknown tags, tolerates truncation. }');

@@ -61,7 +61,7 @@ var
   srv: PLanternServer;
   addr: TLanternAddr;
   c: QWord;
-  i: Longint;
+  i: LongInt;
 begin
   writeln('Admission cookie (SipHash-2-4):');
   cfg := LanternDefaultConfig;
@@ -69,15 +69,15 @@ begin
   if srv = nil then begin Inc(fails); exit; end;
 
   FillChar(addr, SizeOf(addr), 0);
-  addr.len := 6;
-  for i := 0 to 5 do addr.a[i] := Byte(10 + i);
+  addr.Len := 6;
+  for i := 0 to 5 do addr.A[i] := Byte(10 + i);
 
   c := LanternCookie(srv, addr, 12345, 1);
   Check(LanternCookieVerify(srv, addr, 12345, 1, c),
         'a freshly issued cookie verifies');
   Check(not LanternCookieVerify(srv, addr, 99999, 1, c),
         'a cookie for a different nonce is rejected');
-  addr.a[0] := 200;
+  addr.A[0] := 200;
   Check(not LanternCookieVerify(srv, addr, 12345, 1, c),
         'a cookie for a different address is rejected');
 
@@ -101,7 +101,7 @@ begin
   WirePutU32(c, $789ABCDE);
   WirePutU64(c, QWord($0102030405060708));
   WirePutBytes(c, @payload[0], 3);
-  Check(not c.err, 'all writes fit the buffer');
+  Check(not c.Err, 'all writes fit the buffer');
 
   WireInit(c, @buf[0], SizeOf(buf));
   Check(WireGetU8(c) = $12, 'u8 round-trips');
@@ -111,7 +111,7 @@ begin
   view := WireGetView(c, 3);
   Check((view <> nil) and (view[0] = $AA) and (view[2] = $CC),
         'bytes view round-trips');
-  Check(not c.err, 'no underrun');
+  Check(not c.Err, 'no underrun');
   writeln;
 end;
 

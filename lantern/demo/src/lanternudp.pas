@@ -20,8 +20,8 @@ uses
 
 type
   TLanternSocket = record
-    fd    : LongInt;
-    valid : Boolean;
+    Fd    : LongInt;
+    Valid : Boolean;
   end;
 
 { Open a UDP socket. If bindPort <> 0 the socket is bound to it (a server);
@@ -54,13 +54,13 @@ begin
   FillChar(addr, SizeOf(addr), 0);
   n := LongWord(StrToNetAddr(ip));        { returns in network byte order }
   if (n = 0) and (ip <> '0.0.0.0') then exit(False);
-  addr.len := 6;
-  addr.a[0] := Byte(n);
-  addr.a[1] := Byte(n shr 8);
-  addr.a[2] := Byte(n shr 16);
-  addr.a[3] := Byte(n shr 24);
-  addr.a[4] := Byte(port shr 8);          { port on the wire is big-endian }
-  addr.a[5] := Byte(port);
+  addr.Len := 6;
+  addr.A[0] := Byte(n);
+  addr.A[1] := Byte(n shr 8);
+  addr.A[2] := Byte(n shr 16);
+  addr.A[3] := Byte(n shr 24);
+  addr.A[4] := Byte(port shr 8);          { port on the wire is big-endian }
+  addr.A[5] := Byte(port);
   Result := True;
 end;
 
@@ -70,24 +70,24 @@ begin
   sa.sin_family := AF_INET;
   { a[0..3] already hold the IP in network order; a[4..5] the port in
     network order. Copy them straight across. }
-  PByte(@sa.sin_addr)[0] := addr.a[0];
-  PByte(@sa.sin_addr)[1] := addr.a[1];
-  PByte(@sa.sin_addr)[2] := addr.a[2];
-  PByte(@sa.sin_addr)[3] := addr.a[3];
-  PByte(@sa.sin_port)[0] := addr.a[4];
-  PByte(@sa.sin_port)[1] := addr.a[5];
+  PByte(@sa.sin_addr)[0] := addr.A[0];
+  PByte(@sa.sin_addr)[1] := addr.A[1];
+  PByte(@sa.sin_addr)[2] := addr.A[2];
+  PByte(@sa.sin_addr)[3] := addr.A[3];
+  PByte(@sa.sin_port)[0] := addr.A[4];
+  PByte(@sa.sin_port)[1] := addr.A[5];
 end;
 
 procedure SockAddrToAddr(const sa: TInetSockAddr; out addr: TLanternAddr);
 begin
   FillChar(addr, SizeOf(addr), 0);
-  addr.len := 6;
-  addr.a[0] := PByte(@sa.sin_addr)[0];
-  addr.a[1] := PByte(@sa.sin_addr)[1];
-  addr.a[2] := PByte(@sa.sin_addr)[2];
-  addr.a[3] := PByte(@sa.sin_addr)[3];
-  addr.a[4] := PByte(@sa.sin_port)[0];
-  addr.a[5] := PByte(@sa.sin_port)[1];
+  addr.Len := 6;
+  addr.A[0] := PByte(@sa.sin_addr)[0];
+  addr.A[1] := PByte(@sa.sin_addr)[1];
+  addr.A[2] := PByte(@sa.sin_addr)[2];
+  addr.A[3] := PByte(@sa.sin_addr)[3];
+  addr.A[4] := PByte(@sa.sin_port)[0];
+  addr.A[5] := PByte(@sa.sin_port)[1];
 end;
 
 {$IFDEF UNIX}
@@ -96,8 +96,8 @@ var
   fd, fl: LongInt;
   sa: TInetSockAddr;
 begin
-  sk.valid := False;
-  sk.fd := -1;
+  sk.Valid := False;
+  sk.Fd := -1;
   fd := fpSocket(AF_INET, SOCK_DGRAM, 0);
   if fd < 0 then exit(False);
   fl := fpFcntl(fd, F_GETFL, 0);
@@ -113,16 +113,16 @@ begin
       exit(False);
     end;
   end;
-  sk.fd := fd;
-  sk.valid := True;
+  sk.Fd := fd;
+  sk.Valid := True;
   Result := True;
 end;
 
 procedure UdpClose(var sk: TLanternSocket);
 begin
-  if sk.valid then fpClose(sk.fd);
-  sk.valid := False;
-  sk.fd := -1;
+  if sk.Valid then fpClose(sk.Fd);
+  sk.Valid := False;
+  sk.Fd := -1;
 end;
 
 function UdpSend(var sk: TLanternSocket; const buf; len: PtrUInt;
@@ -131,9 +131,9 @@ var
   sa: TInetSockAddr;
   r: ssize_t;
 begin
-  if not sk.valid then exit(LanternErr);
+  if not sk.Valid then exit(LanternErr);
   AddrToSockAddr(dest, sa);
-  r := fpSendTo(sk.fd, @buf, len, 0, @sa, SizeOf(sa));
+  r := fpSendTo(sk.Fd, @buf, len, 0, @sa, SizeOf(sa));
   Result := LongInt(r);
 end;
 
@@ -145,9 +145,9 @@ var
   r: ssize_t;
 begin
   FillChar(from, SizeOf(from), 0);
-  if not sk.valid then exit(LanternErr);
+  if not sk.Valid then exit(LanternErr);
   sl := SizeOf(sa);
-  r := fpRecvFrom(sk.fd, @buf, cap, 0, @sa, @sl);
+  r := fpRecvFrom(sk.Fd, @buf, cap, 0, @sa, @sl);
   if r < 0 then begin
     if fpGetErrno = ESysEAGAIN then exit(0);   { nothing waiting }
     exit(LanternErr);
@@ -164,14 +164,14 @@ end;
   and WSAGetLastError = WSAEWOULDBLOCK for "nothing waiting". }
 function UdpOpen(out sk: TLanternSocket; bindPort: Word): Boolean;
 begin
-  sk.valid := False;
-  sk.fd := -1;
+  sk.Valid := False;
+  sk.Fd := -1;
   Result := False;
 end;
 
 procedure UdpClose(var sk: TLanternSocket);
 begin
-  sk.valid := False;
+  sk.Valid := False;
 end;
 
 function UdpSend(var sk: TLanternSocket; const buf; len: PtrUInt;

@@ -68,8 +68,8 @@ type
   { An opaque transport address, compared and copied over the first len
     bytes. This is the seam that keeps the core from naming a sockaddr. }
   TLanternAddr = record
-    len: Byte;
-    a: array[0 .. LanternAddrMax - 1] of Byte;
+    Len: Byte;
+    A: array[0 .. LanternAddrMax - 1] of Byte;
   end;
 
   { Start-time configuration. The arena size is computed from these fields
@@ -105,11 +105,11 @@ end;
 
 function LanternAddrEqual(const x, y: TLanternAddr): Boolean;
 var
-  i: Longint;
+  i: LongInt;
 begin
-  if x.len <> y.len then exit(False);
-  for i := 0 to x.len - 1 do
-    if x.a[i] <> y.a[i] then exit(False);
+  if x.Len <> y.Len then exit(False);
+  for i := 0 to x.Len - 1 do
+    if x.A[i] <> y.A[i] then exit(False);
   Result := True;
 end;
 

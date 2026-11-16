@@ -18,9 +18,9 @@ interface
 
 type
   TArena = record
-    base : PByte;     { the single GetMem block, nil until created       }
-    cap  : PtrUInt;   { total bytes                                      }
-    used : PtrUInt;   { bytes handed out so far                          }
+    Base : PByte;     { the single GetMem block, nil until created       }
+    Cap  : PtrUInt;   { total bytes                                      }
+    Used : PtrUInt;   { bytes handed out so far                          }
   end;
 
 const
@@ -49,39 +49,39 @@ end;
 
 function ArenaCreate(out a: TArena; totalBytes: PtrUInt): Boolean;
 begin
-  a.base := nil;
-  a.cap  := 0;
-  a.used := 0;
+  a.Base := nil;
+  a.Cap  := 0;
+  a.Used := 0;
   if totalBytes = 0 then exit(False);
-  a.base := GetMem(totalBytes);
-  if a.base = nil then exit(False);
-  FillChar(a.base^, totalBytes, 0);
-  a.cap := totalBytes;
+  a.Base := GetMem(totalBytes);
+  if a.Base = nil then exit(False);
+  FillChar(a.Base^, totalBytes, 0);
+  a.Cap := totalBytes;
   Result := True;
 end;
 
 procedure ArenaDestroy(var a: TArena);
 begin
-  if a.base <> nil then
-    FreeMem(a.base);
-  a.base := nil;
-  a.cap  := 0;
-  a.used := 0;
+  if a.Base <> nil then
+    FreeMem(a.Base);
+  a.Base := nil;
+  a.Cap  := 0;
+  a.Used := 0;
 end;
 
 function ArenaAlloc(var a: TArena; n: PtrUInt): Pointer;
 var
   start: PtrUInt;
 begin
-  start := AlignUp(a.used);
-  if start + n > a.cap then exit(nil);
-  Result := a.base + start;
-  a.used := start + n;
+  start := AlignUp(a.Used);
+  if start + n > a.Cap then exit(nil);
+  Result := a.Base + start;
+  a.Used := start + n;
 end;
 
 function ArenaRemaining(const a: TArena): PtrUInt;
 begin
-  Result := a.cap - a.used;
+  Result := a.Cap - a.Used;
 end;
 
 end.

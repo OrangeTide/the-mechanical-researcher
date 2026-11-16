@@ -30,53 +30,53 @@ type
   PLanternChan   = ^TLanternChan;
 
   TLanternChan = record
-    inUse  : Boolean;
-    id     : Byte;
-    mode   : Longint;    { cmReliable or cmUnreliable                    }
-    buf    : PByte;      { this channel's slice of the arena             }
-    bufLen : PtrUInt;
+    InUse  : Boolean;
+    Id     : Byte;
+    Mode   : LongInt;    { cmReliable or cmUnreliable                    }
+    Buf    : PByte;      { this channel's slice of the arena             }
+    BufLen : PtrUInt;
     { TODO: send-window head/tail, recv reorder bitmap, unreliable txq
       head/tail. All index into buf; none allocates. }
   end;
 
   TLanternConn = record
-    inUse      : Boolean;
-    state      : Longint;        { psClosed .. psClosing                 }
-    localId    : LongWord;       { our connection id                     }
-    remoteId   : LongWord;       { peer's connection id                  }
-    peer       : TLanternAddr;
-    nextFree   : Longint;        { freelist link while not inUse, else -1 }
-    lastRecvMs : QWord;
-    lastSendMs : QWord;
-    lastPingMs : QWord;
-    rttMs      : LongWord;
-    chans      : PLanternChan;    { array[cfg.MaxChan], carved in arena   }
+    InUse      : Boolean;
+    State      : LongInt;        { psClosed .. psClosing                 }
+    LocalId    : LongWord;       { our connection id                     }
+    RemoteId   : LongWord;       { peer's connection id                  }
+    Peer       : TLanternAddr;
+    NextFree   : LongInt;        { freelist link while not inUse, else -1 }
+    LastRecvMs : QWord;
+    LastSendMs : QWord;
+    LastPingMs : QWord;
+    RttMs      : LongWord;
+    Chans      : PLanternChan;    { array[cfg.MaxChan], carved in arena   }
   end;
 
   TLanternEvent = record
-    kind : Longint;              { peNone .. peRedirect                  }
-    ch   : PLanternChan;          { set for peData                        }
-    conn : PLanternConn;
+    Kind : LongInt;              { peNone .. peRedirect                  }
+    Ch   : PLanternChan;          { set for peData                        }
+    Conn : PLanternConn;
   end;
 
   TCookieKey = record
-    k0, k1: QWord;
+    K0, K1: QWord;
   end;
 
   TLanternServer = record
-    arena      : TArena;
-    cfg        : TLanternConfig;
-    isServer   : Boolean;
-    conns      : PLanternConn;    { array[cfg.MaxConns]                   }
-    freeHead   : Longint;        { first free slot index, -1 if full     }
-    freeCount  : Longint;
+    Arena      : TArena;
+    Cfg        : TLanternConfig;
+    IsServer   : Boolean;
+    Conns      : PLanternConn;    { array[cfg.MaxConns]                   }
+    FreeHead   : LongInt;        { first free slot index, -1 if full     }
+    FreeCount  : LongInt;
     { Stateless admission secret, two generations so a cookie issued just
       before a rotation still verifies. }
-    cookieKey  : array[0 .. 1] of TCookieKey;
-    cookieCur  : Longint;        { which generation is current           }
-    cookieEpoch: QWord;
+    CookieKey  : array[0 .. 1] of TCookieKey;
+    CookieCur  : LongInt;        { which generation is current           }
+    CookieEpoch: QWord;
     { Minimal one-slot event queue for the skeleton. }
-    ev         : TLanternEvent;
+    Ev         : TLanternEvent;
   end;
 
 { ---- Arena sizing (public so a tool or test can report it) ---- }
@@ -96,8 +96,8 @@ function LanternArenaSize(const cfg: TLanternConfig): PtrUInt;
 function LanternServerCreate(const cfg: TLanternConfig; isServer: Boolean): PLanternServer;
 procedure LanternServerDestroy(srv: PLanternServer);
 
-function LanternFreeCount(srv: PLanternServer): Longint;
-function LanternActiveCount(srv: PLanternServer): Longint;
+function LanternFreeCount(srv: PLanternServer): LongInt;
+function LanternActiveCount(srv: PLanternServer): LongInt;
 
 { ---- Routing and I/O (application owns the socket) ---- }
 
@@ -109,12 +109,12 @@ function LanternPeekId(const pkt; len: PtrUInt): LongWord;
 { Hand a received datagram to the core. from is the sender's address, nowMs
   the caller's monotonic clock. }
 function LanternFeed(srv: PLanternServer; const pkt; len: PtrUInt;
-                    const from: TLanternAddr; nowMs: QWord): Longint;
+                    const from: TLanternAddr; nowMs: QWord): LongInt;
 
 { Fill buf with the next datagram to transmit and set 'to'. Returns the byte
   count, 0 if nothing is queued, or a negative error. }
 function LanternSendNext(srv: PLanternServer; var buf; cap: PtrUInt;
-                        out dest: TLanternAddr; nowMs: QWord): Longint;
+                        out dest: TLanternAddr; nowMs: QWord): LongInt;
 
 { Advance timers: retransmit, keepalive, idle timeout, cookie rotation. }
 procedure LanternService(srv: PLanternServer; nowMs: QWord);
@@ -134,14 +134,14 @@ implementation
 
 { ---- Element addressing in the arena arrays ---- }
 
-function ConnAt(srv: PLanternServer; i: Longint): PLanternConn; inline;
+function ConnAt(srv: PLanternServer; i: LongInt): PLanternConn; inline;
 begin
-  Result := PLanternConn(PByte(srv^.conns) + PtrUInt(i) * SizeOf(TLanternConn));
+  Result := PLanternConn(PByte(srv^.Conns) + PtrUInt(i) * SizeOf(TLanternConn));
 end;
 
-function ChanAt(conn: PLanternConn; i: Longint): PLanternChan; inline;
+function ChanAt(conn: PLanternConn; i: LongInt): PLanternChan; inline;
 begin
-  Result := PLanternChan(PByte(conn^.chans) + PtrUInt(i) * SizeOf(TLanternChan));
+  Result := PLanternChan(PByte(conn^.Chans) + PtrUInt(i) * SizeOf(TLanternChan));
 end;
 
 { ---- Sizing ---- }
@@ -236,12 +236,12 @@ end;
 
 procedure CookieRotate(srv: PLanternServer);
 var
-  nextGen: Longint;
+  nextGen: LongInt;
 begin
-  nextGen := 1 - srv^.cookieCur;
-  LanternFillRandom(@srv^.cookieKey[nextGen], SizeOf(TCookieKey));
-  srv^.cookieCur := nextGen;
-  Inc(srv^.cookieEpoch);
+  nextGen := 1 - srv^.CookieCur;
+  LanternFillRandom(@srv^.CookieKey[nextGen], SizeOf(TCookieKey));
+  srv^.CookieCur := nextGen;
+  Inc(srv^.CookieEpoch);
 end;
 
 { ---- Lifecycle ---- }
@@ -252,43 +252,43 @@ var
   srv: PLanternServer;
   conn: PLanternConn;
   chan: PLanternChan;
-  i, j: Longint;
+  i, j: LongInt;
 begin
   if not ArenaCreate(a, LanternArenaSize(cfg)) then exit(nil);
 
   srv := ArenaAlloc(a, SizeOf(TLanternServer));
   if srv = nil then begin ArenaDestroy(a); exit(nil); end;
-  srv^.arena    := a;        { copy the handle into the header, which lives
+  srv^.Arena    := a;        { copy the handle into the header, which lives
                                inside the block it describes }
-  srv^.cfg      := cfg;
-  srv^.isServer := isServer;
-  srv^.cookieCur := 0;
-  srv^.cookieEpoch := 0;
-  srv^.ev.kind := peNone;
+  srv^.Cfg      := cfg;
+  srv^.IsServer := isServer;
+  srv^.CookieCur := 0;
+  srv^.CookieEpoch := 0;
+  srv^.Ev.Kind := peNone;
 
-  srv^.conns := ArenaAlloc(srv^.arena, PtrUInt(cfg.MaxConns) * SizeOf(TLanternConn));
-  if srv^.conns = nil then begin a := srv^.arena; ArenaDestroy(a); exit(nil); end;
+  srv^.Conns := ArenaAlloc(srv^.Arena, PtrUInt(cfg.MaxConns) * SizeOf(TLanternConn));
+  if srv^.Conns = nil then begin a := srv^.Arena; ArenaDestroy(a); exit(nil); end;
 
   for i := 0 to cfg.MaxConns - 1 do begin
     conn := ConnAt(srv, i);
-    conn^.inUse    := False;
-    conn^.state    := psClosed;
-    conn^.nextFree := i + 1;
-    conn^.chans := ArenaAlloc(srv^.arena, PtrUInt(cfg.MaxChan) * SizeOf(TLanternChan));
-    if conn^.chans = nil then begin a := srv^.arena; ArenaDestroy(a); exit(nil); end;
+    conn^.InUse    := False;
+    conn^.State    := psClosed;
+    conn^.NextFree := i + 1;
+    conn^.Chans := ArenaAlloc(srv^.Arena, PtrUInt(cfg.MaxChan) * SizeOf(TLanternChan));
+    if conn^.Chans = nil then begin a := srv^.Arena; ArenaDestroy(a); exit(nil); end;
     for j := 0 to cfg.MaxChan - 1 do begin
       chan := ChanAt(conn, j);
-      chan^.inUse  := False;
-      chan^.id     := j;
-      chan^.buf    := ArenaAlloc(srv^.arena, LanternPerChanBytes(cfg));
-      chan^.bufLen := LanternPerChanBytes(cfg);
-      if chan^.buf = nil then begin a := srv^.arena; ArenaDestroy(a); exit(nil); end;
+      chan^.InUse  := False;
+      chan^.Id     := j;
+      chan^.Buf    := ArenaAlloc(srv^.Arena, LanternPerChanBytes(cfg));
+      chan^.BufLen := LanternPerChanBytes(cfg);
+      if chan^.Buf = nil then begin a := srv^.Arena; ArenaDestroy(a); exit(nil); end;
     end;
   end;
   if cfg.MaxConns > 0 then
-    ConnAt(srv, cfg.MaxConns - 1)^.nextFree := -1;
-  srv^.freeHead  := 0;
-  srv^.freeCount := cfg.MaxConns;
+    ConnAt(srv, cfg.MaxConns - 1)^.NextFree := -1;
+  srv^.FreeHead  := 0;
+  srv^.FreeCount := cfg.MaxConns;
 
   Randomize;
   CookieRotate(srv);         { seed the current generation }
@@ -300,7 +300,7 @@ var
   a: TArena;
 begin
   if srv = nil then exit;
-  a := srv^.arena;           { read the handle before freeing the block it
+  a := srv^.Arena;           { read the handle before freeing the block it
                                is stored in }
   ArenaDestroy(a);
 end;
@@ -309,37 +309,37 @@ end;
 
 function TakeSlot(srv: PLanternServer): PLanternConn;
 var
-  idx: Longint;
+  idx: LongInt;
   conn: PLanternConn;
 begin
-  if srv^.freeHead < 0 then exit(nil);     { arena full: O(1) refusal }
-  idx := srv^.freeHead;
+  if srv^.FreeHead < 0 then exit(nil);     { arena full: O(1) refusal }
+  idx := srv^.FreeHead;
   conn := ConnAt(srv, idx);
-  srv^.freeHead := conn^.nextFree;
-  Dec(srv^.freeCount);
-  conn^.inUse    := True;
-  conn^.nextFree := -1;
-  conn^.state    := psConnecting;
+  srv^.FreeHead := conn^.NextFree;
+  Dec(srv^.FreeCount);
+  conn^.InUse    := True;
+  conn^.NextFree := -1;
+  conn^.State    := psConnecting;
   Result := conn;
 end;
 
-procedure ReturnSlot(srv: PLanternServer; conn: PLanternConn; idx: Longint);
+procedure ReturnSlot(srv: PLanternServer; conn: PLanternConn; idx: LongInt);
 begin
-  conn^.inUse    := False;
-  conn^.state    := psClosed;
-  conn^.nextFree := srv^.freeHead;
-  srv^.freeHead  := idx;
-  Inc(srv^.freeCount);
+  conn^.InUse    := False;
+  conn^.State    := psClosed;
+  conn^.NextFree := srv^.FreeHead;
+  srv^.FreeHead  := idx;
+  Inc(srv^.FreeCount);
 end;
 
-function LanternFreeCount(srv: PLanternServer): Longint;
+function LanternFreeCount(srv: PLanternServer): LongInt;
 begin
-  Result := srv^.freeCount;
+  Result := srv^.FreeCount;
 end;
 
-function LanternActiveCount(srv: PLanternServer): Longint;
+function LanternActiveCount(srv: PLanternServer): LongInt;
 begin
-  Result := Longint(srv^.cfg.MaxConns) - srv^.freeCount;
+  Result := LongInt(srv^.Cfg.MaxConns) - srv^.FreeCount;
 end;
 
 { ---- Cookie ---- }
@@ -351,9 +351,9 @@ var
   n, i: PtrUInt;
 begin
   n := 0;
-  tmp[n] := addr.len; Inc(n);
-  for i := 0 to addr.len - 1 do begin
-    tmp[n] := addr.a[i]; Inc(n);
+  tmp[n] := addr.Len; Inc(n);
+  for i := 0 to addr.Len - 1 do begin
+    tmp[n] := addr.A[i]; Inc(n);
   end;
   for i := 0 to 7 do begin
     tmp[n] := Byte(nonce shr (8 * i)); Inc(n);
@@ -361,14 +361,14 @@ begin
   for i := 0 to 7 do begin
     tmp[n] := Byte(epoch shr (8 * i)); Inc(n);
   end;
-  Result := SipHash24(srv^.cookieKey[srv^.cookieCur].k0,
-                      srv^.cookieKey[srv^.cookieCur].k1, @tmp[0], n);
+  Result := SipHash24(srv^.CookieKey[srv^.CookieCur].K0,
+                      srv^.CookieKey[srv^.CookieCur].K1, @tmp[0], n);
 end;
 
 function LanternCookieVerify(srv: PLanternServer; const addr: TLanternAddr;
                            nonce, epoch, cookie: QWord): Boolean;
 var
-  g: Longint;
+  g: LongInt;
   tmp: array[0 .. LanternAddrMax + 16] of Byte;
   n, i: PtrUInt;
   mac: QWord;
@@ -376,12 +376,12 @@ begin
   { Check both generations so a cookie issued just before a rotation still
     verifies. The input is assembled once and hashed under each key. }
   n := 0;
-  tmp[n] := addr.len; Inc(n);
-  for i := 0 to addr.len - 1 do begin tmp[n] := addr.a[i]; Inc(n); end;
+  tmp[n] := addr.Len; Inc(n);
+  for i := 0 to addr.Len - 1 do begin tmp[n] := addr.A[i]; Inc(n); end;
   for i := 0 to 7 do begin tmp[n] := Byte(nonce shr (8 * i)); Inc(n); end;
   for i := 0 to 7 do begin tmp[n] := Byte(epoch shr (8 * i)); Inc(n); end;
   for g := 0 to 1 do begin
-    mac := SipHash24(srv^.cookieKey[g].k0, srv^.cookieKey[g].k1, @tmp[0], n);
+    mac := SipHash24(srv^.CookieKey[g].K0, srv^.CookieKey[g].K1, @tmp[0], n);
     if mac = cookie then exit(True);
   end;
   Result := False;
@@ -407,7 +407,7 @@ begin
 end;
 
 function LanternFeed(srv: PLanternServer; const pkt; len: PtrUInt;
-                    const from: TLanternAddr; nowMs: QWord): Longint;
+                    const from: TLanternAddr; nowMs: QWord): LongInt;
 begin
   { TODO: parse the header, route by LanternPeekId, run admission for id 0
     (issue or verify a cookie, then TakeSlot or REFUSE), and dispatch frames
@@ -419,7 +419,7 @@ begin
 end;
 
 function LanternSendNext(srv: PLanternServer; var buf; cap: PtrUInt;
-                        out dest: TLanternAddr; nowMs: QWord): Longint;
+                        out dest: TLanternAddr; nowMs: QWord): LongInt;
 begin
   { TODO: pack queued frames from every channel into one datagram, padded to
     MTU, and set dest. Honors flow-control credit and the reliable send
@@ -441,12 +441,12 @@ end;
 
 function LanternPoll(srv: PLanternServer; out ev: TLanternEvent): Boolean;
 begin
-  if (srv = nil) or (srv^.ev.kind = peNone) then begin
+  if (srv = nil) or (srv^.Ev.Kind = peNone) then begin
     FillChar(ev, SizeOf(ev), 0);
     exit(False);
   end;
-  ev := srv^.ev;
-  srv^.ev.kind := peNone;
+  ev := srv^.Ev;
+  srv^.Ev.Kind := peNone;
   Result := True;
 end;
 

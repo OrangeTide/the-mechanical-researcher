@@ -31,20 +31,20 @@ const
   khChanged  = 2;   { host known but key differs: refuse and warn          }
 
 { Check a presented host key against known_hosts. Returns one of kh*. }
-function AuthCheckHostKey(const hostName: string; const key: TLanternKey): Longint;
+function AuthCheckHostKey(const hostName: string; const key: TLanternKey): LongInt;
 
 { Append a newly trusted host key to known_hosts. }
 function AuthRememberHostKey(const hostName: string; const key: TLanternKey): Boolean;
 
 { Client side: produce a login offer (pubkey signature or password). }
-function AuthClientLogin(var s: TLanternSession; var buf; cap: PtrUInt): Longint;
+function AuthClientLogin(var s: TLanternSession; var buf; cap: PtrUInt): LongInt;
 
 { Server side: verify a login offer against an authorized-keys list. }
-function AuthServerVerify(var s: TLanternSession; const buf; len: PtrUInt): Longint;
+function AuthServerVerify(var s: TLanternSession; const buf; len: PtrUInt): LongInt;
 
 implementation
 
-function AuthCheckHostKey(const hostName: string; const key: TLanternKey): Longint;
+function AuthCheckHostKey(const hostName: string; const key: TLanternKey): LongInt;
 begin
   { TODO: scan known_hosts for hostName; compare the 32-byte key. }
   Result := khNew;
@@ -56,14 +56,14 @@ begin
   Result := False;
 end;
 
-function AuthClientLogin(var s: TLanternSession; var buf; cap: PtrUInt): Longint;
+function AuthClientLogin(var s: TLanternSession; var buf; cap: PtrUInt): LongInt;
 begin
   { TODO: Ed25519-sign a digest that includes the session id, or fall back
     to sending a password over the already-encrypted channel. }
   Result := LanternErr;
 end;
 
-function AuthServerVerify(var s: TLanternSession; const buf; len: PtrUInt): Longint;
+function AuthServerVerify(var s: TLanternSession; const buf; len: PtrUInt): LongInt;
 begin
   { TODO: verify the signature against authorized_keys, or check the
     password. }
