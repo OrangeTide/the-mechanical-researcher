@@ -22,3 +22,4 @@ rv32-bitmanip
 rv32-zcb
 rv32-interrupts
 rv32-coverage
+lantern
