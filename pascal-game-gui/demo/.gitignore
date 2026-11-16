@@ -1,0 +1,6 @@
+demo
+*.o
+*.ppu
+*.bmp
+link*.res
+ppas*.sh

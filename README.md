@@ -31,6 +31,7 @@ A collection of research topics, primarily gathered through agentic AI sessions,
 - [Interrupts, and the Bug Three Test Methods Missed](rv32-interrupts/)
 - [Coverage Told Us About the Bug and We Did Not Listen](rv32-coverage/)
 - [Lantern: A Static Reliable-Channel Library for FreePascal](lantern/)
+- [Windows Over the Game World: A Retained-Mode GUI for FreePascal](pascal-game-gui/)
 - [Component Pascal](notes/component-pascal.md)
 
 ## Build & Deploy
