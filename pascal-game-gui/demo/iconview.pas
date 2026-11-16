@@ -68,26 +68,26 @@ procedure TDeskIcon.Draw(cv: TCanvas; theme: TTheme);
 var r, tile: TRect; cx: LongInt;
 begin
   r := AbsRect;
-  cx := (r.left + r.right) div 2;
-  tile := Rect(cx - 16, r.top + 2, cx + 16, r.top + 34);
+  cx := (r.Left + r.Right) div 2;
+  tile := Rect(cx - 16, r.Top + 2, cx + 16, r.Top + 34);
   cv.FillRect(tile, Color);
   cv.FrameRect(tile, clBlack);
   cv.DrawText(cx - cv.TextWidth(Glyph) div 2,
-              (tile.top + tile.bottom) div 2 - cv.TextHeight div 2, Glyph, clBlack);
-  cv.DrawText(cx - cv.TextWidth(Caption) div 2, r.top + 38, Caption, clBlack);
+              (tile.Top + tile.Bottom) div 2 - cv.TextHeight div 2, Glyph, clBlack);
+  cv.DrawText(cx - cv.TextWidth(Caption) div 2, r.Top + 38, Caption, clBlack);
 end;
 
 procedure TDeskIcon.OnMouseDown(var e: TUIEvent);
 var a: TRect;
 begin
-  if (e.button = 2) or e.ctrl then begin
-    FView.OpenMenuFor(Self, e.pos);
+  if (e.Button = 2) or e.Ctrl then begin
+    FView.OpenMenuFor(Self, e.Pos);
     exit;
   end;
   FMoving := True;
   a := AbsRect;
-  FGrabDX := e.pos.x - a.left;
-  FGrabDY := e.pos.y - a.top;
+  FGrabDX := e.Pos.X - a.Left;
+  FGrabDY := e.Pos.Y - a.Top;
 end;
 
 procedure TDeskIcon.OnMouseMove(var e: TUIEvent);
@@ -97,8 +97,8 @@ begin
   pa := FParent.AbsRect;
   w := RectW(FBounds); h := RectH(FBounds);
   cw := RectW(FParent.Bounds); ch := RectH(FParent.Bounds);
-  nx := (e.pos.x - FGrabDX) - pa.left;
-  ny := (e.pos.y - FGrabDY) - pa.top;
+  nx := (e.Pos.X - FGrabDX) - pa.Left;
+  ny := (e.Pos.Y - FGrabDY) - pa.Top;
   if nx < 0 then nx := 0;
   if ny < 0 then ny := 0;
   if nx + w > cw then nx := cw - w;
@@ -143,7 +143,7 @@ begin
     0: { Open: a real app would act here; the demo does nothing }
        ;
     1: AddIcon(FMenuTarget.Caption, FMenuTarget.Color, FMenuTarget.Glyph,
-               FMenuTarget.Bounds.left + 18, FMenuTarget.Bounds.top + 18);
+               FMenuTarget.Bounds.Left + 18, FMenuTarget.Bounds.Top + 18);
     2: begin
          RemoveChild(FMenuTarget);
          FMenuTarget.Free;      { safe: HandlePopup is a method of the view, not the icon }

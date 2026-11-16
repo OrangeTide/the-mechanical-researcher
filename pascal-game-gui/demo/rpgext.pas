@@ -114,8 +114,8 @@ begin
   cv.FillRect(r, clWhite);
   skin := TColor($FFD9C9A8);
   line := TColor($FF8A764F);
-  cx := (r.left + r.right) div 2;
-  cy := r.top + 20;
+  cx := (r.Left + r.Right) div 2;
+  cy := r.Top + 20;
   { blocky figure: head, torso, arms, legs }
   cv.FillRect(Rect(cx - 12, cy, cx + 12, cy + 22), skin);        { head }
   cv.FrameRect(Rect(cx - 12, cy, cx + 12, cy + 22), line);

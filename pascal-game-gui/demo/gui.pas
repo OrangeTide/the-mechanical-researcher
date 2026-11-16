@@ -14,29 +14,29 @@ uses
 type
   TColor = LongWord;   { $AARRGGBB }
 
-  TPoint = record x, y: LongInt; end;
-  TRect  = record left, top, right, bottom: LongInt; end;
+  TPoint = record X, Y: LongInt; end;
+  TRect  = record Left, Top, Right, Bottom: LongInt; end;
 
   TEventKind = (ekMouseDown, ekMouseUp, ekMouseMove, ekMouseWheel,
                 ekKeyDown, ekKeyUp);
 
   TUIEvent = record
-    kind:    TEventKind;
-    pos:     TPoint;      { mouse position, screen coordinates }
-    button:  LongInt;     { 0 = left, 1 = middle, 2 = right }
-    key:     LongInt;     { virtual key code }
-    wheel:   LongInt;     { signed wheel delta }
-    ctrl:    Boolean;     { control key held (for control-click) }
-    handled: Boolean;
+    Kind:    TEventKind;
+    Pos:     TPoint;      { mouse position, screen coordinates }
+    Button:  LongInt;     { 0 = left, 1 = middle, 2 = right }
+    Key:     LongInt;     { virtual key code }
+    Wheel:   LongInt;     { signed wheel delta }
+    Ctrl:    Boolean;     { control key held (for control-click) }
+    Handled: Boolean;
   end;
 
   { ---- a draggable item: the game-defined payload ---- }
   TDragItem = class
   public
-    name:     string;
-    category: LongInt;    { a single category bit, for drop validation }
-    color:    TColor;     { tile color, stands in for item art }
-    glyph:    Char;       { letter drawn on the tile }
+    Name:     string;
+    Category: LongInt;    { a single category bit, for drop validation }
+    Color:    TColor;     { tile color, stands in for item art }
+    Glyph:    Char;       { letter drawn on the tile }
     constructor Create(const AName: string; ACat: LongInt; AColor: TColor; AGlyph: Char);
   end;
 
@@ -316,26 +316,26 @@ implementation
 
 function Rect(l, t, r, b: LongInt): TRect;
 begin
-  Rect.left := l; Rect.top := t; Rect.right := r; Rect.bottom := b;
+  Rect.Left := l; Rect.Top := t; Rect.Right := r; Rect.Bottom := b;
 end;
 
 function Pt(x, y: LongInt): TPoint;
 begin
-  Pt.x := x; Pt.y := y;
+  Pt.X := x; Pt.Y := y;
 end;
 
 function PtInRect(const r: TRect; const p: TPoint): Boolean;
 begin
-  PtInRect := (p.x >= r.left) and (p.x < r.right) and
-              (p.y >= r.top) and (p.y < r.bottom);
+  PtInRect := (p.X >= r.Left) and (p.X < r.Right) and
+              (p.Y >= r.Top) and (p.Y < r.Bottom);
 end;
 
-function RectW(const r: TRect): LongInt; begin RectW := r.right - r.left; end;
-function RectH(const r: TRect): LongInt; begin RectH := r.bottom - r.top; end;
+function RectW(const r: TRect): LongInt; begin RectW := r.Right - r.Left; end;
+function RectH(const r: TRect): LongInt; begin RectH := r.Bottom - r.Top; end;
 
 function Inset(const r: TRect; d: LongInt): TRect;
 begin
-  Inset := Rect(r.left + d, r.top + d, r.right - d, r.bottom - d);
+  Inset := Rect(r.Left + d, r.Top + d, r.Right - d, r.Bottom - d);
 end;
 
 { ---- TDragItem ---- }
@@ -343,7 +343,7 @@ end;
 constructor TDragItem.Create(const AName: string; ACat: LongInt; AColor: TColor; AGlyph: Char);
 begin
   inherited Create;
-  name := AName; category := ACat; color := AColor; glyph := AGlyph;
+  Name := AName; Category := ACat; Color := AColor; Glyph := AGlyph;
 end;
 
 { ---- TWidget ---- }
@@ -399,8 +399,8 @@ begin
   r := FBounds;
   p := FParent;
   while p <> nil do begin
-    r.left := r.left + p.FBounds.left;  r.right := r.right + p.FBounds.left;
-    r.top := r.top + p.FBounds.top;     r.bottom := r.bottom + p.FBounds.top;
+    r.Left := r.Left + p.FBounds.Left;  r.Right := r.Right + p.FBounds.Left;
+    r.Top := r.Top + p.FBounds.Top;     r.Bottom := r.Bottom + p.FBounds.Top;
     p := p.FParent;
   end;
   AbsRect := r;
@@ -508,42 +508,42 @@ end;
 procedure TDesktop.Dispatch(var e: TUIEvent);
 var hit, tgt: TWidget; it: TDragItem; win: TWidget;
 begin
-  FMouse := e.pos;
+  FMouse := e.Pos;
 
   { ---- an open context menu eats the next press ---- }
-  if (FPopup <> nil) and (e.kind = ekMouseDown) then begin
-    if PtInRect(FPopup.AbsRect, e.pos) then FPopup.OnMouseDown(e);
+  if (FPopup <> nil) and (e.Kind = ekMouseDown) then begin
+    if PtInRect(FPopup.AbsRect, e.Pos) then FPopup.OnMouseDown(e);
     DismissPopup;
     exit;
   end;
 
   { ---- a drag is in progress: route to the drag machinery ---- }
   if FDrag <> nil then begin
-    if e.kind = ekMouseUp then begin
-      hit := HitTest(e.pos);
+    if e.Kind = ekMouseUp then begin
+      hit := HitTest(e.Pos);
       tgt := nil;
-      if hit <> nil then tgt := FindDropTarget(hit, FDrag, e.pos);
+      if hit <> nil then tgt := FindDropTarget(hit, FDrag, e.Pos);
       it := FDrag; FDrag := nil;
       if tgt <> nil then
-        tgt.DragDrop(it, e.pos)
+        tgt.DragDrop(it, e.Pos)
       else
-        FDragSrc.DragDrop(it, e.pos);   { return to source: no lost items }
+        FDragSrc.DragDrop(it, e.Pos);   { return to source: no lost items }
       FDragSrc := nil;
     end;
     exit;
   end;
 
-  case e.kind of
+  case e.Kind of
     ekMouseDown:
       begin
-        hit := HitTest(e.pos);
+        hit := HitTest(e.Pos);
         if (hit = nil) or (hit is TDesktop) or (hit is TGameView) then exit;
         { bring the owning window to front }
         win := hit;
         while (win <> nil) and (not (win is TWindow)) do win := win.Parent;
         if win is TWindow then BringToFront(TWindow(win));
         { does this press pick up an item? }
-        it := hit.DragStart(e.pos);
+        it := hit.DragStart(e.Pos);
         if it <> nil then begin
           FDrag := it; FDragSrc := hit;
         end else begin
@@ -562,10 +562,10 @@ begin
       end;
     ekMouseWheel:
       begin
-        hit := HitTest(e.pos);
+        hit := HitTest(e.Pos);
         while hit <> nil do begin
           hit.OnMouseWheel(e);
-          if e.handled then break;
+          if e.Handled then break;
           hit := hit.Parent;
         end;
       end;
@@ -582,12 +582,12 @@ begin
     TWidget(FChildren[i]).Paint(cv, FTheme);
   { drag image follows the cursor }
   if FDrag <> nil then begin
-    r := Rect(FMouse.x - 16, FMouse.y - 16, FMouse.x + 16, FMouse.y + 16);
-    cv.FillRect(r, FDrag.color);
+    r := Rect(FMouse.X - 16, FMouse.Y - 16, FMouse.X + 16, FMouse.Y + 16);
+    cv.FillRect(r, FDrag.Color);
     cv.FrameRect(r, clBlack);
     it := FDrag;
-    cv.DrawText(FMouse.x - cv.TextWidth(it.glyph) div 2,
-                FMouse.y - cv.TextHeight div 2, it.glyph, clBlack);
+    cv.DrawText(FMouse.X - cv.TextWidth(it.Glyph) div 2,
+                FMouse.Y - cv.TextHeight div 2, it.Glyph, clBlack);
   end;
 end;
 
@@ -634,28 +634,28 @@ function TWindow.TitleBarRect: TRect;
 var r: TRect;
 begin
   r := AbsRect;
-  TitleBarRect := Rect(r.left, r.top, r.right, r.top + Root.Theme.TitleBarHeight);
+  TitleBarRect := Rect(r.Left, r.Top, r.Right, r.Top + Root.Theme.TitleBarHeight);
 end;
 
 function TWindow.CloseBoxRect: TRect;
 var tb: TRect;
 begin
   tb := TitleBarRect;
-  CloseBoxRect := Rect(tb.left + 6, tb.top + 6, tb.left + 18, tb.top + 18);
+  CloseBoxRect := Rect(tb.Left + 6, tb.Top + 6, tb.Left + 18, tb.Top + 18);
 end;
 
 function TWindow.ZoomBoxRect: TRect;
 var r: TRect;
 begin
   r := AbsRect;
-  ZoomBoxRect := Rect(r.right - 18, r.top + 6, r.right - 6, r.top + 18);
+  ZoomBoxRect := Rect(r.Right - 18, r.Top + 6, r.Right - 6, r.Top + 18);
 end;
 
 function TWindow.GrowBoxRect: TRect;
 var r: TRect;
 begin
   r := AbsRect;
-  GrowBoxRect := Rect(r.right - 16, r.bottom - 16, r.right, r.bottom);
+  GrowBoxRect := Rect(r.Right - 16, r.Bottom - 16, r.Right, r.Bottom);
 end;
 
 function TWindow.ContentRect: TRect;
@@ -689,26 +689,26 @@ end;
 procedure TWindow.OnMouseDown(var e: TUIEvent);
 var r: TRect;
 begin
-  if (wfClose in FFlags) and PtInRect(CloseBoxRect, e.pos) then begin
+  if (wfClose in FFlags) and PtInRect(CloseBoxRect, e.Pos) then begin
     FVisible := False;
     exit;
   end;
-  if (wfZoom in FFlags) and PtInRect(ZoomBoxRect, e.pos) then begin
+  if (wfZoom in FFlags) and PtInRect(ZoomBoxRect, e.Pos) then begin
     ToggleZoom;
     exit;
   end;
-  if (wfGrow in FFlags) and PtInRect(GrowBoxRect, e.pos) then begin
+  if (wfGrow in FFlags) and PtInRect(GrowBoxRect, e.Pos) then begin
     FResizing := True;
     r := AbsRect;
-    FGrabDX := r.right - e.pos.x;      { mouse to right edge }
-    FGrabDY := r.bottom - e.pos.y;     { mouse to bottom edge }
+    FGrabDX := r.Right - e.Pos.X;      { mouse to right edge }
+    FGrabDY := r.Bottom - e.Pos.Y;     { mouse to bottom edge }
     exit;
   end;
-  if (wfDrag in FFlags) and PtInRect(TitleBarRect, e.pos) then begin
+  if (wfDrag in FFlags) and PtInRect(TitleBarRect, e.Pos) then begin
     FMoving := True;
     r := AbsRect;
-    FGrabDX := e.pos.x - r.left;
-    FGrabDY := e.pos.y - r.top;
+    FGrabDX := e.Pos.X - r.Left;
+    FGrabDY := e.Pos.Y - r.Top;
   end;
 end;
 
@@ -718,15 +718,15 @@ begin
   { top-level windows sit on the desktop at (0,0), so screen == parent coords }
   if FMoving then begin
     w := RectW(FBounds); h := RectH(FBounds);
-    nx := e.pos.x - FGrabDX; ny := e.pos.y - FGrabDY;
+    nx := e.Pos.X - FGrabDX; ny := e.Pos.Y - FGrabDY;
     SetBounds(nx, ny, nx + w, ny + h);
     FZoomed := False;
   end else if FResizing then begin
-    nr := e.pos.x + FGrabDX;
-    nb := e.pos.y + FGrabDY;
-    if nr - FBounds.left < FMinW then nr := FBounds.left + FMinW;
-    if nb - FBounds.top  < FMinH then nb := FBounds.top + FMinH;
-    SetBounds(FBounds.left, FBounds.top, nr, nb);
+    nr := e.Pos.X + FGrabDX;
+    nb := e.Pos.Y + FGrabDY;
+    if nr - FBounds.Left < FMinW then nr := FBounds.Left + FMinW;
+    if nb - FBounds.Top  < FMinH then nb := FBounds.Top + FMinH;
+    SetBounds(FBounds.Left, FBounds.Top, nr, nb);
     UpdateContentBounds;
     FZoomed := False;
   end;
@@ -752,7 +752,7 @@ procedure TLabel.Draw(cv: TCanvas; theme: TTheme);
 var r: TRect;
 begin
   r := AbsRect;
-  cv.DrawText(r.left, r.top, Caption, TextColor);
+  cv.DrawText(r.Left, r.Top, Caption, TextColor);
 end;
 
 { ---- TButton ---- }
@@ -777,7 +777,7 @@ end;
 procedure TButton.OnMouseUp(var e: TUIEvent);
 begin
   FPressed := False;
-  if PtInRect(AbsRect, e.pos) and (OnClick <> nil) then OnClick(Self);
+  if PtInRect(AbsRect, e.Pos) and (OnClick <> nil) then OnClick(Self);
 end;
 
 { ---- TItemSlot ---- }
@@ -796,11 +796,11 @@ begin
   theme.DrawSlot(cv, r, False, FItem <> nil);
   if FItem <> nil then begin
     inr := Inset(r, 3);
-    cv.FillRect(inr, FItem.color);
+    cv.FillRect(inr, FItem.Color);
     cv.FrameRect(inr, clBlack);
-    cv.DrawText((r.left + r.right) div 2 - cv.TextWidth(FItem.glyph) div 2,
-                (r.top + r.bottom) div 2 - cv.TextHeight div 2,
-                FItem.glyph, clBlack);
+    cv.DrawText((r.Left + r.Right) div 2 - cv.TextWidth(FItem.Glyph) div 2,
+                (r.Top + r.Bottom) div 2 - cv.TextHeight div 2,
+                FItem.Glyph, clBlack);
   end;
 end;
 
@@ -817,7 +817,7 @@ end;
 function TItemSlot.DragAccepts(it: TDragItem): Boolean;
 begin
   DragAccepts := (FItem = nil) and
-                 ((FAccepts = 0) or ((FAccepts and it.category) <> 0));
+                 ((FAccepts = 0) or ((FAccepts and it.Category) <> 0));
 end;
 
 procedure TItemSlot.DragDrop(it: TDragItem; const p: TPoint);
@@ -866,8 +866,8 @@ var i: LongInt; r, b: TRect;
 begin
   b := AbsRect;
   for i := 0 to High(FCaptions) do begin
-    r := Rect(b.left + i * (FTabW + 2), b.top,
-              b.left + i * (FTabW + 2) + FTabW, b.bottom);
+    r := Rect(b.Left + i * (FTabW + 2), b.Top,
+              b.Left + i * (FTabW + 2) + FTabW, b.Bottom);
     theme.DrawTab(cv, r, FCaptions[i], i = FActive);
   end;
 end;
@@ -876,7 +876,7 @@ procedure TTabBar.OnMouseDown(var e: TUIEvent);
 var b: TRect; i, rel: LongInt;
 begin
   b := AbsRect;
-  rel := e.pos.x - b.left;
+  rel := e.Pos.X - b.Left;
   i := rel div (FTabW + 2);
   if (i >= 0) and (i <= High(FCaptions)) then begin
     FActive := i;
@@ -908,7 +908,7 @@ begin
   if MaxScroll < 0 then MaxScroll := 0;
 end;
 
-function TScrollView.TrackTop: LongInt; begin TrackTop := AbsRect.top + FBarW; end;
+function TScrollView.TrackTop: LongInt; begin TrackTop := AbsRect.Top + FBarW; end;
 function TScrollView.TrackH: LongInt; begin TrackH := RectH(FBounds) - 2 * FBarW; end;
 
 procedure TScrollView.Reposition;
@@ -937,14 +937,14 @@ function TScrollView.ViewportRect: TRect;
 var r: TRect;
 begin
   r := AbsRect;
-  ViewportRect := Rect(r.left, r.top, r.right - FBarW, r.bottom);
+  ViewportRect := Rect(r.Left, r.Top, r.Right - FBarW, r.Bottom);
 end;
 
 function TScrollView.ScrollbarRect: TRect;
 var r: TRect;
 begin
   r := AbsRect;
-  ScrollbarRect := Rect(r.right - FBarW, r.top, r.right, r.bottom);
+  ScrollbarRect := Rect(r.Right - FBarW, r.Top, r.Right, r.Bottom);
 end;
 
 function TScrollView.ThumbRect: TRect;
@@ -957,7 +957,7 @@ begin
   if th < 20 then th := 20;
   if MaxScroll <= 0 then ty := tt
   else ty := tt + ((trk - th) * FScrollY) div MaxScroll;
-  ThumbRect := Rect(bar.left + 2, ty, bar.right - 2, ty + th);
+  ThumbRect := Rect(bar.Left + 2, ty, bar.Right - 2, ty + th);
 end;
 
 procedure TScrollView.Paint(cv: TCanvas; theme: TTheme);
@@ -977,14 +977,14 @@ procedure TScrollView.OnMouseDown(var e: TUIEvent);
 var bar: TRect;
 begin
   bar := ScrollbarRect;
-  if not PtInRect(bar, e.pos) then exit;
-  if e.pos.y < bar.top + FBarW then SetScrollY(FScrollY - 24)
-  else if e.pos.y >= bar.bottom - FBarW then SetScrollY(FScrollY + 24)
-  else if PtInRect(ThumbRect, e.pos) then begin
+  if not PtInRect(bar, e.Pos) then exit;
+  if e.Pos.Y < bar.Top + FBarW then SetScrollY(FScrollY - 24)
+  else if e.Pos.Y >= bar.Bottom - FBarW then SetScrollY(FScrollY + 24)
+  else if PtInRect(ThumbRect, e.Pos) then begin
     FThumbDrag := True;
-    FThumbGrab := e.pos.y - ThumbRect.top;
+    FThumbGrab := e.Pos.Y - ThumbRect.Top;
   end
-  else if e.pos.y < ThumbRect.top then SetScrollY(FScrollY - ViewportH)
+  else if e.Pos.Y < ThumbRect.Top then SetScrollY(FScrollY - ViewportH)
   else SetScrollY(FScrollY + ViewportH);
 end;
 
@@ -993,7 +993,7 @@ var th, newTop, denom: LongInt;
 begin
   if not FThumbDrag then exit;
   th := RectH(ThumbRect);
-  newTop := e.pos.y - FThumbGrab;
+  newTop := e.Pos.Y - FThumbGrab;
   denom := TrackH - th;
   if denom <= 0 then exit;
   SetScrollY(((newTop - TrackTop) * MaxScroll) div denom);
@@ -1006,8 +1006,8 @@ end;
 
 procedure TScrollView.OnMouseWheel(var e: TUIEvent);
 begin
-  SetScrollY(FScrollY - e.wheel * 24);
-  e.handled := True;
+  SetScrollY(FScrollY - e.Wheel * 24);
+  e.Handled := True;
 end;
 
 { ---- TPopupMenu ---- }
@@ -1032,10 +1032,10 @@ begin
   w := w + 16;
   d := Root;
   deskW := RectW(d.Bounds); deskH := RectH(d.Bounds);
-  if at.x + w > deskW then at.x := deskW - w;
-  if at.y + Length(items) * FItemH + 4 > deskH then
-    at.y := deskH - (Length(items) * FItemH + 4);
-  SetBounds(at.x, at.y, at.x + w, at.y + Length(items) * FItemH + 4);
+  if at.X + w > deskW then at.X := deskW - w;
+  if at.Y + Length(items) * FItemH + 4 > deskH then
+    at.Y := deskH - (Length(items) * FItemH + 4);
+  SetBounds(at.X, at.Y, at.X + w, at.Y + Length(items) * FItemH + 4);
 end;
 
 procedure TPopupMenu.Draw(cv: TCanvas; theme: TTheme);
@@ -1045,14 +1045,14 @@ begin
   cv.FillRect(r, clWhite);
   cv.FrameRect(r, clBlack);
   for i := 0 to High(FItems) do
-    cv.DrawText(r.left + 8, r.top + 4 + i * FItemH, FItems[i], clBlack);
+    cv.DrawText(r.Left + 8, r.Top + 4 + i * FItemH, FItems[i], clBlack);
 end;
 
 procedure TPopupMenu.OnMouseDown(var e: TUIEvent);
 var idx: LongInt; r: TRect;
 begin
   r := AbsRect;
-  idx := (e.pos.y - (r.top + 2)) div FItemH;
+  idx := (e.Pos.Y - (r.Top + 2)) div FItemH;
   if (idx >= 0) and (idx <= High(FItems)) and (FOnSelect <> nil) then
     FOnSelect(idx);
 end;

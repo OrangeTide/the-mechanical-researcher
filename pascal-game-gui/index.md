@@ -165,11 +165,11 @@ type
     procedure SetClip(const r: TRect); virtual; abstract;
     procedure FillRect(const r: TRect; c: TColor); virtual; abstract;
     procedure FrameRect(const r: TRect; c: TColor); virtual; abstract;
-    procedure HLine(x1, x2, y: Longint; c: TColor); virtual; abstract;
-    procedure VLine(x, y1, y2: Longint; c: TColor); virtual; abstract;
-    procedure DrawText(x, y: Longint; const s: string; c: TColor); virtual; abstract;
-    function  TextWidth(const s: string): Longint; virtual; abstract;
-    procedure DrawBitmap(x, y: Longint; bmp: TBitmap); virtual; abstract;
+    procedure HLine(x1, x2, y: LongInt; c: TColor); virtual; abstract;
+    procedure VLine(x, y1, y2: LongInt; c: TColor); virtual; abstract;
+    procedure DrawText(x, y: LongInt; const s: string; c: TColor); virtual; abstract;
+    function  TextWidth(const s: string): LongInt; virtual; abstract;
+    procedure DrawBitmap(x, y: LongInt; bmp: TBitmap); virtual; abstract;
   end;
 ```
 
@@ -185,19 +185,19 @@ records passed by reference so a handler can mark one consumed.
 
 ```pascal
 type
-  TPoint = record x, y: Longint; end;
-  TRect  = record left, top, right, bottom: Longint; end;
+  TPoint = record X, Y: LongInt; end;
+  TRect  = record Left, Top, Right, Bottom: LongInt; end;
 
   TEventKind = (ekMouseDown, ekMouseUp, ekMouseMove, ekMouseWheel,
                 ekKeyDown, ekKeyUp);
 
   TUIEvent = record
-    kind:    TEventKind;
-    pos:     TPoint;      { mouse position in root (screen) coordinates }
-    button:  Longint;     { 0 = left, 1 = right, 2 = middle }
-    key:     Longint;     { virtual key code, for key events }
-    wheel:   Longint;     { signed wheel delta }
-    handled: Boolean;     { a handler sets this to stop propagation }
+    Kind:    TEventKind;
+    Pos:     TPoint;      { mouse position in root (screen) coordinates }
+    Button:  LongInt;     { 0 = left, 1 = right, 2 = middle }
+    Key:     LongInt;     { virtual key code, for key events }
+    Wheel:   LongInt;     { signed wheel delta }
+    Handled: Boolean;     { a handler sets this to stop propagation }
   end;
 ```
 
@@ -401,7 +401,7 @@ type
                          pressed, isDefault, enabled: Boolean); virtual; abstract;
     procedure DrawSlot(cv: TCanvas; const r: TRect; hot, filled: Boolean); virtual; abstract;
     procedure DrawGauge(cv: TCanvas; const r: TRect; frac: Single); virtual; abstract;
-    function  TitleBarHeight: Longint; virtual; abstract;
+    function  TitleBarHeight: LongInt; virtual; abstract;
   end;
 ```
 
@@ -504,17 +504,17 @@ icon to draw and to drag.
 ```pascal
 type
   TDragItem = class
-    category: Longint;    { game-defined: weapon, armor, potion, key... }
-    handle:   Pointer;    { game-defined: index or pointer into item data }
-    icon:     TBitmap;    { drawn in the slot and under the cursor while dragging }
+    Category: LongInt;    { game-defined: weapon, armor, potion, key... }
+    Handle:   Pointer;    { game-defined: index or pointer into item data }
+    Icon:     TBitmap;    { drawn in the slot and under the cursor while dragging }
   end;
 
   TItemSlot = class(TWidget)
   private
     FItem:    TDragItem;
-    FAccepts: Longint;    { bitmask of categories; 0 = accept anything }
+    FAccepts: LongInt;    { bitmask of categories; 0 = accept anything }
   public
-    constructor Create(AParent: TWidget; acceptMask: Longint);
+    constructor Create(AParent: TWidget; acceptMask: LongInt);
     procedure Draw(cv: TCanvas); override;
 
     { ---- drag source: picking the item up ---- }
@@ -546,7 +546,7 @@ end;
 
 function TItemSlot.DragAccepts(it: TDragItem): Boolean;
 begin
-  Result := (FAccepts = 0) or ((FAccepts and it.category) <> 0);
+  Result := (FAccepts = 0) or ((FAccepts and it.Category) <> 0);
 end;
 
 procedure TItemSlot.DragDrop(it: TDragItem; const p: TPoint);
@@ -590,17 +590,17 @@ type
   private
     FTabs:  TTabBar;
     FPages: array of TItemGrid;
-    procedure HandleTabChange(index: Longint);
+    procedure HandleTabChange(index: LongInt);
   public
-    constructor Create(AParent: TWidget; pageCount, cols, rows, accept: Longint);
-    procedure ShowPage(i: Longint);
-    function  Page(i: Longint): TItemGrid;
+    constructor Create(AParent: TWidget; pageCount, cols, rows, accept: LongInt);
+    procedure ShowPage(i: LongInt);
+    function  Page(i: LongInt): TItemGrid;
   end;
 
 constructor TInventoryWindow.Create(AParent: TWidget;
-  pageCount, cols, rows, accept: Longint);
+  pageCount, cols, rows, accept: LongInt);
 var
-  i: Longint;
+  i: LongInt;
 begin
   inherited Create(AParent, 'Inventory', [wfClose, wfDrag, wfZoom]);
   FTabs := TTabBar.Create(Content);
@@ -613,9 +613,9 @@ begin
   end;
 end;
 
-procedure TInventoryWindow.ShowPage(i: Longint);
+procedure TInventoryWindow.ShowPage(i: LongInt);
 var
-  k: Longint;
+  k: LongInt;
 begin
   for k := 0 to High(FPages) do
     FPages[k].Visible := (k = i);
@@ -715,11 +715,11 @@ type
   public
     constructor Create(AParent: TWidget; figure: TBitmap);
     procedure Draw(cv: TCanvas); override;        { figure first, slots on top }
-    procedure PlaceSlot(s: TBodySlot; const at: TRect; accept: Longint);
+    procedure PlaceSlot(s: TBodySlot; const at: TRect; accept: LongInt);
     property  Slot[s: TBodySlot]: TItemSlot read GetSlot;
   end;
 
-procedure TPaperdoll.PlaceSlot(s: TBodySlot; const at: TRect; accept: Longint);
+procedure TPaperdoll.PlaceSlot(s: TBodySlot; const at: TRect; accept: LongInt);
 begin
   FSlots[s] := TItemSlot.Create(Self, accept);
   FSlots[s].Bounds := at;
@@ -727,7 +727,7 @@ end;
 
 procedure TPaperdoll.Draw(cv: TCanvas);
 begin
-  cv.DrawBitmap(LocalToRoot(Point(0, 0)).x, LocalToRoot(Point(0, 0)).y, FFigure);
+  cv.DrawBitmap(LocalToRoot(Point(0, 0)).X, LocalToRoot(Point(0, 0)).Y, FFigure);
   inherited Draw(cv);          { the slots paint over the figure }
 end;
 ```
@@ -857,8 +857,8 @@ end;
 
 procedure TScrollView.OnMouseWheel(var e: TUIEvent);
 begin
-  SetScrollY(FScrollY - e.wheel * 24);
-  e.handled := True;
+  SetScrollY(FScrollY - e.Wheel * 24);
+  e.Handled := True;
 end;
 ```
 
@@ -880,14 +880,14 @@ arrangement."
 procedure TDeskIcon.OnMouseDown(var e: TUIEvent);
 var a: TRect;
 begin
-  if (e.button = 2) or e.ctrl then begin        { right-click or control-click }
-    FView.OpenMenuFor(Self, e.pos);
+  if (e.Button = 2) or e.Ctrl then begin        { right-click or control-click }
+    FView.OpenMenuFor(Self, e.Pos);
     exit;
   end;
   FMoving := True;                                { left press begins a free move }
   a := AbsRect;
-  FGrabDX := e.pos.x - a.left;
-  FGrabDY := e.pos.y - a.top;
+  FGrabDX := e.Pos.X - a.Left;
+  FGrabDY := e.Pos.Y - a.Top;
 end;
 ```
 
@@ -909,7 +909,7 @@ begin
   if FMenuTarget = nil then exit;
   case index of
     1: AddIcon(FMenuTarget.Caption, FMenuTarget.Color, FMenuTarget.Glyph,
-               FMenuTarget.Bounds.left + 18, FMenuTarget.Bounds.top + 18);   { Duplicate }
+               FMenuTarget.Bounds.Left + 18, FMenuTarget.Bounds.Top + 18);   { Duplicate }
     2: begin RemoveChild(FMenuTarget); FMenuTarget.Free; end;                 { Delete }
   end;
   FMenuTarget := nil;
