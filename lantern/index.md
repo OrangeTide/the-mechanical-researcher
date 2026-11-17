@@ -87,7 +87,7 @@ rule; the new constraints decided which rules to keep and which to change.
 | netchan-v3 | A Noise/WireGuard-shaped encryption decorator the core never sees | Yes, as `Lantern.Crypto` |
 | netchan-v4 | A server host key, TOFU `known_hosts`, an ssh-shaped login | Yes, as `Lantern.Auth` |
 
-Two lessons are less visible because they were learned as bugs, after the
+Three lessons are less visible because they were learned as bugs, after the
 articles were first published. They are baked into this design from the start.
 
 **One clock, owned by the caller, passed to every entry point.** The original
@@ -105,6 +105,18 @@ had already moved on and ignored the retransmitted init. Lantern's admission
 logic re-sends the accept when the established peer repeats its init, treats a
 repeated accept as idempotent, and refuses to let a stray or mismatched id
 disturb a live connection.
+
+**A live connection's address is never adopted on sight.** The original netchan
+moved a connection to a new source address as soon as a datagram from it carried
+a frame for a known channel. An attacker who learns a connection id can forge
+that frame, so adopting the address on sight was a hijack and amplification
+primitive: it let the attacker redirect the flow to itself, or bounce amplified
+traffic at a victim whose address it supplied. Upstream netchan now challenges a
+new address with an unguessable nonce and migrates only once the nonce is echoed
+back. Lantern is LAN-first and does not roam a live connection at all: a client
+whose address changes re-handshakes rather than having the server silently
+follow it. If migration is ever added, it must carry that same return-routability
+challenge, for the same reason the admission handshake carries a cookie.
 
 ### Discovery: The Beacon
 
