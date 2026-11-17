@@ -444,7 +444,8 @@ The companion download is the snapshot this article describes, and the API and
 handshake above still match it. The [upstream
 repository](https://github.com/OrangeTide/netchan) has since fixed three
 correctness bugs in the core, each of which hides inside a description above
-that reads as settled.
+that reads as settled, and then closed a security weakness in the connection
+migration this article presents as safe.
 
 **A lost `CONNECT_ACCEPT` stranded the client (0.9.3).** The two-frame handshake
 retries `CONNECT_INIT` five times, which sounds like enough. But a server that
@@ -473,8 +474,24 @@ already did, so a single caller-owned clock stamps and compares everything. That
 changes the two signatures printed in the API listing above, which is why it is
 a major-version bump and not a drop-in replacement for a vendored copy.
 
-The wire format is unchanged across all three, so these are corrections to the
-implementation, not to the protocol the rest of this article describes.
+**Adopt-on-sight migration was a hijack and amplification primitive (0.12.0).**
+The Connection Migration section above moves the peer to a new source address as
+soon as a datagram from it carries a DATA or ACK frame for a known channel, and
+calls a packet without that context spoofed and rejected. That check is weaker
+than it reads. An attacker who learns a connection id can forge such a frame, so
+the test the packet has to pass is not a secret, and adopting the address on
+sight lets the attacker redirect the flow to itself or bounce amplified traffic
+at a victim it names as the source. 0.12.0 stops trusting a new address on
+sight: the core answers it with an unguessable nonce in a `PATH_CHALLENGE` frame
+and moves the connection only once the nonce comes back in a `PATH_RESPONSE`. A
+genuine peer that has moved completes the round trip; a spoofed source never
+sees the challenge. It costs a migrating peer one extra round trip, and the
+first reliable message across the move is recovered by its ordinary retransmit.
+
+The first three fixes leave the wire format untouched, so they are corrections
+to the implementation rather than to the protocol the rest of this article
+describes. The migration change is not: it adds the two path frames and bumps
+the wire version, so a 0.11 peer and a 0.12 peer no longer complete a handshake.
 
 ## Conclusion
 
