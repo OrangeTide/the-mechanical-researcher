@@ -392,6 +392,31 @@ demo builds with the vendored [modular-make](/build-systems/), links the same
 `nc_crypto.c` the article dissects, and passes an ASan and UBSan clean loopback
 round-trip test.
 
+## Updates Since Publication
+
+The demo here is the snapshot this part describes. Two upstream changes since
+touch claims on the pages above.
+
+**Roaming now costs a round trip (0.12.0).** The roaming-through-encryption
+section says the server migrates the peer to a new source address the moment a
+datagram arrives from it. Upstream no longer moves on sight: adopting a new
+address that way was a hijack and amplification primitive, since an attacker who
+learns a connection id can forge the frame that used to authorize the move. The
+core now challenges the candidate address with an unguessable nonce and migrates
+only once it is echoed back. The point this part makes still holds, and holds
+for a better reason: because the session keys are per-connection and derived
+from the ephemeral public keys, a proven move needs no renegotiation. What
+changes is that the move is no longer instant; it is instant after one
+return-routability round trip. The change bumps netchan's wire version, so 0.11
+and 0.12 peers do not interoperate.
+
+**The clock became the caller's (0.10.0).** `netchan_feed` and
+`netchan_send_next` each gained the `now_ms` argument `netchan_service` already
+took, so one caller-owned clock stamps and compares every timer. The demo's
+`secure_link` passes `now_ms()` to `netchan_service`; against current upstream
+it would pass the same clock to all three. The listings here show the
+pre-0.10.0 signatures the snapshot ships.
+
 ## Conclusion
 
 `nc_crypto` answers a much narrower question than QUIC does, and it is a mistake
