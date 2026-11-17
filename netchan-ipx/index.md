@@ -137,6 +137,12 @@ Netchan's design survives the move to IPX and 16-bit DOS without much trouble; r
   the 16-bit variant this article describes is `microchan/` there, carrying
   the IPX and UDP transports, the `thor` game, and the Open Watcom makefile.
   It was renamed on import from `nc_*` to `mc_*`, because the two trees
-  otherwise both define `struct nc_addr` with different layouts. The demo
-  here is the snapshot the article describes, so take the repository for code
-  to build on and this directory for code to read alongside the text.
+  otherwise both define `struct nc_addr` with different layouts. Upstream has
+  since reached 0.12.0, whose headline fix challenges a new source address with
+  a return-routability nonce before a live connection follows it, since adopting
+  one on sight was a hijack and amplification primitive. That correction does
+  not reach `microchan`: an IPX client finds the host once by broadcast and
+  locks onto its unicast node for the rest of the match, so there is no
+  mid-session address to migrate to and nothing to challenge. The demo here is
+  the snapshot the article describes, so take the repository for code to build
+  on and this directory for code to read alongside the text.
