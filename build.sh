@@ -131,10 +131,13 @@ is_published() {
 # Build articles and collect card data
 # --------------------------------------------------------------------------
 
-CARDS_UNSORTED=""
-PACKAGES_JSON=""
-PACKAGES_SEP=""
+POSTS_UNSORTED=""
 RSS_ITEMS=""
+
+# Escape &, <, > for safe inclusion in HTML text
+html_escape() {
+    printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'
+}
 
 # Find topic directories (contain an index.md)
 for index_md in */index.md; do
@@ -299,21 +302,11 @@ for index_md in */index.md; do
     }' "$OUT_DIR/$slug/index.html" > "$OUT_DIR/$slug/index.html.tmp"
     mv "$OUT_DIR/$slug/index.html.tmp" "$OUT_DIR/$slug/index.html"
 
-    # Collect card data for the index page (as JS object literal)
-    # Escape strings for JS
-    js_title="$(printf '%s' "$title" | sed 's/\\/\\\\/g; s/"/\\"/g')"
-    js_abstract="$(printf '%s' "$abstract" | sed 's/\\/\\\\/g; s/"/\\"/g')"
-    js_category="$(printf '%s' "$category" | sed 's/\\/\\\\/g; s/"/\\"/g')"
-
-    # Prefix with date for sorting (newest first); TAB separates date from JSON
-    js_revised_display="$(printf '%s' "$revised_display" | sed 's/\\/\\\\/g; s/"/\\"/g')"
-
-    CARDS_UNSORTED="${CARDS_UNSORTED}
-${date}	{\"title\":\"${js_title}\",\"abstract\":\"${js_abstract}\",\"date\":\"${date}\",\"dateDisplay\":\"${date_display}\",\"revisedDisplay\":\"${js_revised_display}\",\"category\":\"${js_category}\",\"url\":\"${slug}/index.html\"}"
-
     # ZIP source code directories (demo/) for download. Prefer the tracked
     # file list so build output (_out/, _build/, cmake build/, .gen/) stays out
     # of the archive; fall back to a plain recursive zip outside a git checkout.
+    # The per-post download link on the index is built from the result.
+    post_source_html=""
     if [ -d "$topic_dir/demo" ]; then
         zip_name="${slug}-source.zip"
         if (cd "$topic_dir" && git rev-parse --is-inside-work-tree >/dev/null 2>&1); then
@@ -329,9 +322,26 @@ ${date}	{\"title\":\"${js_title}\",\"abstract\":\"${js_abstract}\",\"date\":\"${
         else
             zip_display="$(awk "BEGIN{printf \"%.0f KB\", $zip_size/1024}")"
         fi
-        PACKAGES_JSON="${PACKAGES_JSON}${PACKAGES_SEP}{\"name\":\"${js_title}\",\"zip\":\"${slug}/${zip_name}\",\"date\":\"${date}\",\"dateDisplay\":\"${date_display}\",\"size\":\"${zip_display}\",\"article\":\"${slug}/index.html\"}"
-        PACKAGES_SEP=","
+        post_source_html="<a class=\"post-source\" href=\"${slug}/${zip_name}\" download>Source ZIP (${zip_display})</a>"
     fi
+
+    # Collect the index entry. Fields are HTML-escaped, the markup is kept on a
+    # single line so the whole entry survives date-sorting as one record (TAB
+    # separates the sort key from the markup).
+    esc_title="$(html_escape "$title")"
+    esc_abstract="$(html_escape "$abstract")"
+    esc_category="$(html_escape "$category")"
+
+    if [ -n "$revised_display" ]; then
+        post_revised_html="<span class=\"post-revised\">rev. ${revised_display}</span>"
+    else
+        post_revised_html=""
+    fi
+
+    post_html="<article class=\"post\"><div class=\"post-meta\"><span class=\"post-category\">${esc_category}</span><time datetime=\"${date}\">${date_display}</time>${post_revised_html}</div><h2 class=\"post-title\"><a href=\"${slug}/index.html\">${esc_title}</a></h2><p class=\"post-abstract\">${esc_abstract}</p>${post_source_html}</article>"
+
+    POSTS_UNSORTED="${POSTS_UNSORTED}
+${date}	${post_html}"
 
     # Collect RSS item
     rss_date="$(date -d "$date" -R 2>/dev/null || echo "$date")"
@@ -351,19 +361,27 @@ ${date}	{\"title\":\"${js_title}\",\"abstract\":\"${js_abstract}\",\"date\":\"${
 done
 
 # --------------------------------------------------------------------------
-# Sort cards by date (newest first)
+# Sort entries by date (newest first)
 # --------------------------------------------------------------------------
 
-CARDS_JSON="$(printf '%s\n' "$CARDS_UNSORTED" | grep '	' | sort -t'	' -k1,1r | cut -f2- | paste -sd',')"
+POSTS_HTML="$(printf '%s\n' "$POSTS_UNSORTED" | grep '	' | sort -t'	' -k1,1r | cut -f2-)"
 
 # --------------------------------------------------------------------------
 # Build index page
 # --------------------------------------------------------------------------
 
-# Inject cards and packages JSON into the index template
-sed -e "s|{{CARDS}}|${CARDS_JSON}|" \
-    -e "s|{{PACKAGES}}|${PACKAGES_JSON}|" \
-    "$TEMPLATE_DIR/index.html" > "$OUT_DIR/index.html"
+# Inject the post list into the index template. awk via ENVIRON handles the
+# multi-line markup safely (sed cannot carry newlines in a replacement).
+_AWK_POSTS="$POSTS_HTML" awk 'BEGIN{posts=ENVIRON["_AWK_POSTS"]} {
+    idx = index($0, "{{POSTS}}")
+    if (idx > 0) {
+        print substr($0, 1, idx-1)
+        print posts
+        print substr($0, idx+9)
+    } else {
+        print
+    }
+}' "$TEMPLATE_DIR/index.html" > "$OUT_DIR/index.html"
 
 # --------------------------------------------------------------------------
 # Build RSS feed
@@ -385,4 +403,4 @@ RSSEOF
 
 echo ""
 echo "Site built in: $OUT_DIR"
-echo "Cards: $(printf '%s' "$CARDS_JSON" | grep -o '{' | wc -l)"
+echo "Entries: $(printf '%s' "$POSTS_HTML" | grep -c '<article class="post">')"
