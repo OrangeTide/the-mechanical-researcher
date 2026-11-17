@@ -494,6 +494,44 @@ past this protocol: a green suite proves only what it exercises, a sliding
 window's floor tracks acknowledgment and never transmission, and reviving dead
 code can wake more dead code sleeping behind it.
 
+## Updates Since Publication
+
+The demo here is the snapshot this part describes, and its code and prose still
+match. The upstream library has since moved on in ways that touch the pages
+above.
+
+**The clock became the caller's (0.10.0).** The three signatures this part
+reduces to their essence each gained a `now_ms` argument: `netchan_feed` and
+`netchan_send_next` now take the same millisecond clock `netchan_service`
+already did. Earlier the core stamped receive and send times from its own clock
+read inside `feed` while `service` compared them against a clock the caller
+sampled a moment later, and a millisecond of skew between the two reads could
+underflow an unsigned idle timer and close a connection the instant it came up.
+Routing one caller-owned clock through every entry point removes the cause. The
+signatures printed above are the pre-0.10.0 ones the snapshot ships.
+
+**Adopt-on-sight migration was a hijack and amplification primitive (0.12.0).**
+This part presents migration as a `memcmp` over `nc_addr` bytes guarded by a
+`validate_migration` check for a live frame on a known channel. An attacker who
+learns a connection id can forge that frame, so adopting the new address on
+sight lets it redirect the flow to itself or bounce amplified traffic at a
+victim whose address it supplies. 0.12.0 no longer trusts a new address on
+sight: it challenges the candidate with an unguessable nonce and moves the
+connection only once the nonce is echoed back, one extra round trip for a peer
+that genuinely moved and a dead end for a spoofed one. This adds two frames and
+bumps the wire version, so 0.11 and 0.12 peers do not interoperate. The seam is
+unaffected: the challenge lives in the core, above the `nc_addr` the transports
+fill, so every backend inherits it for free.
+
+**The seam's forward-looking claims arrived upstream.** This part guesses that
+the next transports are WebRTC and WebSocket, and that `CONNECT_REDIRECT` points
+the way toward NAT traversal. Upstream 0.12.0 adds a `nat/` layer that learns a
+host's public address over STUN and encodes it as a short typo-checked room
+code, and a `reach/` layer that punches a path between two peers behind NATs
+over that same redirect path. Both are siblings of the core that open no socket
+and run no timer, the same shape as the crypto decorator here, and both speak
+`nc_addr`, so an address they produce drops straight into `netchan_connect`.
+
 ## Conclusion
 
 The change at the center of this part stays small: one new type, `nc_addr`, and
