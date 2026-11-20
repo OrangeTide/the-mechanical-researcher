@@ -24,3 +24,4 @@ rv32-interrupts
 rv32-coverage
 lantern
 pascal-game-gui
+pascal-game-gui-v2

@@ -1,0 +1,9 @@
+build/
+libgui.so
+demo_native
+bindings/c/example_c
+bindings/lua/gui.so
+bindings/python/__pycache__/
+*.bmp
+*.o
+*.ppu

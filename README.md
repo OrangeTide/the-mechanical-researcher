@@ -32,6 +32,7 @@ A collection of research topics, primarily gathered through agentic AI sessions,
 - [Coverage Told Us About the Bug and We Did Not Listen](rv32-coverage/)
 - [Lantern: A Static Reliable-Channel Library for FreePascal](lantern/)
 - [Windows Over the Game World: A Retained-Mode GUI for FreePascal](pascal-game-gui/)
+- [One Core, Four Languages: A C ABI for a Pascal Game GUI](pascal-game-gui-v2/)
 - [Component Pascal](notes/component-pascal.md)
 
 ## Build & Deploy
