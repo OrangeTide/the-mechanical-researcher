@@ -114,6 +114,9 @@ body {
 }
 
 .post {
+  display: flex;
+  gap: 1.25rem;
+  align-items: flex-start;
   padding: 1.75rem 0;
   border-top: 1px solid var(--rule);
 }
@@ -121,6 +124,68 @@ body {
 .post:first-child {
   border-top: none;
   padding-top: 0.5rem;
+}
+
+.post-body {
+  order: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Thumbnail: a small framed preview, sitting to the right of the text. */
+.post-thumb {
+  order: 1;
+  flex: 0 0 auto;
+  width: 160px;
+  height: 112px;
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--paper-raised);
+}
+
+.post-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* A live, scaled-down preview of the article's own first page, used when the
+   article has no image of its own. The iframe is laid out at a fixed design
+   size and scaled into the thumbnail box; it never receives pointer events. */
+.post-thumb-page {
+  position: relative;
+}
+
+.post-thumb-page iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 900px;
+  height: 630px;
+  border: 0;
+  transform: scale(0.1778);
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+
+@media (max-width: 600px) {
+  .post {
+    flex-direction: column;
+  }
+  .post-thumb {
+    order: -1;          /* image thumbnails move above the text on phones */
+    width: 100%;
+    height: 160px;
+    margin-bottom: 0.25rem;
+  }
+  .post-thumb img {
+    object-fit: cover;
+  }
+  .post-thumb-page {
+    display: none;      /* the fixed-scale page preview does not reflow; hide it */
+  }
 }
 
 .post-meta {

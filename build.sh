@@ -338,7 +338,32 @@ for index_md in */index.md; do
         post_revised_html=""
     fi
 
-    post_html="<article class=\"post\"><div class=\"post-meta\"><span class=\"post-category\">${esc_category}</span><time datetime=\"${date}\">${date_display}</time>${post_revised_html}</div><h2 class=\"post-title\"><a href=\"${slug}/index.html\">${esc_title}</a></h2><p class=\"post-abstract\">${esc_abstract}</p>${post_source_html}</article>"
+    # Thumbnail. Prefer an interesting image: a hand-picked thumb.* or
+    # screenshot.* in the topic dir, else the first local image the article
+    # itself shows (a screenshot or a diagram, raster or SVG). If the article
+    # has no image, fall back to a live, scaled-down preview of its own first
+    # page in an iframe. The iframe needs no build-time tooling and never goes
+    # stale, so it works in CI where only lowdown and zip are installed.
+    thumb_src=""
+    for cand in thumb.png thumb.jpg thumb.jpeg thumb.webp \
+                screenshot.png screenshot.jpg screenshot.jpeg screenshot.webp; do
+        if [ -f "$topic_dir/$cand" ]; then thumb_src="$cand"; break; fi
+    done
+    if [ -z "$thumb_src" ]; then
+        first_img="$(grep -oE 'src="[^"]+\.(png|jpg|jpeg|webp|gif|svg)"' "$index_md" \
+                     | head -1 | sed 's/.*src="//; s/"$//')"
+        case "$first_img" in
+            http*|'') : ;;
+            *) [ -f "$topic_dir/$first_img" ] && thumb_src="$first_img" ;;
+        esac
+    fi
+    if [ -n "$thumb_src" ]; then
+        post_thumb_html="<div class=\"post-thumb\"><img src=\"${slug}/${thumb_src}\" alt=\"\" loading=\"lazy\"></div>"
+    else
+        post_thumb_html="<div class=\"post-thumb post-thumb-page\"><iframe src=\"${slug}/index.html\" loading=\"lazy\" scrolling=\"no\" tabindex=\"-1\" aria-hidden=\"true\" title=\"\"></iframe></div>"
+    fi
+
+    post_html="<article class=\"post\">${post_thumb_html}<div class=\"post-body\"><div class=\"post-meta\"><span class=\"post-category\">${esc_category}</span><time datetime=\"${date}\">${date_display}</time>${post_revised_html}</div><h2 class=\"post-title\"><a href=\"${slug}/index.html\">${esc_title}</a></h2><p class=\"post-abstract\">${esc_abstract}</p>${post_source_html}</div></article>"
 
     POSTS_UNSORTED="${POSTS_UNSORTED}
 ${date}	${post_html}"
