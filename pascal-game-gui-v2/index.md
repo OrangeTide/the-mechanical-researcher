@@ -31,7 +31,7 @@ compiles it to a shared library with a flat C ABI, and drives the same core,
 unchanged, from four languages: Pascal natively, and C, Lua, and Python through
 the ABI. The substance of the work is the boundary, not the widgets.
 
-<img src="themes.png" alt="Two screenshots side by side showing the identical GUI scene rendered in two themes. On the left, the System 7 theme: white windows with striped title bars, an Inventory window with Bag, Quest, and Keys tabs over a grid of beige item slots holding lettered tiles, and an Equipment window with a gray humanoid figure surrounded by equipment slots. On the right, the same scene in the NES theme: black panels with bright blue double borders, solid blue title bars, white uppercase text, and the same inventory grid and equipment figure drawn in the Mega Man menu palette.">
+<img src="themes.gif" alt="An animation of one GUI scene swapping its theme at run time. The scene holds in the System 7 theme (white windows with striped title bars, an Inventory window with Bag, Quest, and Keys tabs over a grid of beige item slots holding lettered tiles, and an Equipment window with a gray humanoid figure surrounded by equipment slots), then dissolves into the NES theme (the same windows and figure drawn as black panels with bright blue double borders, solid blue title bars, and white uppercase text), holds there, and dissolves back. The widget tree never changes; only the theme does.">
 
 ## Abstract
 
@@ -316,10 +316,10 @@ and the core never had to know they were coming.
 The theme seam also survives to the ABI, and it swaps live. A desktop is created
 with a theme id, `GUI_THEME_SYSTEM7` or `GUI_THEME_NES`, and `gui_desktop_set_theme`
 replaces it at any time. The call builds the new theme, installs it, and frees the
-one it replaced; the next frame repaints the whole tree through it. The two themes
-in the screenshot are the identical scene, the identical widget tree, the identical
-drag protocol. The only difference is which `TTheme` the desktop is holding at that
-instant.
+one it replaced; the next frame repaints the whole tree through it. The animation
+at the top of this article is exactly that swap: one scene, the identical widget
+tree, the identical drag protocol, dissolving between the two themes. The only
+difference from frame to frame is which `TTheme` the desktop is holding.
 
 Every binding's demo binds the `T` key to the toggle, and the mechanism shows the
 event design paying off: the SDL run loop puts a key-press on the same pull queue
